@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# LoopForge runtime data
+.loopforge/report.json
+
+# OS files
+.DS_Store
+*.log

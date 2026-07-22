@@ -1,0 +1,36 @@
+{
+  "name": "LoopForge Project",
+  "version": "1.0.0",
+  "strategy": "creator",
+  "skills": {
+    "directory": ".loopforge/skills",
+    "activeSkills": []
+  },
+  "harness": {
+    "runners": [
+      {
+        "name": "Unit Tests",
+        "type": "unit",
+        "command": "npm test",
+        "timeoutMs": 60000
+      },
+      {
+        "name": "Linter & Typecheck",
+        "type": "typecheck",
+        "command": "npm run check",
+        "timeoutMs": 30000
+      }
+    ]
+  },
+  "guardrails": {
+    "maxIterations": 10,
+    "maxConsecutiveFailures": 3,
+    "stopOnSuccess": true,
+    "allowGitRollback": true
+  },
+  "memory": {
+    "lessonsFile": ".loopforge/lessons.md",
+    "handoffFile": ".loopforge/handoff.md",
+    "autoUpdateLessons": true
+  }
+}
