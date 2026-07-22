@@ -5,28 +5,34 @@
 O LoopForge é estruturado em camadas concêntricas ao redor do **Loop Engine**, que orquestra ciclos de desenvolvimento autônomos. Cada camada é isolada por interfaces bem definidas, permitindo substituição de implementações sem impacto nas demais.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLI Layer                              │
-│  Commander-based: init, run, bootstrap, refactor, ui, ...    │
-├─────────────────────────────────────────────────────────────┤
-│                     Orchestration Layer                        │
-│  ┌─────────────┐  ┌──────────────────┐  ┌────────────────┐   │
-│  │ Loop Engine  │  │ Refactor Engine  │  │ Web Dashboard  │   │
-│  │ (core/loop)  │  │ (core/refactor)  │  │ (ui/server)    │   │
-│  └──────┬───────┘  └──────────────────┘  └────────────────┘   │
-├─────────┼───────────────────────────────────────────────────┤
-│         │            Domain Services                           │
-│  ┌──────▼──────┐ ┌────────┐ ┌──────────┐ ┌──────────────┐   │
-│  │   Harness    │ │ Memory  │ │  Swarm   │ │     Git      │   │
-│  │ (validação)  │ │ (cache) │ │ (agentes)│ │  (sandbox)   │   │
-│  └──────┬──────┘ └────────┘ └─────┬────┘ └──────┬───────┘   │
-├─────────┼─────────────────────────┼─────────────┼───────────┤
-│         │       Infrastructure      │             │            │
-│  ┌──────▼──────┐  ┌──────────┐  ┌──▼────────┐ ┌─▼────────┐ │
-│  │ LLM Provider │  │   RAG    │  │ Circuit   │ │  CI/CD   │ │
-│  │ (fallback)   │  │ (indexer) │  │ Breaker   │ │ Webhook  │ │
-│  └─────────────┘  └──────────┘  └───────────┘ └──────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                         CLI Layer                                     │
+│  init  run  bootstrap  refactor  workspace  audit  wizard  replay    │
+│  ui  ci:setup  status                                                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                      Orchestration Layer                               │
+│  ┌─────────────┐  ┌──────────────────┐  ┌──────────────────┐        │
+│  │ Loop Engine  │  │ Refactor Engine  │  │ Workspace Orch.  │        │
+│  │ (core/loop)  │  │ (core/refactor)  │  │ (core/workspace) │        │
+│  └──────┬───────┘  └──────────────────┘  └──────────────────┘        │
+├─────────┼───────────────────────────────────────────────────────────┤
+│         │              Domain Services                                 │
+│  ┌──────▼──────┐ ┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│  │   Harness    │ │ Memory │ │  Swarm   │ │Security  │ │   Git    │ │
+│  │ (validação)  │ │ (cache)│ │ (agentes)│ │ Scanner  │ │ (sandbox)│ │
+│  └──────┬──────┘ └────────┘ └─────┬────┘ └──────────┘ └────┬─────┘ │
+├─────────┼─────────────────────────┼────────────────────────┼───────┤
+│         │       Infrastructure      │                        │        │
+│  ┌──────▼──────┐ ┌──────────┐  ┌──▼──────────┐  ┌─────────▼─┐   │
+│  │ LLM Provider │ │   RAG    │  │   Circuit    │  │  CI/CD    │   │
+│  │ (+ Ollama)   │ │ (hash    │  │   Breaker    │  │ + Webhook │   │
+│  │              │ │  cache)  │  │ (+ budget)   │  │           │   │
+│  └─────────────┘ └──────────┘  └─────────────┘  └───────────┘   │
+│  ┌───────────────────────────────────────────────────────────┐   │
+│  │              Cross-Cutting: Telemetry Recorder              │   │
+│  │      .loopforge/telemetry/{sessionId}.json → Replay CLI     │   │
+│  └───────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -66,6 +72,7 @@ Sistema multi-runner que executa comandos e estrutura falhas.
 ### Runner (`runner.ts`)
 - Executa comandos bash com timeout
 - Captura stdout/stderr de forma estruturada
+- **Execução paralela**: runners configurados disparam simultaneamente via `Promise.all` (padrão: ativado)
 
 ### Parser (`parser.ts`)
 - Parseia saídas de diferentes tipos de runner:
@@ -85,6 +92,10 @@ Sistema multi-runner que executa comandos e estrutura falhas.
 ### Self-Healing (`self-healing.ts`)
 - Identifica testes desatualizados ou mocks quebrados
 - Corrige automaticamente sem intervenção manual
+
+### Types (`types.ts`)
+- `RunnerResult`: resultado estruturado de cada runner
+- `HarnessExecutionSummary`: sumário da execução completa
 
 ---
 
@@ -122,27 +133,49 @@ Cada papel recebe o output do anterior como contexto, formando um pipeline de qu
 
 ## LLM Provider (`src/llm/provider.ts`)
 
-Sistema de provedor com fallback automático:
+Sistema de provedor com fallback automático e suporte a LLMs locais:
 
 | Provedor | Modelo | Uso |
 |---|---|---|
 | `opencode` (padrão) | DeepSeek v4 free | Ciclo normal |
-| `fallback` | Anthropic Claude 3.5 Sonnet | Após falhas consecutivas |
+| `ollama` | Modelo local (qwen2.5-coder, etc.) | Offline / custo zero |
+| `openai` | GPT-4, GPT-3.5 | API externa |
+| `anthropic` | Claude 3.5 Sonnet | API externa |
+| `custom` | URL base customizada | Providers arbitrários |
 
-O fallback é ativado quando o número de falhas consecutivas atinge o limiar configurado (`fallbackFailureThreshold`, padrão: 2).
+### Ollama Local
+- Conecta a `http://localhost:11434/api/generate`
+- Custo $0.00, 100% offline
+- Mapeia modelos automaticamente (deepseek* → qwen2.5-coder)
+
+### Model Fallback
+- Ativado quando falhas consecutivas atingem o limiar configurado (`fallbackFailureThreshold`, padrão: 2)
+- Escalona para modelo secundário automaticamente
+
+### Retry Exponencial com Jitter
+- Trata erros temporários de rede e HTTP 429 (rate limit)
+- Backoff exponencial com variação aleatória antes de ativar fallback
 
 ---
 
-## Guardrails (`src/guardrails/circuit-breaker.ts`)
+## Guardrails (`src/guardrails/`)
 
-### Circuit Breaker
-- Monitora falhas consecutivas do harness
-- **Threshold**: 3 falhas consecutivas (configurável)
-- **Ação**: Interrompe o ciclo e retorna estado de falha
+### Circuit Breaker (`circuit-breaker.ts`)
+- Monitora falhas consecutivas, iterações totais e custo acumulado
+- Três condições de abertura:
+  - **Falhas**: `maxConsecutiveFailures` (padrão: 3)
+  - **Iterações**: `maxTotalIterations` (padrão: 10)
+  - **Orçamento**: `maxBudgetUsd` (padrão: $5.00) — trava financeira que interrompe o loop se o custo ultrapassar o limite
+
+### Security Scanner (`security-scanner.ts`)
+- Varredura estática de segurança no código-fonte
+- Detecta:
+  - **Secrets expostos**: chaves de API (sk-), tokens AWS (AKIA), JWT
+  - **SQL Injection**: strings SQL concatenadas com template strings
+  - **Código inseguro**: eval() e similares
 
 ### Proteções
-- `maxIterations`: limite máximo de iterações (padrão: 10)
-- `stopOnSuccess`: para ao primeiro ciclo bem-sucedido
+- `requireCleanGit`: bloqueia execução se repo tem mudanças não commitadas
 - `allowGitRollback`: reverte mudanças em caso de falha
 
 ---
@@ -153,8 +186,18 @@ Indexador semântico de código-fonte para repositórios grandes:
 
 - Extrai símbolos (funções, classes, interfaces, tipos)
 - Armazena em `.loopforge/index/symbols.json`
+- **Cache incremental por hash SHA-256**: re-indexa estritamente arquivos modificados
 - Permite consultas contextuais durante o ciclo do Loop Engine
 - Reduz custo de LLM ao fornecer apenas contexto relevante
+
+---
+
+## Memory Manager (`src/memory/manager.ts`)
+
+- Persistência de lições aprendidas em `.loopforge/lessons.md`
+- Instruções de transição (handoff) em `.loopforge/handoff.md`
+- **Git Diff Stat Semântico**: inclui no handoff o resumo `git diff --stat` das linhas alteradas no ciclo anterior
+- Suporte a `maxLessonsPrompt`: limita quantidade de lições injetadas no prompt do LLM
 
 ---
 
@@ -170,7 +213,32 @@ Indexador semântico de código-fonte para repositórios grandes:
 
 ---
 
-## TUI e Web Dashboard (`src/ui/`)
+## Telemetry & Recorder (`src/telemetry/recorder.ts`)
+
+- Grava histórico quadro-a-quadro da execução em `.loopforge/telemetry/{sessionId}.json`
+- Cada frame contém: timestamp, iteração, papel do agente, modelo, se fallback está ativo, status do harness
+- Reprodução em tempo real via `loopforge replay <sessionId>`
+
+---
+
+## Workspace Orchestrator (`src/core/workspace.ts`)
+
+- Executa loops em lote através de múltiplos projetos
+- Lê manifesto `loopforge-workspace.json` com lista de projetos
+- Instancia `LoopEngine` para cada projeto sequencialmente
+- Coleta resultados agregados por projeto
+
+---
+
+## CLI Wizard (`src/cli/commands/wizard.ts`)
+
+- Assistente interativo de configuração e onboarding
+- Sequência guiada: `init` (template Node/TS) → `bootstrap` → sumário final
+- Ideal para novos usuários do LoopForge
+
+---
+
+## TUI, Web Dashboard & Logger (`src/ui/`)
 
 ### Terminal UI (`tui.ts`)
 - Visualizador de progresso no terminal

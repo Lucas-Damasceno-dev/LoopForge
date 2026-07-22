@@ -12,26 +12,44 @@ export async function isGitRepo(cwd: string = "."): Promise<boolean> {
   }
 }
 
-export async function createCheckpoint(message: string, cwd: string = "."): Promise<boolean> {
-  if (!(await isGitRepo(cwd))) return false;
-
+export async function createCheckpoint(message: string, cwd: string = "."): Promise<string> {
+  if (!(await isGitRepo(cwd))) return "";
   try {
-    await execAsync("git add -A", { cwd });
-    await execAsync(`git commit -m "loopforge: checkpoint - ${message}" --allow-empty`, { cwd });
+    const timestamp = Date.now();
+    const tag = `loopforge-ckpt-${timestamp}`;
+    await execAsync(`git stash push -m "${message} (${tag})"`, { cwd });
+    return tag;
+  } catch {
+    return "";
+  }
+}
+
+export async function rollbackToCheckpoint(cwd: string = "."): Promise<boolean> {
+  if (!(await isGitRepo(cwd))) return false;
+  try {
+    await execAsync("git stash pop", { cwd });
     return true;
   } catch {
     return false;
   }
 }
 
-export async function rollbackToCheckpoint(cwd: string = "."): Promise<boolean> {
-  if (!(await isGitRepo(cwd))) return false;
-
+export async function cleanupOldCheckpoints(cwd: string = "."): Promise<number> {
+  if (!(await isGitRepo(cwd))) return 0;
   try {
-    await execAsync("git reset --hard HEAD", { cwd });
-    await execAsync("git clean -fd", { cwd });
-    return true;
+    const { stdout } = await execAsync("git stash list", { cwd });
+    const lines = stdout.split("\n").filter((l) => l.includes("loopforge-ckpt-"));
+
+    let cleaned = 0;
+    for (const line of lines) {
+      const match = line.match(/stash@\{(\d+)\}/);
+      if (match) {
+        await execAsync(`git stash drop stash@{${match[1]}}`, { cwd }).catch(() => {});
+        cleaned++;
+      }
+    }
+    return cleaned;
   } catch {
-    return false;
+    return 0;
   }
 }

@@ -1,67 +1,46 @@
 import chalk from "chalk";
-import type { HarnessExecutionSummary } from "../harness/types.js";
-import type { SwarmStepResult } from "../agents/swarm.js";
 
-export function renderTUIDashboard(options: {
+export interface TUIDashboardState {
   iteration: number;
-  strategy: string;
+  currentRole: string;
   activeModel: string;
   isFallback: boolean;
-  harnessSummary?: HarnessExecutionSummary;
-  swarmSteps?: SwarmStepResult[];
-  lessonsSnippet?: string;
-}): void {
-  // Limpar tela do terminal para efeito de Dashboard TUI Interativo
-  process.stdout.write("\x1Bc");
-
-  const border = chalk.bold.blue("╔" + "═".repeat(68) + "╗");
-  const bottomBorder = chalk.bold.blue("╚" + "═".repeat(68) + "╝");
-
-  console.log(border);
-  console.log(chalk.bold.blue("║") + chalk.bold.cyan(" 🚀 LOOPFORGE ENTERPRISE TUI DASHBOARD v2.0").padEnd(76) + chalk.bold.blue("║"));
-  console.log(chalk.bold.blue("╠" + "═".repeat(68) + "╣"));
-
-  const modelBadge = options.isFallback
-    ? chalk.bgRed.white.bold(" MODEL FALLBACK: ACTIVATED ")
-    : chalk.bgGreen.black.bold(" OPENCODE DEEPSEEK FREE ");
-
-  console.log(chalk.bold.blue("║") + ` Iteração: #${options.iteration} | Estratégia: ${options.strategy.toUpperCase()} | ${modelBadge}`.padEnd(81) + chalk.bold.blue("║"));
-  console.log(chalk.bold.blue("║") + ` Modelo Ativo: ${chalk.bold(options.activeModel)}`.padEnd(76) + chalk.bold.blue("║"));
-
-  if (options.swarmSteps && options.swarmSteps.length > 0) {
-    console.log(chalk.bold.blue("╠" + "─".repeat(68) + "╣"));
-    console.log(chalk.bold.blue("║") + chalk.bold.yellow(" 🤖 PIPELINE SWARM MULTI-AGENTE:").padEnd(75) + chalk.bold.blue("║"));
-    for (const step of options.swarmSteps) {
-      console.log(chalk.bold.blue("║") + `   ▶ ${chalk.bold(step.roleName)} [${step.modelUsed}]`.padEnd(74) + chalk.bold.blue("║"));
-    }
-  }
-
-  if (options.harnessSummary) {
-    console.log(chalk.bold.blue("╠" + "─".repeat(68) + "╣"));
-    const passRate = Math.round((options.harnessSummary.passedCount / options.harnessSummary.totalRunners) * 100);
-    const progressBar = renderProgressBar(passRate);
-    console.log(chalk.bold.blue("║") + ` 📊 SENSORES HARNESS: ${progressBar} ${passRate}%`.padEnd(76) + chalk.bold.blue("║"));
-
-    for (const runner of options.harnessSummary.results) {
-      const statusIcon = runner.passed ? chalk.green("✔ PASSOU") : chalk.red("✖ FALHOU");
-      console.log(chalk.bold.blue("║") + `   - ${runner.runnerName} (${runner.type.toUpperCase()}): ${statusIcon}`.padEnd(75) + chalk.bold.blue("║"));
-    }
-  }
-
-  if (options.lessonsSnippet) {
-    console.log(chalk.bold.blue("╠" + "─".repeat(68) + "╣"));
-    console.log(chalk.bold.blue("║") + chalk.bold.magenta(" 🧠 ÚLTIMAS LIÇÕES APRENDIDAS:").padEnd(75) + chalk.bold.blue("║"));
-    console.log(chalk.bold.blue("║") + `   ${options.lessonsSnippet.slice(0, 60)}...`.padEnd(74) + chalk.bold.blue("║"));
-  }
-
-  console.log(bottomBorder);
+  passRatePercent: number;
+  tokensUsed: number;
+  costUsd: number;
+  lastLesson: string;
+  streamingChunk?: string;
 }
 
-function renderProgressBar(percentage: number): string {
-  const totalBlocks = 15;
-  const filledBlocks = Math.round((percentage / 100) * totalBlocks);
-  const emptyBlocks = totalBlocks - filledBlocks;
-  const bar = "█".repeat(filledBlocks) + "░".repeat(emptyBlocks);
+export function renderTUIDashboard(state: TUIDashboardState): void {
+  console.clear();
 
-  return percentage === 100 ? chalk.green(bar) : chalk.red(bar);
+  const border = chalk.cyan("═".repeat(65));
+  const modelBadge = state.isFallback
+    ? chalk.bgRed.white.bold(` FALLBACK: ${state.activeModel} `)
+    : chalk.bgGreen.black.bold(` OPENCODE: ${state.activeModel} `);
+
+  const progressBar = renderProgressBar(state.passRatePercent);
+
+  console.log(border);
+  console.log(chalk.bold.magenta(`  🚀 LOOPFORGE INTERACTIVE TUI DASHBOARD  `) + modelBadge);
+  console.log(border);
+  console.log(`  Iteração Atual: ${chalk.bold.yellow(`#${state.iteration}`)} | Papel Swarm: ${chalk.bold.cyan(state.currentRole.toUpperCase())}`);
+  console.log(`  Sensor Pass-Rate: [${progressBar}] ${chalk.bold(`${state.passRatePercent}%`)}`);
+  console.log(`  Consumo: ${chalk.bold(`${state.tokensUsed} tokens`)} | Custo Est.: ${chalk.bold.green(`$${state.costUsd.toFixed(4)}`)}`);
+  console.log(chalk.cyan("─".repeat(65)));
+
+  if (state.streamingChunk) {
+    console.log(chalk.bold.white(`  🌊 Live Stream:`) + ` ${chalk.gray(state.streamingChunk.slice(-150))}`);
+    console.log(chalk.cyan("─".repeat(65)));
+  }
+
+  console.log(`  🧠 Última Lição Aprendida: ${chalk.italic.gray(state.lastLesson || "Nenhuma falha recente")}`);
+  console.log(border + "\n");
+}
+
+function renderProgressBar(percent: number, width: number = 25): string {
+  const filled = Math.round((percent / 100) * width);
+  const empty = width - filled;
+  return chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(empty));
 }

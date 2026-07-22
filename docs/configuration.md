@@ -8,15 +8,12 @@ O LoopForge é configurado via arquivo `.loopforge.json` na raiz do projeto. O s
 
 ```typescript
 interface LoopForgeConfig {
-  name: string;                        // Nome do projeto
-  version: string;                     // Versão do projeto
-  strategy: "fixed" | "creator";       // Estratégia de loop
-  skills?: SkillsConfig;
-  harness?: HarnessConfig;
-  guardrails?: GuardrailsConfig;
+  projectName: string;                  // Nome do projeto
+  version?: string;                     // Versão do projeto
+  harness: HarnessConfig;
   memory?: MemoryConfig;
-  provider?: ProviderConfig;
-  sandbox?: SandboxConfig;
+  guardrails?: GuardrailsConfig;
+  llm?: LLMConfig;
 }
 ```
 
@@ -24,7 +21,7 @@ interface LoopForgeConfig {
 
 ## Campos
 
-### `name`
+### `projectName`
 - **Tipo:** `string`
 - **Obrigatório:** Sim
 - **Descrição:** Nome do projeto para identificação nos ciclos e relatórios.
@@ -33,35 +30,9 @@ interface LoopForgeConfig {
 
 ### `version`
 - **Tipo:** `string`
-- **Obrigatório:** Sim
+- **Obrigatório:** Não
+- **Padrão:** `"3.0.0"`
 - **Descrição:** Versão do projeto.
-
----
-
-### `strategy`
-- **Tipo:** `"fixed" | "creator"`
-- **Obrigatório:** Sim
-- **Padrão:** `"creator"`
-- **Descrição:** Estratégia de execução do loop:
-  - `fixed`: Loop com iterações estritas, sem desvios
-  - `creator`: Estratégia criativa, permite adaptações no ciclo
-
----
-
-### `skills`
-
-| Campo | Tipo | Padrão | Descrição |
-|---|---|---|---|
-| `directory` | `string` | `".loopforge/skills"` | Diretório dos arquivos de skill |
-| `activeSkills` | `string[]` | `[]` | Lista de skills ativas para o ciclo |
-
-**Exemplo:**
-```json
-"skills": {
-  "directory": ".loopforge/skills",
-  "activeSkills": ["clean-code", "testing-rules"]
-}
-```
 
 ---
 
@@ -69,16 +40,19 @@ interface LoopForgeConfig {
 
 | Campo | Tipo | Padrão | Descrição |
 |---|---|---|---|
-| `runners` | `HarnessRunnerConfig[]` | — | Lista de runners do harness |
+| `runners` | `RunnerConfig[]` | — | Lista de runners do harness (mínimo 1) |
+| `parallel` | `boolean` | `true` | Executa runners simultaneamente via Promise.all |
+| `stopOnFirstFailure` | `boolean` | `false` | Interrompe execução ao primeiro runner que falhar |
 
-**`HarnessRunnerConfig`:**
+**`RunnerConfig`:**
 
 | Campo | Tipo | Padrão | Descrição |
 |---|---|---|---|
 | `name` | `string` | — | Nome do runner (ex: "Unit Tests") |
-| `type` | `"unit" | "linter" | "typecheck" | "e2e" | "custom"` | — | Tipo de runner para parser |
+| `type` | `"unit" \| "linter" \| "e2e" \| "custom"` | — | Tipo de runner para parser |
 | `command` | `string` | — | Comando a ser executado |
 | `timeoutMs` | `number` | `60000` | Timeout em milissegundos |
+| `enabled` | `boolean` | `true` | Habilita/desabilita o runner sem removê-lo |
 
 **Exemplo:**
 ```json
@@ -92,7 +66,7 @@ interface LoopForgeConfig {
     },
     {
       "name": "TypeScript Check",
-      "type": "typecheck",
+      "type": "custom",
       "command": "npm run check",
       "timeoutMs": 30000
     },
@@ -100,9 +74,12 @@ interface LoopForgeConfig {
       "name": "Linter",
       "type": "linter",
       "command": "npm run lint",
-      "timeoutMs": 30000
+      "timeoutMs": 30000,
+      "enabled": false
     }
-  ]
+  ],
+  "parallel": true,
+  "stopOnFirstFailure": false
 }
 ```
 
@@ -112,18 +89,18 @@ interface LoopForgeConfig {
 
 | Campo | Tipo | Padrão | Descrição |
 |---|---|---|---|
-| `maxIterations` | `number` | `10` | Número máximo de iterações do loop |
-| `maxConsecutiveFailures` | `number` | `3` | Falhas consecutivas antes do circuit breaker |
-| `stopOnSuccess` | `boolean` | `true` | Para o loop na primeira iteração bem-sucedida |
-| `allowGitRollback` | `boolean` | `true` | Permite rollback automático via git |
+| `maxConsecutiveFailures` | `number` | `3` | Falhas consecutivas antes do circuit breaker abrir |
+| `maxTotalIterations` | `number` | `10` | Número máximo de iterações totais do loop |
+| `maxBudgetUsd` | `number` | `5.0` | Orçamento máximo em dólar — trava financeira que interrompe o loop |
+| `requireCleanGit` | `boolean` | `true` | Exige repositório limpo (sem mudanças não commitadas) para iniciar |
 
 **Exemplo:**
 ```json
 "guardrails": {
-  "maxIterations": 10,
   "maxConsecutiveFailures": 3,
-  "stopOnSuccess": true,
-  "allowGitRollback": true
+  "maxTotalIterations": 10,
+  "maxBudgetUsd": 5.0,
+  "requireCleanGit": true
 }
 ```
 
@@ -134,55 +111,46 @@ interface LoopForgeConfig {
 | Campo | Tipo | Padrão | Descrição |
 |---|---|---|---|
 | `lessonsFile` | `string` | `".loopforge/lessons.md"` | Arquivo de lições aprendidas |
-| `handoffFile` | `string` | `".loopforge/handoff.md"` | Arquivo de instruções de transição |
-| `autoUpdateLessons` | `boolean` | `true` | Atualiza lessons.md automaticamente |
+| `handoffFile` | `string` | `".loopforge/handoff.md"` | Arquivo de instruções de transição (com git diff stat) |
+| `maxLessonsPrompt` | `number` | `5` | Máximo de lições a incluir no prompt do LLM |
 
 **Exemplo:**
 ```json
 "memory": {
   "lessonsFile": ".loopforge/lessons.md",
   "handoffFile": ".loopforge/handoff.md",
-  "autoUpdateLessons": true
+  "maxLessonsPrompt": 5
 }
 ```
 
 ---
 
-### `provider`
+### `llm`
 
 | Campo | Tipo | Padrão | Descrição |
 |---|---|---|---|
-| `name` | `string` | `"opencode"` | Nome do provedor LLM |
+| `provider` | `"opencode" \| "ollama" \| "openai" \| "anthropic" \| "custom"` | `"opencode"` | Provedor LLM |
 | `model` | `string` | `"deepseek-v3"` | Modelo principal |
-| `enableModelFallback` | `boolean` | `true` | Ativa fallback automático |
 | `fallbackModel` | `string` | `"anthropic/claude-3-5-sonnet"` | Modelo de fallback |
-| `fallbackFailureThreshold` | `number` | `2` | Falhas consecutivas para ativar fallback |
+| `baseUrl` | `string` | `"http://localhost:11434"` | URL base (usado pelo provedor ollama) |
+| `temperature` | `number` | `0.2` | Temperatura do modelo (0.0 a 1.0) |
 
 **Exemplo:**
 ```json
-"provider": {
-  "name": "opencode",
+"llm": {
+  "provider": "opencode",
   "model": "deepseek-v3",
-  "enableModelFallback": true,
   "fallbackModel": "anthropic/claude-3-5-sonnet",
-  "fallbackFailureThreshold": 2
+  "temperature": 0.2
 }
 ```
 
----
-
-### `sandbox`
-
-| Campo | Tipo | Padrão | Descrição |
-|---|---|---|---|
-| `enableBranchSandbox` | `boolean` | `true` | Isola mudanças em branch separada |
-| `branchPrefix` | `string` | `"loopforge/task-"` | Prefixo da branch de sandbox |
-
-**Exemplo:**
+**Exemplo com Ollama (local, offline):**
 ```json
-"sandbox": {
-  "enableBranchSandbox": true,
-  "branchPrefix": "loopforge/task-"
+"llm": {
+  "provider": "ollama",
+  "baseUrl": "http://localhost:11434",
+  "temperature": 0.1
 }
 ```
 
@@ -192,13 +160,15 @@ interface LoopForgeConfig {
 
 ```json
 {
-  "name": "Meu Projeto",
+  "projectName": "Meu Projeto",
   "version": "1.0.0",
-  "strategy": "creator"
+  "harness": {
+    "runners": [
+      { "name": "Unit Tests", "type": "unit", "command": "npm test" }
+    ]
+  }
 }
 ```
-
-Todos os outros campos usam valores padrão.
 
 ---
 
@@ -206,44 +176,38 @@ Todos os outros campos usam valores padrão.
 
 ```json
 {
-  "name": "Meu Projeto",
+  "projectName": "Meu Projeto",
   "version": "1.0.0",
-  "strategy": "creator",
-  "skills": {
-    "directory": ".loopforge/skills",
-    "activeSkills": []
-  },
   "harness": {
     "runners": [
       {
         "name": "Unit Tests",
         "type": "unit",
         "command": "npm test",
-        "timeoutMs": 60000
+        "timeoutMs": 60000,
+        "enabled": true
       }
-    ]
+    ],
+    "parallel": true,
+    "stopOnFirstFailure": false
   },
   "guardrails": {
-    "maxIterations": 10,
     "maxConsecutiveFailures": 3,
-    "stopOnSuccess": true,
-    "allowGitRollback": true
+    "maxTotalIterations": 10,
+    "maxBudgetUsd": 5.0,
+    "requireCleanGit": true
   },
   "memory": {
     "lessonsFile": ".loopforge/lessons.md",
     "handoffFile": ".loopforge/handoff.md",
-    "autoUpdateLessons": true
+    "maxLessonsPrompt": 5
   },
-  "provider": {
-    "name": "opencode",
+  "llm": {
+    "provider": "opencode",
     "model": "deepseek-v3",
-    "enableModelFallback": true,
     "fallbackModel": "anthropic/claude-3-5-sonnet",
-    "fallbackFailureThreshold": 2
-  },
-  "sandbox": {
-    "enableBranchSandbox": true,
-    "branchPrefix": "loopforge/task-"
+    "baseUrl": "http://localhost:11434",
+    "temperature": 0.2
   }
 }
 ```

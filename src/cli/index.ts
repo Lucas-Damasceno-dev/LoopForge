@@ -11,6 +11,8 @@ import { workspaceCommand } from "./commands/workspace.js";
 import { auditCommand } from "./commands/audit.js";
 import { wizardCommand } from "./commands/wizard.js";
 import { replayCommand } from "./commands/replay.js";
+import { generateTestsCommand } from "./commands/generate-tests.js";
+import { releaseCommand } from "./commands/release.js";
 import { generateGitHubActionWorkflow } from "../ci/webhook.js";
 import chalk from "chalk";
 
@@ -19,7 +21,7 @@ const program = new Command();
 program
   .name("loopforge")
   .description("Automated Loop Engineering Engine for AI Agents")
-  .version("3.0.0");
+  .version("4.0.0");
 
 program
   .command("init")
@@ -37,6 +39,23 @@ program
   .argument("[directory]", "Diretório do projeto", ".")
   .action(async (directory: string) => {
     await bootstrapCommand(directory);
+  });
+
+program
+  .command("generate-tests")
+  .description("Gera autonomamente suítes de testes unitários para arquivos de código não cobertos")
+  .argument("[directory]", "Diretório do projeto", ".")
+  .action(async (directory: string) => {
+    await generateTestsCommand(directory);
+  });
+
+program
+  .command("release")
+  .description("Gera notas de lançamento semânticas e atualiza o arquivo CHANGELOG.md")
+  .argument("[version]", "Versão da release", "4.0.0")
+  .argument("[directory]", "Diretório do projeto", ".")
+  .action(async (version: string, directory: string) => {
+    await releaseCommand(version, directory);
   });
 
 program

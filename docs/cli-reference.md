@@ -115,6 +115,92 @@ loopforge refactor <rule>
 
 ---
 
+### `workspace`
+
+Orquestra loops em lote através de múltiplos projetos configurados no manifesto.
+
+```bash
+loopforge workspace [workspaceFile]
+```
+
+**Arguments:**
+| Argument | Description |
+|---|---|
+| `workspaceFile` | Caminho para o manifesto `loopforge-workspace.json` (default: `loopforge-workspace.json` no diretório atual) |
+
+**Comportamento:**
+- Lê o manifesto com a lista de projetos
+- Instancia o Loop Engine para cada projeto
+- Coleta e exibe resultados agregados
+- Ideal para monorepos e migrações em lote
+
+---
+
+### `audit`
+
+Scanner de segurança e code smells integrado.
+
+```bash
+loopforge audit [directory]
+```
+
+**Arguments:**
+| Argument | Description |
+|---|---|
+| `directory` | Diretório a ser escaneado (default: diretório atual) |
+
+**Detecta:**
+- **Secrets expostos**: `sk-` (API keys), `AKIA` (AWS tokens), JWT
+- **SQL Injection**: strings SQL concatenadas
+- **Código inseguro**: `eval()` e similares
+
+**Scanning:**
+- Varre `.ts`, `.js`, `.py`, `.go` recursivamente
+- Exibe vulnerabilidades por arquivo e linha
+
+---
+
+### `wizard`
+
+Assistente interativo de configuração e onboarding para novos usuários.
+
+```bash
+loopforge wizard [directory]
+```
+
+**Arguments:**
+| Argument | Description |
+|---|---|
+| `directory` | Diretório alvo (default: diretório atual) |
+
+**Pipeline:**
+1. Inicializa `.loopforge.json` com template Node/TypeScript
+2. Gera suíte de testes baseline via `bootstrap`
+3. Exibe sumário final da configuração
+
+---
+
+### `replay`
+
+Reproduz telemetria quadro-a-quadro de sessões passadas do Loop Engine.
+
+```bash
+loopforge replay <sessionId> [directory]
+```
+
+**Arguments:**
+| Argument | Description |
+|---|---|
+| `sessionId` | ID da sessão a ser reproduzida (obrigatório) |
+| `directory` | Diretório do projeto (default: diretório atual) |
+
+**Comportamento:**
+- Carrega frames de `.loopforge/telemetry/{sessionId}.json`
+- Reproduz em tempo real no terminal com delay de 300ms entre frames
+- Exibe: timestamp, iteração, papel do agente, modelo, status do harness
+
+---
+
 ### `ui`
 
 Inicia o Web Dashboard local para visualização gráfica de relatórios.

@@ -19,6 +19,7 @@ LoopForge é um motor autônomo de Loop Engineering projetado para criar, execut
 | **4** | Provedores LLM, Skill Presets & Git Sandbox (OpenCode, fallback, auto-PR, bootstrap) | ✅ |
 | **5** | Swarm Multi-Agente, TUI & RAG Local (pipelines de 4 papéis, indexação semântica) | ✅ |
 | **6** | Auto-Refatoração, Web Dashboard, Self-Healing Tests & CI/CD Nativo | ✅ |
+| **7** | Workspace Orquestrador, Security Scanner, Budget Guard, Local LLM, Telemetry & Wizard | ✅ |
 
 ---
 
@@ -61,11 +62,15 @@ loopforge run --create-pr
 ## CLI Reference
 
 | Comando | Descrição |
-|---|---|
+|---|---|---|
 | `init [directory]` | Inicializa `.loopforge.json`, memórias e skills templates |
 | `run [directory]` | Executa o ciclo do Loop Engine (Harness → Memória → Fallback → Git Sandbox) |
 | `bootstrap` | Gera suíte de testes baseline automaticamente |
 | `refactor <rule>` | Executa auto-refatoração com isolamento Git Sandbox |
+| `workspace [workspaceFile]` | Orquestra loops em múltiplos projetos configurados no manifesto |
+| `audit [directory]` | Scanner de segurança: detecta secrets, SQL injection, eval() inseguro |
+| `wizard [directory]` | Assistente interativo de configuração e onboarding |
+| `replay <sessionId>` | Reproduz telemetria quadro-a-quadro de sessões passadas |
 | `ui [directory]` | Inicia Web Dashboard em `http://localhost:3000` |
 | `ci:setup` | Gera `.github/workflows/loopforge-ci.yml` |
 | `status [directory]` | Exibe painel de status de config, LLM, skills e memórias |
@@ -88,6 +93,19 @@ loopforge run --create-pr
 **`ui`**
 - `-p, --port <port>` — Porta do servidor (padrão: 3000)
 
+**`workspace`**
+- `[workspaceFile]` — Caminho para o manifesto `loopforge-workspace.json`
+
+**`audit`**
+- `[directory]` — Diretório a ser escaneado (padrão: diretório atual)
+
+**`wizard`**
+- `[directory]` — Diretório alvo (padrão: diretório atual)
+
+**`replay`**
+- `<sessionId>` — ID da sessão a reproduzir
+- `[directory]` — Diretório do projeto (padrão: diretório atual)
+
 ---
 
 ## Configuração
@@ -96,36 +114,32 @@ O LoopForge é configurado via arquivo `.loopforge.json` na raiz do projeto:
 
 ```json
 {
-  "name": "Meu Projeto",
+  "projectName": "Meu Projeto",
   "version": "1.0.0",
-  "strategy": "creator",
   "harness": {
     "runners": [
       { "name": "Unit Tests", "type": "unit", "command": "npm test", "timeoutMs": 60000 },
       { "name": "Linter", "type": "linter", "command": "npm run lint", "timeoutMs": 30000 }
-    ]
+    ],
+    "parallel": true,
+    "stopOnFirstFailure": false
   },
   "guardrails": {
-    "maxIterations": 10,
+    "maxTotalIterations": 10,
     "maxConsecutiveFailures": 3,
-    "stopOnSuccess": true,
-    "allowGitRollback": true
+    "maxBudgetUsd": 5.0,
+    "requireCleanGit": true
   },
   "memory": {
     "lessonsFile": ".loopforge/lessons.md",
     "handoffFile": ".loopforge/handoff.md",
-    "autoUpdateLessons": true
+    "maxLessonsPrompt": 5
   },
-  "provider": {
-    "name": "opencode",
+  "llm": {
+    "provider": "opencode",
     "model": "deepseek-v3",
-    "enableModelFallback": true,
     "fallbackModel": "anthropic/claude-3-5-sonnet",
-    "fallbackFailureThreshold": 2
-  },
-  "sandbox": {
-    "enableBranchSandbox": true,
-    "branchPrefix": "loopforge/task-"
+    "temperature": 0.2
   }
 }
 ```
@@ -137,29 +151,30 @@ Veja [docs/configuration.md](docs/configuration.md) para a documentação comple
 ## Arquitetura
 
 ```
-┌────────────────────────────────────────────────────┐
-│                    CLI (Commander)                   │
-│  init  run  bootstrap  refactor  ui  ci:setup  status │
-└──────────┬────────────────────────────┬────────────┘
-           │                            │
-     ┌─────▼──────┐            ┌───────▼────────┐
-     │  Loop Engine │            │ Refactor Engine │
-     │  (orquestrador)│          │ (auto-refactor) │
-     └──────┬──────┘            └────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                      CLI (Commander)                              │
+│  init  run  bootstrap  refactor  workspace  audit  wizard  replay │
+│  ui  ci:setup  status                                              │
+└──────────┬───────────────────────────────────────────┬──────────┘
+           │                                           │
+     ┌─────▼──────┐                            ┌──────▼─────────┐
+     │ Loop Engine │                            │ Refactor Engine │
+     │(orquestrador)│                           │ (auto-refactor) │
+     └──────┬──────┘                           └─────────────────┘
             │
-    ┌───────┼───────────┬───────────────┐
-    ▼       ▼           ▼               ▼
-┌──────┐ ┌──────┐ ┌────────┐ ┌────────────┐
-│Harness│ │Memory│ │Swarm   │ │   Git       │
-│       │ │      │ │Agents  │ │  Sandbox    │
-└──┬───┘ └──────┘ └───┬────┘ └──────┬─────┘
-   │                  │             │
-   ▼                  ▼             ▼
-┌──────┐        ┌────────┐  ┌──────────┐
-│Parser│        │  RAG   │  │PR Creator│
-│Runner│        │ Local  │  │Checkpoint│
-│Format│        │ Index  │  │          │
-└──────┘        └────────┘  └──────────┘
+    ┌───────┼───────┬─────────┬──────────┬──────────┐
+    ▼       ▼       ▼         ▼          ▼          ▼
+┌──────┐ ┌──────┐ ┌──────┐ ┌────────┐ ┌────────┐ ┌──────────┐
+│Harness│ │Memory│ │Swarm │ │Workspace│ │Security│ │   Git    │
+│      │ │      │ │Agents│ │Orch.   │ │Scanner │ │  Sandbox │
+└──┬───┘ └──────┘ └──┬───┘ └────────┘ └────────┘ └────┬─────┘
+   │                  │                                │
+   ▼                  ▼                                ▼
+┌──────┐        ┌────────┐  ┌──────────┐  ┌──────────┐
+│Parser│        │  RAG   │  │Telemetry │  │PR Creator│
+│Runner│        │ Local  │  │Recorder  │  │Checkpoint│
+│Format│        │ Index  │  │Replay    │  │          │
+└──────┘        └────────┘  └──────────┘  └──────────┘
 ```
 
 Veja [docs/architecture.md](docs/architecture.md) para uma visão detalhada.
@@ -223,8 +238,8 @@ npm run check
 
 ## Testes
 
-- **16 arquivos** de teste em `tests/`
-- **30/30 testes aprovados**
+- **19 arquivos** de teste em `tests/`
+- **32/32 testes aprovados**
 - **0 erros e 0 warnings** no build (`tsc --noEmit`)
 - Framework: **Vitest**
 
@@ -233,19 +248,20 @@ npm run check
 ## Módulos
 
 | Módulo | Descrição | Arquivos |
-|---|---|---|
+|---|---|---|---|
 | `src/agents/` | Swarm multi-agente (Architect, Coder, Tester, Reviewer) | 2 |
 | `src/ci/` | Integração contínua e webhooks (Slack/Discord) | 1 |
-| `src/cli/` | Interface de linha de comando (Commander) | 7 |
+| `src/cli/` | Interface de linha de comando (Commander) | 10 |
 | `src/config/` | Schema Zod e loader de configuração | 2 |
-| `src/core/` | Loop Engine orquestrador + Refactor Engine | 2 |
+| `src/core/` | Loop Engine + Refactor Engine + Workspace Orchestrator | 3 |
 | `src/git/` | Git Sandbox, PRs e Checkpoints | 3 |
-| `src/guardrails/` | Circuit Breaker (3 falhas consecutivas) | 1 |
+| `src/guardrails/` | Circuit Breaker + Security Scanner (budget, falhas, secrets) | 2 |
 | `src/harness/` | Runner, Parser, Formatter, Bootstrap, Self-Healing | 6 |
-| `src/indexer/` | RAG local de código (índice semântico) | 1 |
-| `src/llm/` | Provedor LLM com fallback automático | 1 |
-| `src/memory/` | Persistência de lessons.md e handoff.md | 1 |
+| `src/indexer/` | RAG local de código com cache incremental por hash | 1 |
+| `src/llm/` | Provedor LLM com fallback automático e suporte a Ollama | 1 |
+| `src/memory/` | Persistência de lessons.md e handoff.md com diff stat | 1 |
 | `src/skills/` | Templates e loader de skills | 3 |
+| `src/telemetry/` | Gravador de telemetria e replay de sessão | 1 |
 | `src/ui/` | TUI interativa + Web Dashboard + Logger | 4 |
 
 ---
@@ -259,7 +275,7 @@ npm run check
 | CLI | Commander 12 |
 | Validação | Zod 3.23 |
 | Testes | Vitest 1.6 |
-| LLM | OpenCode DeepSeek v4 + fallback Claude 3.5 Sonnet |
+| LLM | OpenCode DeepSeek v4 + fallback Claude 3.5 Sonnet + Ollama (local) |
 | CI | GitHub Actions (gerado automaticamente) |
 
 ---
