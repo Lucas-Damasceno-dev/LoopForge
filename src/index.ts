@@ -14,4 +14,8 @@ export * from "./git/checkpoint.js";
 export * from "./git/sandbox.js";
 export * from "./git/pr.js";
 export * from "./llm/provider.js";
+export * from "./agents/roles.js";
+export * from "./agents/swarm.js";
+export * from "./ui/tui.js";
+export * from "./indexer/rag.js";
 export * from "./core/loop-engine.js";
