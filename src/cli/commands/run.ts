@@ -15,9 +15,9 @@ export async function runCommand(targetDir: string = "."): Promise<void> {
 
     const engine = new LoopEngine(config, resolvedDir);
 
-    const result = await engine.runLoop(async (_context, iteration) => {
-      logIterationStart(iteration, config.strategy);
-      // Simulação do Agent Step Runner para a CLI
+    const result = await engine.runLoop(async (_context, iteration, llmEngine) => {
+      const activeModel = llmEngine.getActiveModel(0);
+      logIterationStart(iteration, config.strategy, activeModel.model, activeModel.isFallback);
       return `Agente concluiu análise e ações para a iteração #${iteration}.`;
     });
 

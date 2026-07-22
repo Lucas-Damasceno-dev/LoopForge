@@ -2,8 +2,9 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import chalk from "chalk";
 import { createDefaultConfig } from "../../config/loader.js";
+import { PRESET_TEMPLATES } from "../../skills/templates.js";
 
-export async function initCommand(targetDir: string = "."): Promise<void> {
+export async function initCommand(targetDir: string = ".", templateName?: string): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
 
   try {
@@ -14,14 +15,25 @@ export async function initCommand(targetDir: string = "."): Promise<void> {
 
     await fs.mkdir(skillsDir, { recursive: true });
 
-    // Criar arquivo de exemplo de Skill
-    const sampleSkillPath = path.join(skillsDir, "quality-rules.md");
-    const sampleSkillContent = `# Diretrizes de Qualidade
+    let appliedTemplate = "default";
+
+    if (templateName && PRESET_TEMPLATES[templateName]) {
+      const template = PRESET_TEMPLATES[templateName];
+      appliedTemplate = template.name;
+
+      for (const [filename, content] of Object.entries(template.skills)) {
+        await fs.writeFile(path.join(skillsDir, filename), content, "utf-8");
+      }
+    } else {
+      // Skill padrão de amostra
+      const sampleSkillPath = path.join(skillsDir, "quality-rules.md");
+      const sampleSkillContent = `# Diretrizes de Qualidade
 - Mantenha funções pequenas e com responsabilidade única.
 - Cubra novos métodos com testes unitários.
 - Não remova ou ignore falhas de linter ou compilador.
 `;
-    await fs.writeFile(sampleSkillPath, sampleSkillContent, "utf-8");
+      await fs.writeFile(sampleSkillPath, sampleSkillContent, "utf-8");
+    }
 
     // Criar arquivos iniciais de memória se não existirem
     await fs.writeFile(
@@ -37,7 +49,9 @@ export async function initCommand(targetDir: string = "."): Promise<void> {
     ).catch(() => {});
 
     console.log(chalk.green("✔ Projeto LoopForge inicializado com sucesso!"));
+    console.log(chalk.cyan(`  Template Aplicado: ${appliedTemplate}`));
     console.log(chalk.cyan(`  Configuração: ${configPath}`));
+    console.log(chalk.cyan(`  Provedor Padrão: OpenCode (DeepSeek v4 free)`));
     console.log(chalk.cyan(`  Diretório de Skills: ${skillsDir}`));
     console.log(chalk.cyan(`  Memória Lessons: ${lessonsFile}`));
     console.log(chalk.cyan(`  Memória Handoff: ${handoffFile}`));

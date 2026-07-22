@@ -32,6 +32,21 @@ export const MemoryConfigSchema = z.object({
 });
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
 
+export const ProviderConfigSchema = z.object({
+  name: z.string().default("opencode"),
+  model: z.string().default("deepseek-v3"),
+  fallbackModel: z.string().default("anthropic/claude-3-5-sonnet"),
+  enableModelFallback: z.boolean().default(true),
+  fallbackFailureThreshold: z.number().int().positive().default(2),
+});
+export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
+
+export const SandboxConfigSchema = z.object({
+  enableBranchSandbox: z.boolean().default(true),
+  branchPrefix: z.string().default("loopforge/task-"),
+});
+export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
+
 export const LoopStrategySchema = z.enum(["fixed", "creator"]);
 export type LoopStrategy = z.infer<typeof LoopStrategySchema>;
 
@@ -39,6 +54,8 @@ export const LoopForgeConfigSchema = z.object({
   name: z.string().default("LoopForge Project"),
   version: z.string().default("1.0.0"),
   strategy: LoopStrategySchema.default("creator"),
+  provider: ProviderConfigSchema.default({}),
+  sandbox: SandboxConfigSchema.default({}),
   skills: SkillsConfigSchema.default({}),
   harness: z.object({
     runners: z.array(HarnessRunnerConfigSchema).default([

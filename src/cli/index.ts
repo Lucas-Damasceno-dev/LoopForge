@@ -10,19 +10,20 @@ const program = new Command();
 program
   .name("loopforge")
   .description("Automated Loop Engineering Engine for AI Agents")
-  .version("0.1.0");
+  .version("0.2.0");
 
 program
   .command("init")
-  .description("Inicializa a configuração do LoopForge e a estrutura de memórias e skills no repositório")
+  .description("Inicializa a configuração do LoopForge, memórias e templates de skills no repositório")
   .argument("[directory]", "Diretório alvo para inicialização", ".")
-  .action(async (directory: string) => {
-    await initCommand(directory);
+  .option("-t, --template <template>", "Template de skills pré-construído (node-typescript, python-pytest, rust-cargo)")
+  .action(async (directory: string, options: { template?: string }) => {
+    await initCommand(directory, options.template);
   });
 
 program
   .command("run")
-  .description("Executa o ciclo do Loop Engine com Harness, Memória e Safety Guardrails")
+  .description("Executa o ciclo do Loop Engine com Harness, Memória, Model Fallback e Git Sandbox")
   .argument("[directory]", "Diretório do projeto", ".")
   .action(async (directory: string) => {
     await runCommand(directory);
@@ -30,7 +31,7 @@ program
 
 program
   .command("status")
-  .description("Exibe o painel de status da configuração, skills e memórias do LoopForge")
+  .description("Exibe o painel de status da configuração, provedores LLM, skills e memórias do LoopForge")
   .argument("[directory]", "Diretório do projeto", ".")
   .action(async (directory: string) => {
     await statusCommand(directory);
