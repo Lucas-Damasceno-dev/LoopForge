@@ -40,14 +40,23 @@ export async function cleanupOldCheckpoints(cwd: string = "."): Promise<number> 
     const { stdout } = await execAsync("git stash list", { cwd });
     const lines = stdout.split("\n").filter((l) => l.includes("loopforge-ckpt-"));
 
-    let cleaned = 0;
+    const indices: number[] = [];
     for (const line of lines) {
       const match = line.match(/stash@\{(\d+)\}/);
       if (match) {
-        await execAsync(`git stash drop stash@{${match[1]}}`, { cwd }).catch(() => {});
-        cleaned++;
+        indices.push(parseInt(match[1], 10));
       }
     }
+
+    // Sort indices descending so dropping higher indices doesn't shift lower indices
+    indices.sort((a, b) => b - a);
+
+    let cleaned = 0;
+    for (const index of indices) {
+      await execAsync(`git stash drop stash@{${index}}`, { cwd }).catch(() => {});
+      cleaned++;
+    }
+
     return cleaned;
   } catch {
     return 0;

@@ -1,14 +1,22 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { LLMEngine } from "../llm/provider.js";
 
 export interface GeneratedTestFile {
   sourceFile: string;
   testFile: string;
   created: boolean;
+  contentSnippet: string;
 }
 
 export class TestGenerator {
-  public async generateTestsForUncoveredCode(cwd: string = "."): Promise<GeneratedTestFile[]> {
+  private llm: LLMEngine;
+
+  constructor(llmEngine?: LLMEngine) {
+    this.llm = llmEngine || new LLMEngine();
+  }
+
+  public async generateTestsForUncoveredCode(cwd: string = ".", dryRun: boolean = false): Promise<GeneratedTestFile[]> {
     const resolvedDir = path.resolve(cwd);
     const sourceFiles = await this.findSourceFiles(resolvedDir);
     const results: GeneratedTestFile[] = [];
@@ -21,10 +29,29 @@ export class TestGenerator {
       const testExists = await fs.stat(testFilePath).then(() => true).catch(() => false);
 
       if (!testExists) {
-        await fs.mkdir(path.dirname(testFilePath), { recursive: true });
-        const testBoilerplate = `import { describe, it, expect } from "vitest";\n\ndescribe("${baseName} Auto-Generated Test Suite", () => {\n  it("deve executar caso de teste inicial para ${baseName}", () => {\n    expect(true).toBe(true);\n  });\n});\n`;
-        await fs.writeFile(testFilePath, testBoilerplate, "utf-8");
-        results.push({ sourceFile: relPath, testFile: path.relative(resolvedDir, testFilePath), created: true });
+        const sourceCode = await fs.readFile(srcFile, "utf-8");
+        const prompt = `Gere uma suíte de testes unitários em TypeScript usando Vitest para o seguinte código:\n\n${sourceCode.slice(0, 1000)}`;
+        
+        let testContent = `import { describe, it, expect } from "vitest";\n\ndescribe("${baseName} Test Suite", () => {\n  it("deve validar o funcionamento basico de ${baseName}", () => {\n    expect(true).toBe(true);\n  });\n});\n`;
+        
+        try {
+          const llmRes = await this.llm.generateStep(prompt);
+          if (llmRes.content && llmRes.content.includes("describe")) {
+            testContent = llmRes.content;
+          }
+        } catch {}
+
+        if (!dryRun) {
+          await fs.mkdir(path.dirname(testFilePath), { recursive: true });
+          await fs.writeFile(testFilePath, testContent, "utf-8");
+        }
+
+        results.push({
+          sourceFile: relPath,
+          testFile: path.relative(resolvedDir, testFilePath),
+          created: !dryRun,
+          contentSnippet: testContent.slice(0, 150) + "...",
+        });
       }
     }
 

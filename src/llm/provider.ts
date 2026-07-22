@@ -20,7 +20,7 @@ export class LLMEngine {
     this.provider = config?.provider || "opencode";
     this.primaryModel = config?.model || "deepseek-v3";
     this.fallbackModel = config?.fallbackModel || "anthropic/claude-3-5-sonnet";
-    this.baseUrl = config?.baseUrl || "http://localhost:11434";
+    this.baseUrl = config?.baseUrl || "http://localhost:8000";
   }
 
   public registerHarnessResult(passed: boolean): void {
@@ -50,6 +50,10 @@ export class LLMEngine {
       try {
         if (this.provider === "ollama") {
           return await this.callOllamaApi(prompt, model, isFallback);
+        }
+
+        if (this.provider === "vllm") {
+          return await this.callVllmApi(prompt, model, isFallback);
         }
 
         // Simulação/OpenCode API mock provider
@@ -97,7 +101,35 @@ export class LLMEngine {
       modelUsed: `ollama/${model}`,
       isFallback,
       tokensUsed: data.eval_count || 150,
-      estimatedCostUsd: 0, // Ollama local é 100% gratuito
+      estimatedCostUsd: 0,
+    };
+  }
+
+  private async callVllmApi(prompt: string, model: string, isFallback: boolean): Promise<LLMResponse> {
+    const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro na API do vLLM: ${response.statusText}`);
+    }
+
+    const data: any = await response.json();
+    const content = data.choices?.[0]?.message?.content || "Resposta gerada pelo vLLM";
+    const tokensUsed = data.usage?.total_tokens || 150;
+
+    return {
+      content,
+      modelUsed: `vllm/${model}`,
+      isFallback,
+      tokensUsed,
+      estimatedCostUsd: 0,
     };
   }
 }

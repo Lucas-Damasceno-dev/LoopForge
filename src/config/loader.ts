@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import yaml from "js-yaml";
 import { LoopForgeConfigSchema, type LoopForgeConfig } from "./schema.js";
 
 export const DEFAULT_CONFIG_FILENAME = ".loopforge.json";
@@ -31,8 +32,7 @@ export async function loadConfig(configPath?: string, cwd: string = "."): Promis
   try {
     let json: any;
     if (resolvedPath.endsWith(".yml") || resolvedPath.endsWith(".yaml")) {
-      // Basic YAML to JSON key-value parser for configuration
-      json = parseSimpleYaml(rawData);
+      json = yaml.load(rawData);
     } else {
       json = JSON.parse(rawData);
     }
@@ -40,25 +40,6 @@ export async function loadConfig(configPath?: string, cwd: string = "."): Promis
   } catch (error: any) {
     throw new Error(`Validação de configuração falhou em '${resolvedPath}': ${error.message}`);
   }
-}
-
-function parseSimpleYaml(yamlContent: string): any {
-  const lines = yamlContent.split("\n");
-  const result: any = {};
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const parts = trimmed.split(":");
-    if (parts.length >= 2) {
-      const key = parts[0].trim();
-      const val = parts.slice(1).join(":").trim().replace(/^['"]|['"]$/g, "");
-      if (val === "true") result[key] = true;
-      else if (val === "false") result[key] = false;
-      else if (!isNaN(Number(val))) result[key] = Number(val);
-      else result[key] = val;
-    }
-  }
-  return result;
 }
 
 export async function createDefaultConfig(targetDir: string = "."): Promise<string> {

@@ -26,6 +26,7 @@ export * from "./ui/tui.js";
 export * from "./ui/server.js";
 export * from "./indexer/rag.js";
 export * from "./telemetry/recorder.js";
+export * from "./telemetry/analytics.js";
 export * from "./ci/webhook.js";
 export * from "./ci/release.js";
 export * from "./ci/bot.js";

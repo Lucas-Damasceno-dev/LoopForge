@@ -12,7 +12,7 @@ loopforge [command] [options] [directory]
 
 | Option | Description |
 |---|---|
-| `-V, --version` | Display version number (3.0.0) |
+| `-V, --version` | Display version number (4.0.0) |
 | `-h, --help` | Display help for command |
 
 ---
@@ -93,6 +93,24 @@ loopforge bootstrap
 
 ---
 
+### `generate-tests`
+
+Gera suítes de teste unitário para módulos do projeto que ainda não possuem cobertura.
+
+```bash
+loopforge generate-tests [directory]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `directory` | Diretório do projeto (default: diretório atual) |
+
+Gera arquivos `.test.ts` em `tests/` com estrutura Vitest básica (`describe`/`it`/`expect`).
+
+---
+
 ### `refactor`
 
 Executa o motor de auto-refatoração com isolamento Git Sandbox.
@@ -112,6 +130,25 @@ loopforge refactor <rule>
 - Executa refatoração em lote
 - Valida com o harness após modificações
 - Commita ou reverte conforme resultado
+
+---
+
+### `release`
+
+Gera notas de lançamento semânticas e atualiza o CHANGELOG.md do projeto.
+
+```bash
+loopforge release [version] [directory]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|---|---|
+| `version` | Versão para o release (default: `4.0.0`) |
+| `directory` | Diretório do projeto (default: diretório atual) |
+
+Lê os 5 commits mais recentes via `git log --oneline` e insere entrada datada no CHANGELOG.md.
 
 ---
 

@@ -1,6 +1,6 @@
 # Configuration
 
-O LoopForge é configurado via arquivo `.loopforge.json` na raiz do projeto. O schema é validado com **Zod** em runtime.
+O LoopForge é configurado via arquivo `.loopforge.json`, `.loopforge.yml` ou `.loopforge.yaml` na raiz do projeto. O schema é validado com **Zod** em runtime. A ordem de resolução é: JSON → YML → YAML.
 
 ---
 
@@ -17,6 +17,8 @@ interface LoopForgeConfig {
 }
 ```
 
+> **Nota:** O formato YAML aceita configuração plana (chave: valor) via parser interno `parseSimpleYaml()`. Estruturas aninhadas não são suportadas em YAML — use JSON para configurações complexas.
+
 ---
 
 ## Campos
@@ -31,7 +33,7 @@ interface LoopForgeConfig {
 ### `version`
 - **Tipo:** `string`
 - **Obrigatório:** Não
-- **Padrão:** `"3.0.0"`
+- **Padrão:** `"4.0.0"`
 - **Descrição:** Versão do projeto.
 
 ---

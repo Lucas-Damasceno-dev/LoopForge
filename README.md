@@ -4,7 +4,7 @@
 
 LoopForge é um motor autônomo de Loop Engineering projetado para criar, executar, refatorar e monitorar ciclos de desenvolvimento orientados a IA com resiliência industrial, guardrails rigorosos e observabilidade completa.
 
-> **Versão atual:** 3.0.0
+> **Versão atual:** 4.0.0
 > **License:** MIT
 
 ---
@@ -20,6 +20,7 @@ LoopForge é um motor autônomo de Loop Engineering projetado para criar, execut
 | **5** | Swarm Multi-Agente, TUI & RAG Local (pipelines de 4 papéis, indexação semântica) | ✅ |
 | **6** | Auto-Refatoração, Web Dashboard, Self-Healing Tests & CI/CD Nativo | ✅ |
 | **7** | Workspace Orquestrador, Security Scanner, Budget Guard, Local LLM, Telemetry & Wizard | ✅ |
+| **8** | Docker Sandbox, Test Generator, Release/Bot, Context Compressor, Loop Lock Detector | ✅ |
 
 ---
 
@@ -66,7 +67,9 @@ loopforge run --create-pr
 | `init [directory]` | Inicializa `.loopforge.json`, memórias e skills templates |
 | `run [directory]` | Executa o ciclo do Loop Engine (Harness → Memória → Fallback → Git Sandbox) |
 | `bootstrap` | Gera suíte de testes baseline automaticamente |
+| `generate-tests` | Gera suítes de teste unitário para código não coberto |
 | `refactor <rule>` | Executa auto-refatoração com isolamento Git Sandbox |
+| `release [version]` | Gera notas de lançamento semânticas e atualiza CHANGELOG.md |
 | `workspace [workspaceFile]` | Orquestra loops em múltiplos projetos configurados no manifesto |
 | `audit [directory]` | Scanner de segurança: detecta secrets, SQL injection, eval() inseguro |
 | `wizard [directory]` | Assistente interativo de configuração e onboarding |
@@ -151,30 +154,31 @@ Veja [docs/configuration.md](docs/configuration.md) para a documentação comple
 ## Arquitetura
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                      CLI (Commander)                              │
-│  init  run  bootstrap  refactor  workspace  audit  wizard  replay │
-│  ui  ci:setup  status                                              │
-└──────────┬───────────────────────────────────────────┬──────────┘
-           │                                           │
-     ┌─────▼──────┐                            ┌──────▼─────────┐
-     │ Loop Engine │                            │ Refactor Engine │
-     │(orquestrador)│                           │ (auto-refactor) │
-     └──────┬──────┘                           └─────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              CLI (Commander)                                  │
+│  init  run  bootstrap  generate-tests  refactor  release  workspace  audit   │
+│  wizard  replay  ui  ci:setup  status                                         │
+└──────────┬───────────────────────────────────────────────────────┬──────────┘
+           │                                                       │
+     ┌─────▼──────┐                                        ┌──────▼─────────┐
+     │ Loop Engine │                                        │ Refactor Engine │
+     │(orquestrador)│                                       │ (auto-refactor) │
+     │(compressor)  │                                       └─────────────────┘
+     └──────┬──────┘
             │
-    ┌───────┼───────┬─────────┬──────────┬──────────┐
-    ▼       ▼       ▼         ▼          ▼          ▼
-┌──────┐ ┌──────┐ ┌──────┐ ┌────────┐ ┌────────┐ ┌──────────┐
-│Harness│ │Memory│ │Swarm │ │Workspace│ │Security│ │   Git    │
-│      │ │      │ │Agents│ │Orch.   │ │Scanner │ │  Sandbox │
-└──┬───┘ └──────┘ └──┬───┘ └────────┘ └────────┘ └────┬─────┘
-   │                  │                                │
-   ▼                  ▼                                ▼
-┌──────┐        ┌────────┐  ┌──────────┐  ┌──────────┐
-│Parser│        │  RAG   │  │Telemetry │  │PR Creator│
-│Runner│        │ Local  │  │Recorder  │  │Checkpoint│
-│Format│        │ Index  │  │Replay    │  │          │
-└──────┘        └────────┘  └──────────┘  └──────────┘
+    ┌───────┼───────┬──────────┬─────────┬──────────┬──────────┐
+    ▼       ▼       ▼          ▼         ▼          ▼          ▼
+┌──────┐ ┌──────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────┐
+│Harness││Memory│ │  Swarm  │ │Workspace│ │ Guard- │ │Telemetry│ │   Git    │
+│TestGen││      │ │ Agents  │ │  Orch.  │ │ rails  │ │Recorder│ │  Sandbox │
+└──┬───┘ └──────┘ └───┬────┘ └────────┘ └───┬────┘ └────────┘ └────┬─────┘
+   │                  │                     │                      │
+   ▼                  ▼                     ▼                      ▼
+┌──────┐        ┌────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+│Parser│        │  RAG   │  │ Security  │  │   Bot/   │  │PR Creator│
+│Runner│        │ Local  │  │  Scanner  │  │ Release  │  │Checkpoint│
+│Format│        │ Index  │  │ Loop Lock │  │          │  │  Docker  │
+└──────┘        └────────┘  └──────────┘  └──────────┘  └──────────┘
 ```
 
 Veja [docs/architecture.md](docs/architecture.md) para uma visão detalhada.
@@ -238,8 +242,8 @@ npm run check
 
 ## Testes
 
-- **19 arquivos** de teste em `tests/`
-- **32/32 testes aprovados**
+- **24 arquivos** de teste em `tests/`
+- **38/38 testes aprovados**
 - **0 erros e 0 warnings** no build (`tsc --noEmit`)
 - Framework: **Vitest**
 
@@ -250,15 +254,15 @@ npm run check
 | Módulo | Descrição | Arquivos |
 |---|---|---|---|
 | `src/agents/` | Swarm multi-agente (Architect, Coder, Tester, Reviewer) | 2 |
-| `src/ci/` | Integração contínua e webhooks (Slack/Discord) | 1 |
-| `src/cli/` | Interface de linha de comando (Commander) | 10 |
+| `src/ci/` | Integração contínua, Bot/Release e webhooks (Slack/Discord) | 3 |
+| `src/cli/` | Interface de linha de comando (Commander) | 12 |
 | `src/config/` | Schema Zod e loader de configuração | 2 |
 | `src/core/` | Loop Engine + Refactor Engine + Workspace Orchestrator | 3 |
-| `src/git/` | Git Sandbox, PRs e Checkpoints | 3 |
-| `src/guardrails/` | Circuit Breaker + Security Scanner (budget, falhas, secrets) | 2 |
-| `src/harness/` | Runner, Parser, Formatter, Bootstrap, Self-Healing | 6 |
+| `src/git/` | Git Sandbox, Docker, PRs e Checkpoints | 5 |
+| `src/guardrails/` | Circuit Breaker + Security Scanner + Loop Lock (budget, falhas, secrets) | 4 |
+| `src/harness/` | Runner, Parser, Formatter, Bootstrap, Test Generator, Self-Healing | 8 |
 | `src/indexer/` | RAG local de código com cache incremental por hash | 1 |
-| `src/llm/` | Provedor LLM com fallback automático e suporte a Ollama | 1 |
+| `src/llm/` | Provedor LLM, Compressor, fallback automático e suporte a Ollama | 3 |
 | `src/memory/` | Persistência de lessons.md e handoff.md com diff stat | 1 |
 | `src/skills/` | Templates e loader de skills | 3 |
 | `src/telemetry/` | Gravador de telemetria e replay de sessão | 1 |

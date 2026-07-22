@@ -13,6 +13,8 @@ import { wizardCommand } from "./commands/wizard.js";
 import { replayCommand } from "./commands/replay.js";
 import { generateTestsCommand } from "./commands/generate-tests.js";
 import { releaseCommand } from "./commands/release.js";
+import { dockerRunCommand } from "./commands/docker.js";
+import { analyticsCommand } from "./commands/analytics.js";
 import { generateGitHubActionWorkflow } from "../ci/webhook.js";
 import chalk from "chalk";
 
@@ -21,7 +23,7 @@ const program = new Command();
 program
   .name("loopforge")
   .description("Automated Loop Engineering Engine for AI Agents")
-  .version("4.0.0");
+  .version("5.0.0");
 
 program
   .command("init")
@@ -45,14 +47,33 @@ program
   .command("generate-tests")
   .description("Gera autonomamente suítes de testes unitários para arquivos de código não cobertos")
   .argument("[directory]", "Diretório do projeto", ".")
+  .option("--dry-run", "Simula a criação de testes exibindo a lista e o diff sem gravar arquivos")
+  .action(async (directory: string, options: { dryRun?: boolean }) => {
+    await generateTestsCommand(directory, options);
+  });
+
+program
+  .command("docker")
+  .description("Executa comandos no Docker Container Sandbox isolado")
+  .argument("<cmd>", "Comando a ser executado dentro do container")
+  .option("-i, --image <image>", "Imagem Docker", "node:20-alpine")
+  .argument("[directory]", "Diretório do projeto", ".")
+  .action(async (cmd: string, options: { image?: string }, directory: string) => {
+    await dockerRunCommand(cmd, options.image, directory);
+  });
+
+program
+  .command("analytics")
+  .description("Compila métricas de telemetria e gera relatório gráfico visual HTML")
+  .argument("[directory]", "Diretório do projeto", ".")
   .action(async (directory: string) => {
-    await generateTestsCommand(directory);
+    await analyticsCommand(directory);
   });
 
 program
   .command("release")
   .description("Gera notas de lançamento semânticas e atualiza o arquivo CHANGELOG.md")
-  .argument("[version]", "Versão da release", "4.0.0")
+  .argument("[version]", "Versão da release", "5.0.0")
   .argument("[directory]", "Diretório do projeto", ".")
   .action(async (version: string, directory: string) => {
     await releaseCommand(version, directory);
@@ -69,7 +90,7 @@ program
 
 program
   .command("ui")
-  .description("Inicia o servidor local do Web Dashboard gráfico interativo no navegador")
+  .description("Inicia o servidor local do Web Dashboard gráfico interativo com WebSocket no navegador")
   .argument("[directory]", "Diretório do projeto", ".")
   .option("-p, --port <port>", "Porta do servidor HTTP", "3000")
   .action(async (directory: string, options: { port?: string }) => {
@@ -124,7 +145,8 @@ program
   .description("Executa o ciclo do Loop Engine com Harness, Memória, Model Fallback e Git Sandbox")
   .argument("[directory]", "Diretório do projeto", ".")
   .option("--create-pr", "Cria automaticamente um Pull Request no GitHub ao concluir com sucesso")
-  .action(async (directory: string, options: { createPr?: boolean }) => {
+  .option("-w, --watch", "Re-executa o ciclo automaticamente sempre que arquivos .ts forem alterados")
+  .action(async (directory: string, options: { createPr?: boolean; watch?: boolean }) => {
     await runCommand(directory, options);
   });
 

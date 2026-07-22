@@ -17,22 +17,23 @@ O LoopForge é estruturado em camadas concêntricas ao redor do **Loop Engine**,
 │  └──────┬───────┘  └──────────────────┘  └──────────────────┘        │
 ├─────────┼───────────────────────────────────────────────────────────┤
 │         │              Domain Services                                 │
-│  ┌──────▼──────┐ ┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
-│  │   Harness    │ │ Memory │ │  Swarm   │ │Security  │ │   Git    │ │
-│  │ (validação)  │ │ (cache)│ │ (agentes)│ │ Scanner  │ │ (sandbox)│ │
-│  └──────┬──────┘ └────────┘ └─────┬────┘ └──────────┘ └────┬─────┘ │
-├─────────┼─────────────────────────┼────────────────────────┼───────┤
+│  ┌──────▼──────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
+│  │   Harness    │ │  Memory  │ │  Swarm   │ │Security  │ │ Git      │ │
+│  │ Validação /  │ │ (cache)  │ │ (agentes)│ │ Scanner  │ │ Sandbox /│ │
+│  │  Test Gen    │ │          │ │          │ │          │ │ Docker   │ │
+│  └──────┬──────┘ └──────────┘ └─────┬────┘ └──────────┘ └────┬─────┘ │
+├─────────┼───────────────────────────┼────────────────────────┼───────┤
 │         │       Infrastructure      │                        │        │
-│  ┌──────▼──────┐ ┌──────────┐  ┌──▼──────────┐  ┌─────────▼─┐   │
-│  │ LLM Provider │ │   RAG    │  │   Circuit    │  │  CI/CD    │   │
-│  │ (+ Ollama)   │ │ (hash    │  │   Breaker    │  │ + Webhook │   │
-│  │              │ │  cache)  │  │ (+ budget)   │  │           │   │
-│  └─────────────┘ └──────────┘  └─────────────┘  └───────────┘   │
-│  ┌───────────────────────────────────────────────────────────┐   │
-│  │              Cross-Cutting: Telemetry Recorder              │   │
-│  │      .loopforge/telemetry/{sessionId}.json → Replay CLI     │   │
-│  └───────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+│  ┌──────▼──────┐ ┌──────────┐  ┌──▼────────────┐  ┌──────────▼──┐ │
+│  │ LLM Provider │ │   RAG    │  │   Guardrails   │  │   CI/CD     │ │
+│  │+ Compressor  │ │ (hash    │  │  Circuit Brek  │  │ Webhooks /  │ │
+│  │+ Ollama      │ │  cache)  │  │  + Loop Lock   │  │ Bot/Release │ │
+│  └─────────────┘ └──────────┘  └───────────────┘  └─────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │              Cross-Cutting: Telemetry Recorder                │   │
+│  │      .loopforge/telemetry/{sessionId}.json → Replay CLI       │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -93,6 +94,12 @@ Sistema multi-runner que executa comandos e estrutura falhas.
 - Identifica testes desatualizados ou mocks quebrados
 - Corrige automaticamente sem intervenção manual
 
+### Gerador Autônomo de Testes (`src/harness/test-generator.ts`)
+Analisa a estrutura do projeto e gera arquivos de teste `.test.ts` para módulos sem cobertura.
+- `TestGenerator.generateTestsForUncoveredCode(cwd?)` → encontra `.ts`/`.js` sem par em `tests/`, cria boilerplate Vitest.
+- `GeneratedTestFile`: `{ sourceFile, testFile, created }`.
+- CLI: `loopforge generate-tests [directory]`.
+
 ### Types (`types.ts`)
 - `RunnerResult`: resultado estruturado de cada runner
 - `HarnessExecutionSummary`: sumário da execução completa
@@ -129,6 +136,16 @@ Cada papel recebe o output do anterior como contexto, formando um pipeline de qu
 - Commits parciais durante o ciclo
 - Preserva histórico de tentativas
 
+### Docker Container Sandbox (`src/git/docker.ts`)
+Isola execução de tarefas e runners em containers Docker, garantindo zero efeitos colaterais no SO do desenvolvedor.
+- `runInDockerContainer(command, image?, cwd?)` → executa comando em container (default `node:20-alpine`).
+- `isDockerAvailable(cwd?)` → verifica se Docker está instalado.
+- Monta o diretório do projeto via bind mount (`-v`), usa `--rm` para autolimpeza.
+
+### Rotação de Snapshots Git (`src/git/checkpoint.ts`)
+P urga stales e marcadores temporários antigos gerados pelo ciclo de execução.
+- `cleanupOldCheckpoints(cwd?)` → lista stashes com prefixo `loopforge-ckpt-` e os remove via `git stash drop`.
+
 ---
 
 ## LLM Provider (`src/llm/provider.ts`)
@@ -142,6 +159,12 @@ Sistema de provedor com fallback automático e suporte a LLMs locais:
 | `openai` | GPT-4, GPT-3.5 | API externa |
 | `anthropic` | Claude 3.5 Sonnet | API externa |
 | `custom` | URL base customizada | Providers arbitrários |
+
+### Compressor de Contexto (`src/llm/compressor.ts`)
+Detecta prompts extensos e aplica sumarização dinâmica, preservando seções críticas (Lições Aprendidas, Handoff).
+- `compressPromptContext(fullContext, maxCharLength?)` → retorna contexto comprimido com flag de compressão.
+- Prioriza seções de memória do loop (Handoff, Lessons, Iteração) e trunca as demais para 300 caracteres.
+- Default `maxCharLength`: 8000 caracteres.
 
 ### Ollama Local
 - Conecta a `http://localhost:11434/api/generate`
@@ -173,6 +196,12 @@ Sistema de provedor com fallback automático e suporte a LLMs locais:
   - **Secrets expostos**: chaves de API (sk-), tokens AWS (AKIA), JWT
   - **SQL Injection**: strings SQL concatenadas com template strings
   - **Código inseguro**: eval() e similares
+
+### Loop Lock Detector (`src/guardrails/loop-lock.ts`)
+Detecta oscilação e repetição de código comparando hashes SHA-256 das respostas consecutivas do LLM.
+- `CodeLoopLockDetector.registerResponse(content)` → hasheia e compara com histórico (últimas 5).
+- Se hash idêntico detectado, retorna `isLocked: true` com warning prompt forçando mudança de estratégia.
+- `reset()` → limpa histórico de hashes.
 
 ### Proteções
 - `requireCleanGit`: bloqueia execução se repo tem mudanças não commitadas
@@ -211,6 +240,17 @@ Indexador semântico de código-fonte para repositórios grandes:
 - Notificações para Slack e Discord
 - Estado do ciclo (sucesso/falha/fallback ativo)
 
+### Gerador de Release & CHANGELOG (`src/ci/release.ts`)
+Gera notas de lançamento semânticas e mantém CHANGELOG.md automaticamente.
+- `generateReleaseNotes(version?, cwd?)` → lê `git log -n 5 --oneline`, formata entry datada, atualiza CHANGELOG.md.
+- CLI: `loopforge release [version]`
+
+### Bot Slack/Discord (`src/ci/bot.ts`)
+Listener para comandos via webhook em canais Slack e Discord.
+- `handleSlackOrDiscordBotCommand(payload)` → reconhece `/loopforge run` e `/loopforge status`, retorna resposta com feedback.
+- `BotCommandPayload`: `{ command, user, channel }`.
+- `BotCommandResponse`: `{ handled, replyMessage }`.
+
 ---
 
 ## Telemetry & Recorder (`src/telemetry/recorder.ts`)
@@ -230,7 +270,7 @@ Indexador semântico de código-fonte para repositórios grandes:
 
 ---
 
-## CLI Wizard (`src/cli/commands/wizard.ts`)
+### CLI Wizard (`src/cli/commands/wizard.ts`)
 
 - Assistente interativo de configuração e onboarding
 - Sequência guiada: `init` (template Node/TS) → `bootstrap` → sumário final
@@ -238,12 +278,20 @@ Indexador semântico de código-fonte para repositórios grandes:
 
 ---
 
+## Carregamento de Configuração (`src/config/loader.ts`)
+
+Suporte a múltiplos formatos: `.loopforge.json`, `.loopforge.yml`, `.loopforge.yaml`.
+- Ordem de resolução: JSON → YML → YAML.
+- Parsing YAML via `parseSimpleYaml()` para configurações planas (sem dependência externa de YAML).
+
+---
+
 ## TUI, Web Dashboard & Logger (`src/ui/`)
 
 ### Terminal UI (`tui.ts`)
-- Visualizador de progresso no terminal
-- Barra de pass-rate
-- Indicador de model fallback
+Painel interativo no terminal com refresh full-screen.
+- Renderiza iteração, papel Swarm, barra de progresso, tokens, custo estimado.
+- **Live Stream**: exibe os últimos 150 caracteres da geração de tokens do LLM em tempo real via campo `streamingChunk`.
 
 ### Web Dashboard (`server.ts`)
 - Servidor local em `http://localhost:3000`

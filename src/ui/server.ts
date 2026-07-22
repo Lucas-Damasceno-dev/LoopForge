@@ -1,9 +1,10 @@
 import * as http from "node:http";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { WebSocketServer, WebSocket } from "ws";
 import chalk from "chalk";
 
-export async function startWebUIServer(port: number = 3000, cwd: string = "."): Promise<http.Server> {
+export async function startWebUIServer(port: number = 3000, cwd: string = "."): Promise<{ server: http.Server; wss: WebSocketServer; broadcast: (msg: any) => void }> {
   const resolvedDir = path.resolve(cwd);
 
   const server = http.createServer(async (req, res) => {
@@ -33,19 +34,25 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
     .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: bold; font-size: 0.85rem; }
     .badge-success { background: #059669; color: #fff; }
     .metric { font-size: 2rem; font-weight: bold; color: #a7f3d0; margin: 0.5rem 0; }
+    #liveFeed { background: #020617; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.9rem; max-height: 200px; overflow-y: auto; color: #38bdf8; }
   </style>
 </head>
 <body>
-  <h1>🚀 LoopForge Web Dashboard</h1>
+  <h1>🚀 LoopForge Web Dashboard (Real-time Live WebSocket)</h1>
   <div class="card">
     <h2>Status Geral</h2>
-    <div id="statusBadge" class="badge badge-success">SISTEMA ATIVO</div>
-    <div class="metric" id="iterationsCount">Iterações: --</div>
+    <div id="statusBadge" class="badge badge-success">SISTEMA CONECTADO</div>
+    <div class="metric" id="iterationsCount">Iterações Concluídas: --</div>
   </div>
 
   <div class="card">
     <h2>Consumo de Tokens e Custos</h2>
     <p id="tokenUsage">Carregando métricas...</p>
+  </div>
+
+  <div class="card">
+    <h2>🌊 Live WebSocket Feed</h2>
+    <div id="liveFeed">Aguardando eventos do LoopForge Engine...</div>
   </div>
 
   <script>
@@ -55,10 +62,18 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
         if (!res.ok) return;
         const data = await res.json();
         document.getElementById('iterationsCount').innerText = 'Iterações Concluídas: ' + data.totalIterations;
-        document.getElementById('tokenUsage').innerText = 'Tokens Consumidos: ' + data.totalTokensUsed + ' | Custo Est.: $' + (data.totalCostUsd || 0).toFixed(4);
+        document.getElementById('tokenUsage').innerText = 'Tokens Consumidos: ' + (data.totalTokensUsed || 0) + ' | Custo Est.: $' + (data.totalCostUsd || 0).toFixed(4);
       } catch {}
     }
     loadReport();
+
+    const ws = new WebSocket('ws://' + window.location.host);
+    ws.onmessage = (event) => {
+      const feed = document.getElementById('liveFeed');
+      const item = document.createElement('div');
+      item.innerText = '[' + new Date().toLocaleTimeString() + '] ' + event.data;
+      feed.prepend(item);
+    };
   </script>
 </body>
 </html>`;
@@ -67,10 +82,21 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
     res.end(htmlContent);
   });
 
+  const wss = new WebSocketServer({ server });
+
+  const broadcast = (msg: any) => {
+    const payload = typeof msg === "string" ? msg : JSON.stringify(msg);
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    });
+  };
+
   return new Promise((resolve) => {
     server.listen(port, () => {
-      console.log(chalk.green(`\n🌐 LoopForge Web Dashboard rodando em: ${chalk.bold.cyan(`http://localhost:${port}`)}`));
-      resolve(server);
+      console.log(chalk.green(`\n🌐 LoopForge Web Dashboard rodando em: ${chalk.bold.cyan(`http://localhost:${port}`)} (WebSocket ativo)`));
+      resolve({ server, wss, broadcast });
     });
   });
 }
