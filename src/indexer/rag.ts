@@ -1,107 +1,131 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import * as crypto from "node:crypto";
 
-export interface CodeChunk {
+export interface CodeSymbol {
+  name: string;
+  kind: "function" | "class" | "interface" | "type" | "const";
   filePath: string;
-  symbolName: string;
+  line: number;
   snippet: string;
-  score?: number;
+}
+
+export interface IndexCache {
+  hashes: Record<string, string>;
+  symbols: CodeSymbol[];
 }
 
 export class CodeIndexer {
-  private indexedChunks: CodeChunk[] = [];
+  private indexPath: string;
+
+  constructor(indexDir: string = ".loopforge/index") {
+    this.indexPath = path.join(indexDir, "symbols.json");
+  }
+
+  private calculateHash(content: string): string {
+    return crypto.createHash("sha256").update(content).digest("hex");
+  }
 
   public async indexRepository(cwd: string = "."): Promise<number> {
     const resolvedDir = path.resolve(cwd);
-    this.indexedChunks = [];
+    const indexDir = path.dirname(this.indexPath);
+    await fs.mkdir(path.resolve(resolvedDir, indexDir), { recursive: true });
 
-    await this.scanDirectory(resolvedDir, resolvedDir);
+    let existingCache: IndexCache = { hashes: {}, symbols: [] };
+    const fullIndexPath = path.resolve(resolvedDir, this.indexPath);
 
-    const indexDir = path.join(resolvedDir, ".loopforge/index");
-    await fs.mkdir(indexDir, { recursive: true });
-    await fs.writeFile(
-      path.join(indexDir, "symbols.json"),
-      JSON.stringify(this.indexedChunks, null, 2),
-      "utf-8"
-    );
+    try {
+      const raw = await fs.readFile(fullIndexPath, "utf-8");
+      existingCache = JSON.parse(raw);
+    } catch {}
 
-    return this.indexedChunks.length;
-  }
+    const codeFiles = await this.findCodeFiles(resolvedDir);
+    const symbols: CodeSymbol[] = [];
+    const newHashes: Record<string, string> = {};
 
-  public searchRelevantSnippets(query: string, topK: number = 3): CodeChunk[] {
-    const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+    for (const file of codeFiles) {
+      const relativePath = path.relative(resolvedDir, file);
+      try {
+        const content = await fs.readFile(file, "utf-8");
+        const hash = this.calculateHash(content);
+        newHashes[relativePath] = hash;
 
-    if (terms.length === 0 || this.indexedChunks.length === 0) {
-      return this.indexedChunks.slice(0, topK);
-    }
-
-    const scored = this.indexedChunks.map((chunk) => {
-      let score = 0;
-      const lowerSnippet = chunk.snippet.toLowerCase();
-      const lowerSymbol = chunk.symbolName.toLowerCase();
-
-      for (const term of terms) {
-        if (lowerSymbol.includes(term)) score += 5;
-        if (lowerSnippet.includes(term)) score += 1;
-      }
-
-      return { ...chunk, score };
-    });
-
-    return scored
-      .filter((c) => (c.score || 0) > 0)
-      .sort((a, b) => (b.score || 0) - (a.score || 0))
-      .slice(0, topK);
-  }
-
-  private async scanDirectory(currentDir: string, rootDir: string): Promise<void> {
-    const entries = await fs.readdir(currentDir, { withFileTypes: true }).catch(() => []);
-
-    for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
-      const relativePath = path.relative(rootDir, fullPath);
-
-      if (entry.isDirectory()) {
-        if (
-          entry.name === "node_modules" ||
-          entry.name === "dist" ||
-          entry.name === ".git" ||
-          entry.name === ".loopforge"
-        ) {
+        if (existingCache.hashes[relativePath] === hash) {
+          const cachedFileSymbols = existingCache.symbols.filter(s => s.filePath === relativePath);
+          symbols.push(...cachedFileSymbols);
           continue;
         }
-        await this.scanDirectory(fullPath, rootDir);
-      } else if (entry.isFile() && /\.(ts|js|py|rs|go)$/.test(entry.name)) {
-        await this.indexFile(fullPath, relativePath);
-      }
+
+        const extracted = this.extractSymbols(content, relativePath);
+        symbols.push(...extracted);
+      } catch {}
+    }
+
+    const updatedCache: IndexCache = {
+      hashes: newHashes,
+      symbols,
+    };
+
+    await fs.writeFile(fullIndexPath, JSON.stringify(updatedCache, null, 2), "utf-8");
+    return symbols.length;
+  }
+
+  public async searchRelevantSnippets(query: string, topK: number = 3, cwd: string = "."): Promise<CodeSymbol[]> {
+    const fullIndexPath = path.resolve(cwd, this.indexPath);
+    try {
+      const raw = await fs.readFile(fullIndexPath, "utf-8");
+      const cache: IndexCache = JSON.parse(raw);
+      const queryTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+
+      const scored = cache.symbols.map((sym) => {
+        let score = 0;
+        const targetText = `${sym.name} ${sym.snippet}`.toLowerCase();
+        for (const term of queryTerms) {
+          if (targetText.includes(term)) score += 1;
+        }
+        return { symbol: sym, score };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+      return scored.slice(0, topK).map((s) => s.symbol);
+    } catch {
+      return [];
     }
   }
 
-  private async indexFile(filePath: string, relativePath: string): Promise<void> {
-    try {
-      const content = await fs.readFile(filePath, "utf-8");
-      const lines = content.split("\n");
+  private async findCodeFiles(dir: string): Promise<string[]> {
+    const results: string[] = [];
+    const entries = await fs.readdir(dir, { withFileTypes: true });
 
-      // Extrair assinaturas de função / classe / interface
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (
-          line.includes("function") ||
-          line.includes("class") ||
-          line.includes("interface") ||
-          line.includes("def ") ||
-          line.includes("fn ")
-        ) {
-          const snippet = lines.slice(Math.max(0, i - 1), Math.min(lines.length, i + 10)).join("\n");
-          this.indexedChunks.push({
-            filePath: relativePath,
-            symbolName: line.trim(),
-            snippet,
-          });
-        }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "dist") continue;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...(await this.findCodeFiles(fullPath)));
+      } else if (/\.(ts|js|py|rs|go)$/.test(entry.name)) {
+        results.push(fullPath);
       }
-    } catch {
-      // Ignorar erros de leitura de arquivo individual
     }
+    return results;
+  }
+
+  private extractSymbols(content: string, filePath: string): CodeSymbol[] {
+    const lines = content.split("\n");
+    const symbols: CodeSymbol[] = [];
+
+    lines.forEach((line, idx) => {
+      const fnMatch = line.match(/(?:function|class|interface|type)\s+([A-Za-z0-9_]+)/);
+      if (fnMatch) {
+        symbols.push({
+          name: fnMatch[1],
+          kind: line.includes("function") ? "function" : line.includes("class") ? "class" : "interface",
+          filePath,
+          line: idx + 1,
+          snippet: line.trim(),
+        });
+      }
+    });
+
+    return symbols;
   }
 }

@@ -7,6 +7,10 @@ import { statusCommand } from "./commands/status.js";
 import { bootstrapCommand } from "./commands/bootstrap.js";
 import { refactorCommand } from "./commands/refactor.js";
 import { uiCommand } from "./commands/ui.js";
+import { workspaceCommand } from "./commands/workspace.js";
+import { auditCommand } from "./commands/audit.js";
+import { wizardCommand } from "./commands/wizard.js";
+import { replayCommand } from "./commands/replay.js";
 import { generateGitHubActionWorkflow } from "../ci/webhook.js";
 import chalk from "chalk";
 
@@ -51,6 +55,40 @@ program
   .option("-p, --port <port>", "Porta do servidor HTTP", "3000")
   .action(async (directory: string, options: { port?: string }) => {
     await uiCommand(directory, options);
+  });
+
+program
+  .command("workspace")
+  .description("Orquestra execuções de loops em múltiplos repositórios do workspace em lote")
+  .argument("[workspaceFile]", "Arquivo manifesto de workspace", "loopforge-workspace.json")
+  .argument("[directory]", "Diretório raiz", ".")
+  .action(async (workspaceFile: string, directory: string) => {
+    await workspaceCommand(workspaceFile, directory);
+  });
+
+program
+  .command("audit")
+  .description("Executa o scanner de segurança e code smells em busca de segredos expostos e falhas OWASP")
+  .argument("[directory]", "Diretório do projeto", ".")
+  .action(async (directory: string) => {
+    await auditCommand(directory);
+  });
+
+program
+  .command("wizard")
+  .description("Assistente guiado interativo de onboarding e configuração do LoopForge")
+  .argument("[directory]", "Diretório do projeto", ".")
+  .action(async (directory: string) => {
+    await wizardCommand(directory);
+  });
+
+program
+  .command("replay")
+  .description("Reproduz em tempo real a gravação de telemetria de uma sessão passada")
+  .argument("<sessionId>", "ID da sessão gravada em .loopforge/telemetry/")
+  .argument("[directory]", "Diretório do projeto", ".")
+  .action(async (sessionId: string, directory: string) => {
+    await replayCommand(sessionId, directory);
   });
 
 program

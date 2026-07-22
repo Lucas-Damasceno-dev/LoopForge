@@ -24,7 +24,15 @@ export async function loadConfig(configPath?: string): Promise<LoopForgeConfig> 
 
 export async function createDefaultConfig(targetDir: string = "."): Promise<string> {
   const filePath = path.resolve(targetDir, DEFAULT_CONFIG_FILENAME);
-  const defaultConfig: LoopForgeConfig = LoopForgeConfigSchema.parse({});
+  const defaultConfig: LoopForgeConfig = LoopForgeConfigSchema.parse({
+    projectName: "LoopForge Project",
+    version: "3.0.0",
+    harness: {
+      runners: [
+        { name: "Unit Tests", type: "unit", command: "npm test", enabled: true },
+      ],
+    },
+  });
 
   await fs.writeFile(filePath, JSON.stringify(defaultConfig, null, 2), "utf-8");
   return filePath;

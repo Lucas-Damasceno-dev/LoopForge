@@ -1,29 +1,12 @@
 import type { RunnerType } from "../config/schema.js";
 
-export function parseRunnerErrors(
-  type: RunnerType,
-  stdout: string,
-  stderr: string
-): string {
-  const combinedLog = `${stdout}\n${stderr}`.trim();
-  if (!combinedLog) return "Nenhuma saída detalhada de erro capturada.";
+export function extractErrorDetails(combinedLog: string, type: RunnerType): string {
+  if (!combinedLog.trim()) return "Nenhuma saída detalhada de erro capturada.";
 
   const lines = combinedLog.split("\n");
 
   switch (type) {
-    case "typecheck": {
-      // Filtrar erros comuns de TypeScript / Cargo / MyPy
-      const tsErrors = lines.filter(
-        (line) => line.includes("error TS") || line.includes("error[E") || line.includes("error:")
-      );
-      if (tsErrors.length > 0) {
-        return tsErrors.slice(0, 15).join("\n");
-      }
-      break;
-    }
-
     case "unit": {
-      // Filtrar falhas do Vitest / Jest / Pytest
       const failureLines = lines.filter(
         (line) =>
           line.includes("FAIL") ||
@@ -40,7 +23,6 @@ export function parseRunnerErrors(
     }
 
     case "e2e": {
-      // Filtrar falhas do Playwright / Cypress
       const e2eFailures = lines.filter(
         (line) =>
           line.includes("Error:") ||
@@ -57,9 +39,8 @@ export function parseRunnerErrors(
     }
 
     case "linter": {
-      // Filtrar erros de linter (ESLint, Biome, Flake8)
       const linterErrors = lines.filter(
-        (line) => line.includes("error") || line.includes("Warning") || line.includes("✖")
+        (line) => line.includes("error") || line.includes("Warning") || line.includes("✖") || line.includes("error TS")
       );
       if (linterErrors.length > 0) {
         return linterErrors.slice(0, 15).join("\n");
@@ -71,6 +52,9 @@ export function parseRunnerErrors(
       break;
   }
 
-  // Fallback se não encontrar padrões específicos: retorna os últimos 2500 caracteres
   return combinedLog.length > 2500 ? combinedLog.slice(-2500) : combinedLog;
+}
+
+export function parseRunnerErrors(type: RunnerType, stdout: string, stderr: string): string {
+  return extractErrorDetails(`${stdout}\n${stderr}`, type);
 }

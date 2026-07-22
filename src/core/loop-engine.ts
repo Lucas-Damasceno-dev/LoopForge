@@ -1,13 +1,13 @@
 import type { LoopForgeConfig } from "../config/schema.js";
-import { runAllHarness } from "../harness/runner.js";
+import { runHarness } from "../harness/runner.js";
 import { formatHarnessFeedback } from "../harness/formatter.js";
 import type { HarnessExecutionSummary } from "../harness/types.js";
 import { loadActiveSkills, formatSkillsPrompt } from "../skills/loader.js";
-import { readMemoryFile, appendLesson, formatMemoryPrompt, updateHandoff } from "../memory/manager.js";
+import { MemoryManager } from "../memory/manager.js";
 import { CircuitBreaker } from "../guardrails/circuit-breaker.js";
 import { createCheckpoint, rollbackToCheckpoint } from "../git/checkpoint.js";
 import { createSandboxBranch, mergeSandboxBranch, cleanupSandboxBranch, type SandboxInfo } from "../git/sandbox.js";
-import { LLMEngine, type LLMResponse, type TokenUsage } from "../llm/provider.js";
+import { LLMEngine, type LLMResponse } from "../llm/provider.js";
 
 export type AgentStepRunner = (promptContext: string, iteration: number, llmEngine: LLMEngine) => Promise<string>;
 
@@ -18,7 +18,8 @@ export interface IterationReport {
   agentResponse: string;
   modelUsed: string;
   isFallbackModel: boolean;
-  tokens: TokenUsage;
+  tokensUsed: number;
+  estimatedCostUsd: number;
   rollbackExecuted: boolean;
   circuitBreakerTripped: boolean;
   stopReason?: string;
@@ -37,20 +38,15 @@ export interface LoopExecutionResult {
 export class LoopEngine {
   private circuitBreaker: CircuitBreaker;
   private llmEngine: LLMEngine;
+  private memoryManager: MemoryManager;
 
   constructor(
     private config: LoopForgeConfig,
     private cwd: string = "."
   ) {
     this.circuitBreaker = new CircuitBreaker(config.guardrails);
-    const providerConfig = config.provider || {
-      name: "opencode",
-      model: "deepseek-v3",
-      fallbackModel: "anthropic/claude-3-5-sonnet",
-      enableModelFallback: true,
-      fallbackFailureThreshold: 2,
-    };
-    this.llmEngine = new LLMEngine(providerConfig);
+    this.llmEngine = new LLMEngine(config.llm);
+    this.memoryManager = new MemoryManager(config.memory, cwd);
   }
 
   public async runLoop(customStepRunner?: AgentStepRunner): Promise<LoopExecutionResult> {
@@ -58,89 +54,64 @@ export class LoopEngine {
     let lastHarnessFeedback = "";
     let sandboxInfo: SandboxInfo | null = null;
 
-    const sandboxConfig = this.config.sandbox || { enableBranchSandbox: false, branchPrefix: "loopforge/task-" };
-
-    // Criar Sandbox Branch se ativado
-    if (sandboxConfig.enableBranchSandbox) {
-      sandboxInfo = await createSandboxBranch(sandboxConfig.branchPrefix || "loopforge/task-", this.cwd);
-    }
+    try {
+      sandboxInfo = await createSandboxBranch("loopforge/task-", this.cwd);
+    } catch {}
 
     try {
+      let iteration = 0;
       while (true) {
-        const status = this.circuitBreaker.nextIteration();
-        if (status.stop) {
+        iteration++;
+        const status = this.circuitBreaker.evaluate();
+        if (status.isOpen) {
           if (sandboxInfo) {
             await cleanupSandboxBranch(sandboxInfo.sandboxBranch, sandboxInfo.originalBranch, this.cwd);
           }
           return this.buildExecutionResult(false, reports, status.reason || "Interrompido por Guardrail.", sandboxInfo?.sandboxBranch);
         }
 
-        const iteration = status.currentIteration;
-        const consecutiveFailures = status.consecutiveFailures;
-
-        // 1. Carregar Skills e Memórias
-        const { loadedSkills } = await loadActiveSkills(this.config.skills, this.cwd);
-        const skillsPrompt = formatSkillsPrompt(loadedSkills);
-
-        const lessonsText = await readMemoryFile(
-          this.config.memory.lessonsFile,
-          "🧠 Lições Aprendidas (Lessons Learned)"
-        );
-        const handoffText = await readMemoryFile(
-          this.config.memory.handoffFile,
-          "🤝 Instruções de Transição (Handoff)"
-        );
-        const memoryPrompt = formatMemoryPrompt(lessonsText, handoffText);
+        // 1. Carregar Memórias
+        const lessonsText = await this.memoryManager.readLessonsPrompt();
+        const handoffText = await this.memoryManager.readHandoffPrompt();
 
         // 2. Construir Contexto do Prompt
         const fullContext = [
-          `# 🔄 LoopForge Iteração #${iteration} [Estratégia: ${this.config.strategy.toUpperCase()}]`,
-          skillsPrompt,
-          memoryPrompt,
+          `# 🔄 LoopForge Iteração #${iteration}`,
+          lessonsText,
+          handoffText,
           lastHarnessFeedback,
         ]
           .filter(Boolean)
           .join("\n\n");
 
-        // 3. Executar o LLM / Agent Step (com OpenCode DeepSeek v4 free ou Model Fallback)
+        // 3. Executar o LLM / Agent Step
         let llmResponse: LLMResponse;
         if (customStepRunner) {
           const content = await customStepRunner(fullContext, iteration, this.llmEngine);
-          const activeModelInfo = this.llmEngine.getActiveModel(consecutiveFailures);
+          const activeModelInfo = this.llmEngine.getActiveModel();
           llmResponse = {
             content,
             modelUsed: activeModelInfo.model,
             isFallback: activeModelInfo.isFallback,
-            tokens: {
-              promptTokens: Math.ceil(fullContext.length / 4),
-              completionTokens: Math.ceil(content.length / 4),
-              totalTokens: Math.ceil((fullContext.length + content.length) / 4),
-              estimatedCostUsd: activeModelInfo.isFallback ? 0.003 : 0.0,
-            },
+            tokensUsed: Math.ceil((fullContext.length + content.length) / 4),
+            estimatedCostUsd: activeModelInfo.isFallback ? 0.003 : 0.0,
           };
         } else {
-          llmResponse = await this.llmEngine.generateStep(fullContext, consecutiveFailures, this.cwd);
+          llmResponse = await this.llmEngine.generateStep(fullContext);
         }
 
-        // 4. Executar o Harness Engine (Unit, Linter, E2E)
-        const harnessSummary = await runAllHarness(this.config.harness.runners, this.cwd);
-
-        // 5. Atualizar Circuit Breaker
-        const breakerResult = this.circuitBreaker.recordResult(harnessSummary.allPassed);
+        // 4. Executar o Harness Engine
+        const harnessSummary = await runHarness(this.config.harness, this.cwd);
+        this.llmEngine.registerHarnessResult(harnessSummary.allPassed);
 
         let rollbackExecuted = false;
 
         if (harnessSummary.allPassed) {
           lastHarnessFeedback = formatHarnessFeedback(harnessSummary);
+          await createCheckpoint(`Iteração #${iteration} passou no harness`, this.cwd);
+          await this.memoryManager.updateHandoff(`Iteração #${iteration} concluída`, "Manter automação ativa", this.cwd);
 
-          if (this.config.strategy === "creator" && this.config.guardrails.allowGitRollback) {
-            await createCheckpoint(`Iteração #${iteration} passou no harness`, this.cwd);
-          }
-
-          await updateHandoff(
-            this.config.memory.handoffFile,
-            `# 🤝 Handoff Status\n- Iteração #${iteration} concluída com sucesso.\n- Modelo: ${llmResponse.modelUsed}\n- Resposta: ${llmResponse.content.slice(0, 100)}...`
-          );
+          const breakerStatus = this.circuitBreaker.recordSuccess(llmResponse.estimatedCostUsd);
 
           const report: IterationReport = {
             iteration,
@@ -149,43 +120,34 @@ export class LoopEngine {
             agentResponse: llmResponse.content,
             modelUsed: llmResponse.modelUsed,
             isFallbackModel: llmResponse.isFallback,
-            tokens: llmResponse.tokens,
+            tokensUsed: llmResponse.tokensUsed,
+            estimatedCostUsd: llmResponse.estimatedCostUsd,
             rollbackExecuted: false,
-            circuitBreakerTripped: breakerResult.stop,
+            circuitBreakerTripped: breakerStatus.isOpen,
           };
           reports.push(report);
 
-          if (this.config.guardrails.stopOnSuccess) {
-            // Realizar Merge da Sandbox Branch caso 100% de sucesso
-            if (sandboxInfo) {
-              await mergeSandboxBranch(sandboxInfo.sandboxBranch, sandboxInfo.originalBranch, this.cwd);
-            }
-            return this.buildExecutionResult(
-              true,
-              reports,
-              `✅ SUCESSO: Todos os runners do Harness passaram na iteração #${iteration}.`,
-              sandboxInfo?.sandboxBranch
-            );
+          if (sandboxInfo) {
+            await mergeSandboxBranch(sandboxInfo.sandboxBranch, sandboxInfo.originalBranch, this.cwd);
           }
+
+          return this.buildExecutionResult(
+            true,
+            reports,
+            `✅ SUCESSO: Todos os runners do Harness passaram na iteração #${iteration}.`,
+            sandboxInfo?.sandboxBranch
+          );
         } else {
           // Falha no Harness
           lastHarnessFeedback = formatHarnessFeedback(harnessSummary);
+          const failedNames = harnessSummary.results.filter((r) => !r.passed).map((r) => r.runnerName).join(", ");
+          await this.memoryManager.appendLesson(
+            `Falha nos runners: ${failedNames}`,
+            `Ajustar lógica de código na iteração #${iteration}`
+          );
 
-          if (this.config.memory.autoUpdateLessons) {
-            const failedNames = harnessSummary.results
-              .filter((r) => !r.passed)
-              .map((r) => r.runnerName)
-              .join(", ");
-
-            await appendLesson(
-              this.config.memory.lessonsFile,
-              `Iteração #${iteration} falhou nos runners: ${failedNames}. Modelo utilizado: ${llmResponse.modelUsed}. Ajuste abordagens que provocam este erro.`
-            );
-          }
-
-          if (this.config.strategy === "creator" && this.config.guardrails.allowGitRollback) {
-            rollbackExecuted = await rollbackToCheckpoint(this.cwd);
-          }
+          rollbackExecuted = await rollbackToCheckpoint(this.cwd);
+          const breakerStatus = this.circuitBreaker.recordFailure(llmResponse.estimatedCostUsd);
 
           const report: IterationReport = {
             iteration,
@@ -194,21 +156,22 @@ export class LoopEngine {
             agentResponse: llmResponse.content,
             modelUsed: llmResponse.modelUsed,
             isFallbackModel: llmResponse.isFallback,
-            tokens: llmResponse.tokens,
+            tokensUsed: llmResponse.tokensUsed,
+            estimatedCostUsd: llmResponse.estimatedCostUsd,
             rollbackExecuted,
-            circuitBreakerTripped: breakerResult.stop,
-            stopReason: breakerResult.reason,
+            circuitBreakerTripped: breakerStatus.isOpen,
+            stopReason: breakerStatus.reason,
           };
           reports.push(report);
 
-          if (breakerResult.stop) {
+          if (breakerStatus.isOpen) {
             if (sandboxInfo) {
               await cleanupSandboxBranch(sandboxInfo.sandboxBranch, sandboxInfo.originalBranch, this.cwd);
             }
             return this.buildExecutionResult(
               false,
               reports,
-              breakerResult.reason || "Disparo do Circuit Breaker.",
+              breakerStatus.reason || "Disparo do Circuit Breaker.",
               sandboxInfo?.sandboxBranch
             );
           }
@@ -228,8 +191,8 @@ export class LoopEngine {
     stopReason: string,
     sandboxBranchUsed?: string
   ): LoopExecutionResult {
-    const totalTokensUsed = reports.reduce((acc, r) => acc + r.tokens.totalTokens, 0);
-    const totalCostUsd = Number(reports.reduce((acc, r) => acc + r.tokens.estimatedCostUsd, 0).toFixed(6));
+    const totalTokensUsed = reports.reduce((acc, r) => acc + r.tokensUsed, 0);
+    const totalCostUsd = Number(reports.reduce((acc, r) => acc + r.estimatedCostUsd, 0).toFixed(6));
 
     return {
       success,

@@ -1,18 +1,18 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { loadConfig } from "../config/loader.js";
-import type { HarnessRunnerConfig } from "../config/schema.js";
+import type { RunnerConfig } from "../config/schema.js";
 
 export interface BootstrapResult {
   stackDetected: string;
   createdFiles: string[];
-  runnersAdded: HarnessRunnerConfig[];
+  runnersAdded: RunnerConfig[];
 }
 
 export async function bootstrapHarness(targetDir: string = "."): Promise<BootstrapResult> {
   const resolvedDir = path.resolve(targetDir);
   const createdFiles: string[] = [];
-  const runnersAdded: HarnessRunnerConfig[] = [];
+  const runnersAdded: RunnerConfig[] = [];
   let stackDetected = "Desconhecida";
 
   const hasPackageJson = await fs.stat(path.join(resolvedDir, "package.json")).then(() => true).catch(() => false);
@@ -23,7 +23,7 @@ export async function bootstrapHarness(targetDir: string = "."): Promise<Bootstr
     stackDetected = "Node.js / TypeScript";
     const sampleTestPath = path.join(resolvedDir, "tests/baseline.test.ts");
     await fs.mkdir(path.dirname(sampleTestPath), { recursive: true });
-    
+
     const sampleTestContent = `import { describe, it, expect } from "vitest";
 
 describe("Baseline Test Suite (Auto-Harness)", () => {
@@ -36,8 +36,8 @@ describe("Baseline Test Suite (Auto-Harness)", () => {
     createdFiles.push(sampleTestPath);
 
     runnersAdded.push(
-      { name: "Unit Tests (Vitest)", type: "unit", command: "npm test", timeoutMs: 60000 },
-      { name: "Typecheck (TSC)", type: "typecheck", command: "npm run check", timeoutMs: 30000 }
+      { name: "Unit Tests (Vitest)", type: "unit", command: "npm test", timeoutMs: 60000, enabled: true },
+      { name: "Linter / Check", type: "linter", command: "npm run check", timeoutMs: 30000, enabled: true }
     );
   } else if (hasPyproject) {
     stackDetected = "Python";
@@ -51,31 +51,27 @@ describe("Baseline Test Suite (Auto-Harness)", () => {
     createdFiles.push(sampleTestPath);
 
     runnersAdded.push(
-      { name: "Pytest Suite", type: "unit", command: "pytest", timeoutMs: 60000 }
+      { name: "Pytest Suite", type: "unit", command: "pytest", timeoutMs: 60000, enabled: true }
     );
   } else if (hasCargoToml) {
     stackDetected = "Rust";
     runnersAdded.push(
-      { name: "Cargo Test", type: "unit", command: "cargo test", timeoutMs: 60000 },
-      { name: "Cargo Clippy", type: "linter", command: "cargo clippy", timeoutMs: 30000 }
+      { name: "Cargo Test", type: "unit", command: "cargo test", timeoutMs: 60000, enabled: true },
+      { name: "Cargo Clippy", type: "linter", command: "cargo clippy", timeoutMs: 30000, enabled: true }
     );
   } else {
-    // Fallback genérico
     stackDetected = "Genérica / Script";
     runnersAdded.push(
-      { name: "Linter Genérico", type: "custom", command: "echo 'Sensores ativos'", timeoutMs: 10000 }
+      { name: "Linter Genérico", type: "custom", command: "echo 'Sensores ativos'", timeoutMs: 10000, enabled: true }
     );
   }
 
-  // Atualizar a configuração .loopforge.json se ela existir
   try {
     const configPath = path.join(resolvedDir, ".loopforge.json");
     const config = await loadConfig(configPath);
     config.harness.runners = runnersAdded;
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
-  } catch {
-    // Ignora se o arquivo .loopforge.json ainda não tiver sido inicializado
-  }
+  } catch {}
 
   return {
     stackDetected,

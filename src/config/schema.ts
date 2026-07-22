@@ -1,70 +1,54 @@
 import { z } from "zod";
 
-export const RunnerTypeSchema = z.enum(["unit", "linter", "typecheck", "e2e", "custom"]);
+export const RunnerTypeSchema = z.enum(["unit", "linter", "e2e", "custom"]);
 export type RunnerType = z.infer<typeof RunnerTypeSchema>;
 
-export const HarnessRunnerConfigSchema = z.object({
+export const RunnerConfigSchema = z.object({
   name: z.string(),
   type: RunnerTypeSchema,
   command: z.string(),
   timeoutMs: z.number().optional().default(60000),
+  enabled: z.boolean().optional().default(true),
 });
-export type HarnessRunnerConfig = z.infer<typeof HarnessRunnerConfigSchema>;
+export type RunnerConfig = z.infer<typeof RunnerConfigSchema>;
 
-export const SkillsConfigSchema = z.object({
-  directory: z.string().default(".loopforge/skills"),
-  activeSkills: z.array(z.string()).default([]),
+export const HarnessConfigSchema = z.object({
+  runners: z.array(RunnerConfigSchema).min(1),
+  stopOnFirstFailure: z.boolean().optional().default(false),
+  parallel: z.boolean().optional().default(true),
 });
-export type SkillsConfig = z.infer<typeof SkillsConfigSchema>;
-
-export const GuardrailsConfigSchema = z.object({
-  maxIterations: z.number().int().positive().default(10),
-  maxConsecutiveFailures: z.number().int().positive().default(3),
-  stopOnSuccess: z.boolean().default(true),
-  allowGitRollback: z.boolean().default(true),
-});
-export type GuardrailsConfig = z.infer<typeof GuardrailsConfigSchema>;
+export type HarnessConfig = z.infer<typeof HarnessConfigSchema>;
 
 export const MemoryConfigSchema = z.object({
-  lessonsFile: z.string().default(".loopforge/lessons.md"),
-  handoffFile: z.string().default(".loopforge/handoff.md"),
-  autoUpdateLessons: z.boolean().default(true),
+  lessonsFile: z.string().optional().default(".loopforge/lessons.md"),
+  handoffFile: z.string().optional().default(".loopforge/handoff.md"),
+  maxLessonsPrompt: z.number().optional().default(5),
 });
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
 
-export const ProviderConfigSchema = z.object({
-  name: z.string().default("opencode"),
-  model: z.string().default("deepseek-v3"),
-  fallbackModel: z.string().default("anthropic/claude-3-5-sonnet"),
-  enableModelFallback: z.boolean().default(true),
-  fallbackFailureThreshold: z.number().int().positive().default(2),
+export const GuardrailsConfigSchema = z.object({
+  maxConsecutiveFailures: z.number().optional().default(3),
+  maxTotalIterations: z.number().optional().default(10),
+  maxBudgetUsd: z.number().optional().default(5.0),
+  requireCleanGit: z.boolean().optional().default(true),
 });
-export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
+export type GuardrailsConfig = z.infer<typeof GuardrailsConfigSchema>;
 
-export const SandboxConfigSchema = z.object({
-  enableBranchSandbox: z.boolean().default(true),
-  branchPrefix: z.string().default("loopforge/task-"),
+export const LLMConfigSchema = z.object({
+  provider: z.enum(["opencode", "ollama", "openai", "anthropic", "custom"]).optional().default("opencode"),
+  model: z.string().optional().default("deepseek-v3"),
+  fallbackModel: z.string().optional().default("anthropic/claude-3-5-sonnet"),
+  baseUrl: z.string().optional().default("http://localhost:11434"),
+  temperature: z.number().optional().default(0.2),
 });
-export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
-
-export const LoopStrategySchema = z.enum(["fixed", "creator"]);
-export type LoopStrategy = z.infer<typeof LoopStrategySchema>;
+export type LLMConfig = z.infer<typeof LLMConfigSchema>;
 
 export const LoopForgeConfigSchema = z.object({
-  name: z.string().default("LoopForge Project"),
-  version: z.string().default("1.0.0"),
-  strategy: LoopStrategySchema.default("creator"),
-  provider: ProviderConfigSchema.default({}),
-  sandbox: SandboxConfigSchema.default({}),
-  skills: SkillsConfigSchema.default({}),
-  harness: z.object({
-    runners: z.array(HarnessRunnerConfigSchema).default([
-      { name: "Unit Tests", type: "unit", command: "npm test", timeoutMs: 60000 },
-      { name: "Linter & Typecheck", type: "typecheck", command: "npm run check", timeoutMs: 30000 },
-    ]),
-  }).default({}),
-  guardrails: GuardrailsConfigSchema.default({}),
-  memory: MemoryConfigSchema.default({}),
+  projectName: z.string(),
+  version: z.string().optional().default("3.0.0"),
+  harness: HarnessConfigSchema,
+  memory: MemoryConfigSchema.optional().default({}),
+  guardrails: GuardrailsConfigSchema.optional().default({}),
+  llm: LLMConfigSchema.optional().default({}),
 });
-
 export type LoopForgeConfig = z.infer<typeof LoopForgeConfigSchema>;

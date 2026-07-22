@@ -4,7 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { LoopEngine } from "../src/core/loop-engine.js";
 import type { LoopForgeConfig } from "../src/config/schema.js";
-import { readMemoryFile } from "../src/memory/manager.js";
+import { MemoryManager } from "../src/memory/manager.js";
 
 describe("LoopForge Engine Integration", () => {
   let tmpDir: string;
@@ -19,25 +19,21 @@ describe("LoopForge Engine Integration", () => {
 
   it("deve executar o loop e encerrar com sucesso quando o harness passa", async () => {
     const config: LoopForgeConfig = {
-      name: "Test Engine",
-      version: "1.0.0",
-      strategy: "creator",
-      skills: { directory: ".loopforge/skills", activeSkills: [] },
+      projectName: "Test Engine",
+      version: "3.0.0",
       harness: {
         runners: [
-          { name: "Pass Runner", type: "unit", command: "echo 'All tests passed'", timeoutMs: 5000 },
+          { name: "Pass Runner", type: "unit", command: "echo 'All tests passed'", timeoutMs: 5000, enabled: true },
         ],
       },
       guardrails: {
-        maxIterations: 5,
+        maxTotalIterations: 5,
         maxConsecutiveFailures: 3,
-        stopOnSuccess: true,
-        allowGitRollback: false,
+        maxBudgetUsd: 5.0,
       },
       memory: {
         lessonsFile: path.join(tmpDir, "lessons.md"),
         handoffFile: path.join(tmpDir, "handoff.md"),
-        autoUpdateLessons: true,
       },
     };
 
@@ -57,10 +53,8 @@ describe("LoopForge Engine Integration", () => {
     const lessonsFile = path.join(tmpDir, "lessons.md");
 
     const config: LoopForgeConfig = {
-      name: "Failing Engine",
-      version: "1.0.0",
-      strategy: "fixed",
-      skills: { directory: ".loopforge/skills", activeSkills: [] },
+      projectName: "Failing Engine",
+      version: "3.0.0",
       harness: {
         runners: [
           {
@@ -68,19 +62,18 @@ describe("LoopForge Engine Integration", () => {
             type: "unit",
             command: "node -e 'process.exit(1);'",
             timeoutMs: 5000,
+            enabled: true,
           },
         ],
       },
       guardrails: {
-        maxIterations: 10,
+        maxTotalIterations: 10,
         maxConsecutiveFailures: 2,
-        stopOnSuccess: true,
-        allowGitRollback: false,
+        maxBudgetUsd: 5.0,
       },
       memory: {
         lessonsFile,
         handoffFile: path.join(tmpDir, "handoff.md"),
-        autoUpdateLessons: true,
       },
     };
 
@@ -92,9 +85,10 @@ describe("LoopForge Engine Integration", () => {
 
     expect(result.success).toBe(false);
     expect(result.totalIterations).toBe(2);
-    expect(result.stopReason).toContain("CIRCUIT BREAKER DISPARADO");
+    expect(result.stopReason).toContain("Circuit Breaker ATIVADO");
 
-    const lessonsContent = await readMemoryFile(lessonsFile, "Lições");
+    const memoryManager = new MemoryManager(config.memory, tmpDir);
+    const lessonsContent = await memoryManager.readLessonsPrompt();
     expect(lessonsContent).toContain("Failing Runner");
   });
 });

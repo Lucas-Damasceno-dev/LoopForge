@@ -1,82 +1,99 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import type { HarnessRunnerConfig } from "../config/schema.js";
+import type { HarnessConfig } from "../config/schema.js";
 import type { RunnerResult, HarnessExecutionSummary } from "./types.js";
-import { parseRunnerErrors } from "./parser.js";
+import { extractErrorDetails } from "./parser.js";
 
 const execAsync = promisify(exec);
 
-export async function executeRunner(
-  runner: HarnessRunnerConfig,
-  cwd: string = "."
+export async function runSingleRunner(
+  runnerName: string,
+  runnerType: "unit" | "linter" | "e2e" | "custom",
+  command: string,
+  cwd: string = ".",
+  timeoutMs: number = 60000
 ): Promise<RunnerResult> {
   const startTime = Date.now();
-
   try {
-    const { stdout, stderr } = await execAsync(runner.command, {
+    const { stdout, stderr } = await execAsync(command, {
       cwd,
-      timeout: runner.timeoutMs || 60000,
-      env: { ...process.env, FORCE_COLOR: "0" },
+      timeout: timeoutMs,
     });
-
     const durationMs = Date.now() - startTime;
-
     return {
-      runnerName: runner.name,
-      type: runner.type,
-      command: runner.command,
+      runnerName,
+      type: runnerType,
+      command,
       passed: true,
       exitCode: 0,
       durationMs,
-      stdout: stdout.toString(),
-      stderr: stderr.toString(),
+      stdout,
+      stderr,
     };
   } catch (error: any) {
     const durationMs = Date.now() - startTime;
-    const stdout = error.stdout ? error.stdout.toString() : "";
-    const stderr = error.stderr ? error.stderr.toString() : "";
-    const timedOut = error.killed && error.signal === "SIGTERM";
-
-    const errorDetails = timedOut
-      ? `⏱️ TIMEOUT: O runner '${runner.name}' excedeu o limite de ${runner.timeoutMs}ms.`
-      : parseRunnerErrors(runner.type, stdout, stderr);
+    const stdout = error.stdout || "";
+    const stderr = error.stderr || "";
+    const combinedOutput = `${stdout}\n${stderr}`;
+    const errorDetails = extractErrorDetails(combinedOutput, runnerType);
 
     return {
-      runnerName: runner.name,
-      type: runner.type,
-      command: runner.command,
+      runnerName,
+      type: runnerType,
+      command,
       passed: false,
-      exitCode: typeof error.code === "number" ? error.code : 1,
+      exitCode: error.code || 1,
       durationMs,
       stdout,
       stderr,
       errorDetails,
-      timedOut,
+      timedOut: error.killed || false,
     };
   }
 }
 
-export async function runAllHarness(
-  runners: HarnessRunnerConfig[],
+export async function runHarness(
+  config: HarnessConfig,
   cwd: string = "."
 ): Promise<HarnessExecutionSummary> {
   const startTime = Date.now();
-  const results: RunnerResult[] = [];
+  const enabledRunners = config.runners.filter((r) => r.enabled !== false);
+  const isParallel = config.parallel !== false;
 
-  for (const runner of runners) {
-    const result = await executeRunner(runner, cwd);
-    results.push(result);
+  let results: RunnerResult[] = [];
+
+  if (isParallel) {
+    results = await Promise.all(
+      enabledRunners.map((runner) =>
+        runSingleRunner(runner.name, runner.type, runner.command, cwd, runner.timeoutMs)
+      )
+    );
+  } else {
+    for (const runner of enabledRunners) {
+      const result = await runSingleRunner(
+        runner.name,
+        runner.type,
+        runner.command,
+        cwd,
+        runner.timeoutMs
+      );
+      results.push(result);
+      if (config.stopOnFirstFailure && !result.passed) {
+        break;
+      }
+    }
   }
 
   const totalDurationMs = Date.now() - startTime;
   const passedCount = results.filter((r) => r.passed).length;
   const failedCount = results.length - passedCount;
+  const allPassed = failedCount === 0;
 
   return {
-    allPassed: failedCount === 0,
+    allPassed,
     passedCount,
     failedCount,
-    totalRunners: runners.length,
+    totalRunners: results.length,
     totalDurationMs,
     results,
   };

@@ -1,37 +1,26 @@
 import { describe, it, expect } from "vitest";
 import { LLMEngine } from "../src/llm/provider.js";
-import type { ProviderConfig } from "../src/config/schema.js";
 
 describe("LoopForge LLM Engine & Model Fallback", () => {
-  it("deve usar o modelo OpenCode DeepSeek v4 free por padrão quando consecutiveFailures é 0", () => {
-    const config: ProviderConfig = {
-      name: "opencode",
-      model: "deepseek-v3",
-      fallbackModel: "anthropic/claude-3-5-sonnet",
-      enableModelFallback: true,
-      fallbackFailureThreshold: 2,
-    };
-
-    const llm = new LLMEngine(config);
-    const active = llm.getActiveModel(0);
-
+  it("deve usar OpenCode DeepSeek v3 por padrão como modelo primário sem custo", () => {
+    const llm = new LLMEngine();
+    const active = llm.getActiveModel();
     expect(active.model).toBe("deepseek-v3");
     expect(active.isFallback).toBe(false);
   });
 
-  it("deve ativar o Model Fallback quando consecutiveFailures atinge o limite de 2 falhas", () => {
-    const config: ProviderConfig = {
-      name: "opencode",
+  it("deve ativar o Model Fallback quando falhas consecutivas do Harness atingem o limite de 2", () => {
+    const llm = new LLMEngine({
+      provider: "opencode",
       model: "deepseek-v3",
       fallbackModel: "anthropic/claude-3-5-sonnet",
-      enableModelFallback: true,
-      fallbackFailureThreshold: 2,
-    };
+    });
 
-    const llm = new LLMEngine(config);
+    llm.registerHarnessResult(false);
+    expect(llm.getActiveModel().isFallback).toBe(false);
 
-    expect(llm.getActiveModel(1).isFallback).toBe(false);
-    expect(llm.getActiveModel(2).isFallback).toBe(true);
-    expect(llm.getActiveModel(2).model).toBe("anthropic/claude-3-5-sonnet");
+    llm.registerHarnessResult(false);
+    expect(llm.getActiveModel().isFallback).toBe(true);
+    expect(llm.getActiveModel().model).toBe("anthropic/claude-3-5-sonnet");
   });
 });

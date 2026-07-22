@@ -1,94 +1,103 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-import type { ProviderConfig } from "../config/schema.js";
-
-const execAsync = promisify(exec);
-
-export interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  estimatedCostUsd: number;
-}
+import type { LLMConfig } from "../config/schema.js";
 
 export interface LLMResponse {
   content: string;
   modelUsed: string;
   isFallback: boolean;
-  tokens: TokenUsage;
+  tokensUsed: number;
+  estimatedCostUsd: number;
 }
 
 export class LLMEngine {
-  constructor(private config: ProviderConfig) {}
+  private primaryModel: string;
+  private fallbackModel: string;
+  private provider: string;
+  private baseUrl: string;
+  private consecutiveFailures: number = 0;
+  private isFallbackActive: boolean = false;
 
-  public getActiveModel(consecutiveFailures: number): { model: string; isFallback: boolean } {
-    if (
-      this.config.enableModelFallback &&
-      consecutiveFailures >= this.config.fallbackFailureThreshold
-    ) {
-      return {
-        model: this.config.fallbackModel,
-        isFallback: true,
-      };
-    }
-
-    return {
-      model: this.config.model,
-      isFallback: false,
-    };
+  constructor(config?: LLMConfig) {
+    this.provider = config?.provider || "opencode";
+    this.primaryModel = config?.model || "deepseek-v3";
+    this.fallbackModel = config?.fallbackModel || "anthropic/claude-3-5-sonnet";
+    this.baseUrl = config?.baseUrl || "http://localhost:11434";
   }
 
-  public async generateStep(
-    promptContext: string,
-    consecutiveFailures: number,
-    cwd: string = "."
-  ): Promise<LLMResponse> {
-    const { model, isFallback } = this.getActiveModel(consecutiveFailures);
-
-    try {
-      // Invocar OpenCode CLI com o modelo configurado por padrão (ou modelo de fallback)
-      const command = `opencode run --model "${model}" ${JSON.stringify(promptContext)}`;
-      const { stdout } = await execAsync(command, { cwd, timeout: 120000 });
-
-      const content = stdout.trim() || "Resposta do agente via OpenCode concluída.";
-      const tokens = this.estimateTokenUsage(promptContext, content, isFallback);
-
-      return {
-        content,
-        modelUsed: model,
-        isFallback,
-        tokens,
-      };
-    } catch {
-      // Fallback gracioso para simulação local se o binary do opencode não estiver instalado no ambiente
-      const content = `[Agente LoopForge - Modelo: ${model} ${isFallback ? "(FALLBACK ATIVADO)" : "(OPENCODE DEFAULT)"}]\nProcessando contexto da iteração...`;
-      const tokens = this.estimateTokenUsage(promptContext, content, isFallback);
-
-      return {
-        content,
-        modelUsed: model,
-        isFallback,
-        tokens,
-      };
+  public registerHarnessResult(passed: boolean): void {
+    if (passed) {
+      this.consecutiveFailures = 0;
+      this.isFallbackActive = false;
+    } else {
+      this.consecutiveFailures++;
+      if (this.consecutiveFailures >= 2) {
+        this.isFallbackActive = true;
+      }
     }
   }
 
-  private estimateTokenUsage(prompt: string, completion: string, isFallback: boolean): TokenUsage {
-    // Estimativa simples (4 caracteres por token em média)
-    const promptTokens = Math.ceil(prompt.length / 4);
-    const completionTokens = Math.ceil(completion.length / 4);
-    const totalTokens = promptTokens + completionTokens;
+  public getActiveModel(): { model: string; isFallback: boolean } {
+    if (this.isFallbackActive) {
+      return { model: this.fallbackModel, isFallback: true };
+    }
+    return { model: this.primaryModel, isFallback: false };
+  }
 
-    // Se estiver usando o modelo OpenCode DeepSeek v4 free, custo é zero ($0.00)
-    // Se for o modelo fallback (ex: Claude 3.5 Sonnet), aplica taxa estimada
-    const costPer1kTokens = isFallback ? 0.003 : 0.0;
-    const estimatedCostUsd = Number(((totalTokens / 1000) * costPer1kTokens).toFixed(6));
+  public async generateStep(prompt: string, maxRetries: number = 3): Promise<LLMResponse> {
+    const { model, isFallback } = this.getActiveModel();
 
+    let attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        if (this.provider === "ollama") {
+          return await this.callOllamaApi(prompt, model, isFallback);
+        }
+
+        // Simulação/OpenCode API mock provider
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const estimatedTokens = Math.ceil(prompt.length / 4) + 200;
+        const costPerToken = isFallback ? 0.000015 : 0; // OpenCode free vs Claude
+        const estimatedCostUsd = estimatedTokens * costPerToken;
+
+        return {
+          content: `[OpenCode Step Generated for Model ${model}]\n${prompt.slice(0, 100)}...`,
+          modelUsed: model,
+          isFallback,
+          tokensUsed: estimatedTokens,
+          estimatedCostUsd,
+        };
+      } catch (err) {
+        attempt++;
+        if (attempt >= maxRetries) throw err;
+        const delay = Math.pow(2, attempt) * 100 + Math.random() * 50;
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
+
+    throw new Error("Erro catastrófico ao comunicar com a API do modelo LLM.");
+  }
+
+  private async callOllamaApi(prompt: string, model: string, isFallback: boolean): Promise<LLMResponse> {
+    const response = await fetch(`${this.baseUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model.includes("deepseek") ? "qwen2.5-coder" : model,
+        prompt,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro na API do Ollama: ${response.statusText}`);
+    }
+
+    const data: any = await response.json();
     return {
-      promptTokens,
-      completionTokens,
-      totalTokens,
-      estimatedCostUsd,
+      content: data.response || "Resposta gerada pelo Ollama",
+      modelUsed: `ollama/${model}`,
+      isFallback,
+      tokensUsed: data.eval_count || 150,
+      estimatedCostUsd: 0, // Ollama local é 100% gratuito
     };
   }
 }

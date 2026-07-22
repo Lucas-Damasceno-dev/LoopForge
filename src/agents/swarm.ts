@@ -19,8 +19,8 @@ export class SwarmOrchestrator {
 
   public async executeSwarmPipeline(
     promptContext: string,
-    consecutiveFailures: number,
-    cwd: string = "."
+    _consecutiveFailures: number = 0,
+    _cwd: string = "."
   ): Promise<SwarmExecutionResult> {
     const rolesOrder: AgentRoleType[] = ["architect", "coder", "tester", "reviewer"];
     const steps: SwarmStepResult[] = [];
@@ -28,10 +28,8 @@ export class SwarmOrchestrator {
 
     for (const roleType of rolesOrder) {
       const roleDef = SWARM_ROLES[roleType];
-
       const rolePrompt = `${roleDef.systemPrompt}\n\n${intermediateContext}`;
-
-      const llmRes: LLMResponse = await this.llmEngine.generateStep(rolePrompt, consecutiveFailures, cwd);
+      const llmRes: LLMResponse = await this.llmEngine.generateStep(rolePrompt);
 
       steps.push({
         role: roleType,

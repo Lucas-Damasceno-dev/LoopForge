@@ -12,13 +12,13 @@ export async function runCommand(targetDir: string = ".", options: { createPr?: 
 
   try {
     const config = await loadConfig(path.join(resolvedDir, ".loopforge.json"));
-    console.log(chalk.cyan(`🚀 Iniciando LoopForge Engine para o projeto: '${config.name}'`));
+    console.log(chalk.cyan(`🚀 Iniciando LoopForge Engine para o projeto: '${config.projectName}'`));
 
     const engine = new LoopEngine(config, resolvedDir);
 
     const result = await engine.runLoop(async (_context, iteration, llmEngine) => {
-      const activeModel = llmEngine.getActiveModel(0);
-      logIterationStart(iteration, config.strategy, activeModel.model, activeModel.isFallback);
+      const activeModel = llmEngine.getActiveModel();
+      logIterationStart(iteration, "creator", activeModel.model, activeModel.isFallback);
       return `Agente concluiu análise e ações para a iteração #${iteration}.`;
     });
 
@@ -28,13 +28,11 @@ export async function runCommand(targetDir: string = ".", options: { createPr?: 
 
     renderSummaryDashboard(result);
 
-    // Salvar relatório de execução
     const reportPath = path.join(resolvedDir, ".loopforge/report.json");
     await fs.mkdir(path.dirname(reportPath), { recursive: true });
     await fs.writeFile(reportPath, JSON.stringify(result, null, 2), "utf-8");
     console.log(chalk.gray(`💾 Relatório de execução salvo em: ${reportPath}`));
 
-    // Se a flag --create-pr estiver ativada
     if (options.createPr) {
       console.log(chalk.cyan("\n🐙 Criando Pull Request no GitHub via GitHub CLI ('gh')..."));
       const prResult = await createGitHubPullRequest(result, { draft: true }, resolvedDir);
@@ -44,7 +42,6 @@ export async function runCommand(targetDir: string = ".", options: { createPr?: 
         console.log(chalk.yellow(`⚠️ Não foi possível criar o PR: ${prResult.error}`));
       }
     }
-
   } catch (error: any) {
     console.error(chalk.red(`❌ Erro ao executar o LoopForge: ${error.message}`));
     process.exit(1);

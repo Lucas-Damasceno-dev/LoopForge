@@ -1,23 +1,23 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Skill, SkillLoadResult } from "./types.js";
-import type { SkillsConfig } from "../config/schema.js";
 
 export async function loadActiveSkills(
-  config: SkillsConfig,
+  config?: { directory?: string; activeSkills?: string[] },
   baseDir: string = "."
 ): Promise<SkillLoadResult> {
-  const skillDir = path.resolve(baseDir, config.directory);
+  const directory = config?.directory || ".loopforge/skills";
+  const activeSkills = config?.activeSkills || [];
+
+  const skillDir = path.resolve(baseDir, directory);
   const loadedSkills: Skill[] = [];
   const missingSkills: string[] = [];
 
   try {
     await fs.mkdir(skillDir, { recursive: true });
-  } catch {
-    // Diretório pode já existir
-  }
+  } catch {}
 
-  for (const skillName of config.activeSkills) {
+  for (const skillName of activeSkills) {
     const fileName = skillName.endsWith(".md") ? skillName : `${skillName}.md`;
     const fullPath = path.join(skillDir, fileName);
 

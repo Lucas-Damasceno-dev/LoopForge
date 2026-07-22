@@ -38,7 +38,7 @@ export function logIterationReport(report: IterationReport): void {
 
   console.log(
     chalk.gray(
-      `   📊 Tokens: ${report.tokens.totalTokens} | Custo Est.: $${report.tokens.estimatedCostUsd.toFixed(4)}`
+      `   📊 Tokens: ${report.tokensUsed} | Custo Est.: $${report.estimatedCostUsd.toFixed(4)}`
     )
   );
 
