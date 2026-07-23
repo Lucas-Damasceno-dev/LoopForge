@@ -20,6 +20,6 @@ describe("LoopForge Semantic Release Generator", () => {
     const content = await fs.readFile(changelogPath, "utf-8");
 
     expect(content).toContain("[4.0.0]");
-    expect(content).toContain("# 📜 Changelog do Projeto");
+    expect(content).toContain("# 📜 Changelog");
   });
 });

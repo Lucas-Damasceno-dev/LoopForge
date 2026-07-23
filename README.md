@@ -2,9 +2,9 @@
 
 **Automated Loop Engineering Engine for AI Agents**
 
-LoopForge é um motor autônomo de Loop Engineering projetado para criar, executar, refatorar e monitorar ciclos de desenvolvimento orientados a IA com resiliência industrial, guardrails rigorosos e observabilidade completa.
+LoopForge é um motor autônomo de Loop Engineering projetado para criar, executar, refatorar e monitorar ciclos de desenvolvimento orientados a IA com resiliência industrial, guardrails rigorosos, telemetria SQLite e observabilidade completa.
 
-> **Versão atual:** 4.0.0
+> **Versão atual:** 5.0.0
 > **License:** MIT
 
 ---
@@ -17,10 +17,11 @@ LoopForge é um motor autônomo de Loop Engineering projetado para criar, execut
 | **2** | Harness de Validação Multi-Runner (bash, parser, formatter) | ✅ |
 | **3** | Gerenciamento de Memória & Guardrails (Circuit Breaker, Lessons/Handoff) | ✅ |
 | **4** | Provedores LLM, Skill Presets & Git Sandbox (OpenCode, fallback, auto-PR, bootstrap) | ✅ |
-| **5** | Swarm Multi-Agente, TUI & RAG Local (pipelines de 4 papéis, indexação semântica) | ✅ |
+| **5** | Swarm Multi-Agente, TUI & RAG Local (indexação semântica com embeddings e cosseno) | ✅ |
 | **6** | Auto-Refatoração, Web Dashboard, Self-Healing Tests & CI/CD Nativo | ✅ |
 | **7** | Workspace Orquestrador, Security Scanner, Budget Guard, Local LLM, Telemetry & Wizard | ✅ |
-| **8** | Docker Sandbox, Test Generator, Release/Bot, Context Compressor, Loop Lock Detector | ✅ |
+| **8** | Docker Sandbox, Test Generator Multi-Stack, Release/Bot, Context Compressor, Loop Lock | ✅ |
+| **9** | **Propostas de Melhoria (P1)**: Telemetria SQLite, Interactive Review Gate, Auto-Fix Security, Notificações Multi-canal (Email, Desktop, Webhook), Parallel Workspaces, Config Hot-Reload, Pipeline npm & CLI JSON Output | ✅ |
 
 ---
 
@@ -54,8 +55,11 @@ loopforge init --template node-typescript
 # Executar o ciclo do Loop Engine
 loopforge run
 
-# Executar com criação automática de PR
-loopforge run --create-pr
+# Executar com revisão interativa antes do PR
+loopforge run --create-pr --review
+
+# Modo watch com hot-reload de configurações
+loopforge run --watch
 ```
 
 ---
@@ -63,51 +67,20 @@ loopforge run --create-pr
 ## CLI Reference
 
 | Comando | Descrição |
-|---|---|---|
+|---|---|
 | `init [directory]` | Inicializa `.loopforge.json`, memórias e skills templates |
-| `run [directory]` | Executa o ciclo do Loop Engine (Harness → Memória → Fallback → Git Sandbox) |
+| `run [directory]` | Executa o ciclo do Loop Engine (`--create-pr`, `--review`, `--auto`, `-w/--watch`, `--format json\|text`) |
 | `bootstrap` | Gera suíte de testes baseline automaticamente |
-| `generate-tests` | Gera suítes de teste unitário para código não coberto |
+| `generate-tests` | Gera suítes de teste unitário multi-stack (Node, Python, Rust) (`--dry-run`, `--format json\|text`) |
 | `refactor <rule>` | Executa auto-refatoração com isolamento Git Sandbox |
 | `release [version]` | Gera notas de lançamento semânticas e atualiza CHANGELOG.md |
-| `workspace [workspaceFile]` | Orquestra loops em múltiplos projetos configurados no manifesto |
-| `audit [directory]` | Scanner de segurança: detecta secrets, SQL injection, eval() inseguro |
+| `workspace [manifest]` | Orquestra loops em múltiplos projetos (`--parallel`, `-c/--concurrency <n>`, `--format json\|text`) |
+| `audit [directory]` | Scanner de segurança com auto-correção (`--fix`, `--format json\|text`) |
 | `wizard [directory]` | Assistente interativo de configuração e onboarding |
 | `replay <sessionId>` | Reproduz telemetria quadro-a-quadro de sessões passadas |
 | `ui [directory]` | Inicia Web Dashboard em `http://localhost:3000` |
-| `ci:setup` | Gera `.github/workflows/loopforge-ci.yml` |
+| `ci:setup` | Gera `.github/workflows/loopforge-ci.yml` com etapa CodeQL/Audit |
 | `status [directory]` | Exibe painel de status de config, LLM, skills e memórias |
-
-### Opções Globais
-
-| Opção | Descrição |
-|---|---|
-| `-V, --version` | Exibe versão |
-| `-h, --help` | Exibe ajuda |
-
-### Opções por Comando
-
-**`init`**
-- `--template <name>` — Template de skills: `node-typescript`, `python-pytest`, `rust-cargo`
-
-**`run`**
-- `--create-pr` — Cria automaticamente um PR no GitHub após sucesso
-
-**`ui`**
-- `-p, --port <port>` — Porta do servidor (padrão: 3000)
-
-**`workspace`**
-- `[workspaceFile]` — Caminho para o manifesto `loopforge-workspace.json`
-
-**`audit`**
-- `[directory]` — Diretório a ser escaneado (padrão: diretório atual)
-
-**`wizard`**
-- `[directory]` — Diretório alvo (padrão: diretório atual)
-
-**`replay`**
-- `<sessionId>` — ID da sessão a reproduzir
-- `[directory]` — Diretório do projeto (padrão: diretório atual)
 
 ---
 
@@ -118,7 +91,7 @@ O LoopForge é configurado via arquivo `.loopforge.json` na raiz do projeto:
 ```json
 {
   "projectName": "Meu Projeto",
-  "version": "1.0.0",
+  "version": "5.0.0",
   "harness": {
     "runners": [
       { "name": "Unit Tests", "type": "unit", "command": "npm test", "timeoutMs": 60000 },
@@ -131,12 +104,23 @@ O LoopForge é configurado via arquivo `.loopforge.json` na raiz do projeto:
     "maxTotalIterations": 10,
     "maxConsecutiveFailures": 3,
     "maxBudgetUsd": 5.0,
+    "maxCostPerIteration": 2.0,
     "requireCleanGit": true
   },
   "memory": {
     "lessonsFile": ".loopforge/lessons.md",
     "handoffFile": ".loopforge/handoff.md",
     "maxLessonsPrompt": 5
+  },
+  "notifications": {
+    "webhookUrl": "https://discord.com/api/webhooks/...",
+    "desktop": { "enabled": true },
+    "email": {
+      "enabled": false,
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "to": "dev@exemplo.com"
+    }
   },
   "llm": {
     "provider": "opencode",
@@ -147,77 +131,11 @@ O LoopForge é configurado via arquivo `.loopforge.json` na raiz do projeto:
 }
 ```
 
-Veja [docs/configuration.md](docs/configuration.md) para a documentação completa do schema.
-
 ---
 
-## Arquitetura
-
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              CLI (Commander)                                  │
-│  init  run  bootstrap  generate-tests  refactor  release  workspace  audit   │
-│  wizard  replay  ui  ci:setup  status                                         │
-└──────────┬───────────────────────────────────────────────────────┬──────────┘
-           │                                                       │
-     ┌─────▼──────┐                                        ┌──────▼─────────┐
-     │ Loop Engine │                                        │ Refactor Engine │
-     │(orquestrador)│                                       │ (auto-refactor) │
-     │(compressor)  │                                       └─────────────────┘
-     └──────┬──────┘
-            │
-    ┌───────┼───────┬──────────┬─────────┬──────────┬──────────┐
-    ▼       ▼       ▼          ▼         ▼          ▼          ▼
-┌──────┐ ┌──────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────┐
-│Harness││Memory│ │  Swarm  │ │Workspace│ │ Guard- │ │Telemetry│ │   Git    │
-│TestGen││      │ │ Agents  │ │  Orch.  │ │ rails  │ │Recorder│ │  Sandbox │
-└──┬───┘ └──────┘ └───┬────┘ └────────┘ └───┬────┘ └────────┘ └────┬─────┘
-   │                  │                     │                      │
-   ▼                  ▼                     ▼                      ▼
-┌──────┐        ┌────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-│Parser│        │  RAG   │  │ Security  │  │   Bot/   │  │PR Creator│
-│Runner│        │ Local  │  │  Scanner  │  │ Release  │  │Checkpoint│
-│Format│        │ Index  │  │ Loop Lock │  │          │  │  Docker  │
-└──────┘        └────────┘  └──────────┘  └──────────┘  └──────────┘
-```
-
-Veja [docs/architecture.md](docs/architecture.md) para uma visão detalhada.
-
----
-
-## Skill Presets
-
-| Template | Descrição |
-|---|---|
-| `node-typescript` | Node.js + TypeScript + Vitest + ESLint/Biome |
-| `python-pytest` | Python + Pytest + MyPy + Flake8 |
-| `rust-cargo` | Rust + Cargo Test + Clippy + rustfmt |
-
----
-
-## Exemplos
-
-```
-examples/basic-loop/    — Configuração funcional mínima com quality rules
-```
+## Desenvolvimento & Testes
 
 ```bash
-cd examples/basic-loop
-loopforge run
-```
-
----
-
-## Desenvolvimento
-
-```bash
-# Clonar
-git clone <repo-url>
-cd LoopForge
-
-# Instalar dependências
-npm install
-
 # Build
 npm run build
 
@@ -228,64 +146,6 @@ npm test
 npm run check
 ```
 
-### Scripts Disponíveis
-
-| Script | Comando |
-|---|---|
-| `npm run build` | `tsc` — Compila TypeScript para `dist/` |
-| `npm test` | `vitest run` — Executa suíte de testes |
-| `npm run test:watch` | `vitest` — Testes em modo watch |
-| `npm run check` | `tsc --noEmit` — Type-check sem emitir |
-| `npm start` | `node dist/cli/index.js` — Executa CLI |
-
----
-
-## Testes
-
-- **24 arquivos** de teste em `tests/`
-- **38/38 testes aprovados**
-- **0 erros e 0 warnings** no build (`tsc --noEmit`)
-- Framework: **Vitest**
-
----
-
-## Módulos
-
-| Módulo | Descrição | Arquivos |
-|---|---|---|---|
-| `src/agents/` | Swarm multi-agente (Architect, Coder, Tester, Reviewer) | 2 |
-| `src/ci/` | Integração contínua, Bot/Release e webhooks (Slack/Discord) | 3 |
-| `src/cli/` | Interface de linha de comando (Commander) | 12 |
-| `src/config/` | Schema Zod e loader de configuração | 2 |
-| `src/core/` | Loop Engine + Refactor Engine + Workspace Orchestrator | 3 |
-| `src/git/` | Git Sandbox, Docker, PRs e Checkpoints | 5 |
-| `src/guardrails/` | Circuit Breaker + Security Scanner + Loop Lock (budget, falhas, secrets) | 4 |
-| `src/harness/` | Runner, Parser, Formatter, Bootstrap, Test Generator, Self-Healing | 8 |
-| `src/indexer/` | RAG local de código com cache incremental por hash | 1 |
-| `src/llm/` | Provedor LLM, Compressor, fallback automático e suporte a Ollama | 3 |
-| `src/memory/` | Persistência de lessons.md e handoff.md com diff stat | 1 |
-| `src/skills/` | Templates e loader de skills | 3 |
-| `src/telemetry/` | Gravador de telemetria e replay de sessão | 1 |
-| `src/ui/` | TUI interativa + Web Dashboard + Logger | 4 |
-
----
-
-## Stack
-
-| Camada | Tecnologia |
-|---|---|
-| Runtime | Node.js ≥ 18 (ESM) |
-| Linguagem | TypeScript 5.5 (ES2022, strict) |
-| CLI | Commander 12 |
-| Validação | Zod 3.23 |
-| Testes | Vitest 1.6 |
-| LLM | OpenCode DeepSeek v4 + fallback Claude 3.5 Sonnet + Ollama (local) |
-| CI | GitHub Actions (gerado automaticamente) |
-
----
-
-## Documentação Complementar
-
-- [Arquitetura Detalhada](docs/architecture.md)
-- [Referência da CLI](docs/cli-reference.md)
-- [Configuração](docs/configuration.md)
+- **26 arquivos** de teste em `tests/`
+- **46/46 testes aprovados** (incluindo testes de RAG semântico, SQLite, paralelo, auto-fix e notificações)
+- **0 erros** no build TypeScript (`tsc --noEmit`)

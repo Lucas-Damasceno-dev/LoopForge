@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { loadConfig } from "../config/loader.js";
+import { detectProjectStack } from "./stack-detector.js";
 import type { RunnerConfig } from "../config/schema.js";
 
 export interface BootstrapResult {
@@ -15,11 +16,9 @@ export async function bootstrapHarness(targetDir: string = "."): Promise<Bootstr
   const runnersAdded: RunnerConfig[] = [];
   let stackDetected = "Desconhecida";
 
-  const hasPackageJson = await fs.stat(path.join(resolvedDir, "package.json")).then(() => true).catch(() => false);
-  const hasPyproject = await fs.stat(path.join(resolvedDir, "pyproject.toml")).then(() => true).catch(() => false);
-  const hasCargoToml = await fs.stat(path.join(resolvedDir, "Cargo.toml")).then(() => true).catch(() => false);
+  const stack = await detectProjectStack(resolvedDir);
 
-  if (hasPackageJson) {
+  if (stack === "node") {
     stackDetected = "Node.js / TypeScript";
     const sampleTestPath = path.join(resolvedDir, "tests/baseline.test.ts");
     await fs.mkdir(path.dirname(sampleTestPath), { recursive: true });
@@ -39,7 +38,7 @@ describe("Baseline Test Suite (Auto-Harness)", () => {
       { name: "Unit Tests (Vitest)", type: "unit", command: "npm test", timeoutMs: 60000, enabled: true },
       { name: "Linter / Check", type: "linter", command: "npm run check", timeoutMs: 30000, enabled: true }
     );
-  } else if (hasPyproject) {
+  } else if (stack === "python") {
     stackDetected = "Python";
     const sampleTestPath = path.join(resolvedDir, "tests/test_baseline.py");
     await fs.mkdir(path.dirname(sampleTestPath), { recursive: true });
@@ -53,7 +52,7 @@ describe("Baseline Test Suite (Auto-Harness)", () => {
     runnersAdded.push(
       { name: "Pytest Suite", type: "unit", command: "pytest", timeoutMs: 60000, enabled: true }
     );
-  } else if (hasCargoToml) {
+  } else if (stack === "rust") {
     stackDetected = "Rust";
     runnersAdded.push(
       { name: "Cargo Test", type: "unit", command: "cargo test", timeoutMs: 60000, enabled: true },

@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { LLMEngine } from "../llm/provider.js";
 
 export interface CodeSymbol {
   name: string;
@@ -8,6 +9,7 @@ export interface CodeSymbol {
   filePath: string;
   line: number;
   snippet: string;
+  embedding?: number[];
 }
 
 export interface IndexCache {
@@ -15,11 +17,27 @@ export interface IndexCache {
   symbols: CodeSymbol[];
 }
 
+export function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 export class CodeIndexer {
   private indexPath: string;
+  private llm: LLMEngine;
 
-  constructor(indexDir: string = ".loopforge/index") {
+  constructor(indexDir: string = ".loopforge/index", llmEngine?: LLMEngine) {
     this.indexPath = path.join(indexDir, "symbols.json");
+    this.llm = llmEngine || new LLMEngine();
   }
 
   private calculateHash(content: string): string {
@@ -57,6 +75,12 @@ export class CodeIndexer {
         }
 
         const extracted = this.extractSymbols(content, relativePath);
+        for (const sym of extracted) {
+          try {
+            const vec = await this.llm.generateEmbedding(`${sym.name} ${sym.snippet}`);
+            sym.embedding = vec;
+          } catch {}
+        }
         symbols.push(...extracted);
       } catch {}
     }
@@ -75,14 +99,21 @@ export class CodeIndexer {
     try {
       const raw = await fs.readFile(fullIndexPath, "utf-8");
       const cache: IndexCache = JSON.parse(raw);
+      const queryVec = await this.llm.generateEmbedding(query);
       const queryTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
 
       const scored = cache.symbols.map((sym) => {
         let score = 0;
+        if (sym.embedding && queryVec && sym.embedding.length === queryVec.length) {
+          score = cosineSimilarity(queryVec, sym.embedding);
+        }
+
+        // Combine semantic similarity score with term-matching bonus
         const targetText = `${sym.name} ${sym.snippet}`.toLowerCase();
         for (const term of queryTerms) {
-          if (targetText.includes(term)) score += 1;
+          if (targetText.includes(term)) score += 0.5;
         }
+
         return { symbol: sym, score };
       });
 
@@ -114,7 +145,6 @@ export class CodeIndexer {
     const symbols: CodeSymbol[] = [];
 
     lines.forEach((line, idx) => {
-      // Extended regex matching functions, classes, interfaces, types, consts, arrow functions, and class methods
       const match = line.match(/(?:export\s+)?(?:async\s+)?(?:function|class|interface|type|const|let|var)\s+([A-Za-z0-9_]+)/) ||
                     line.match(/(?:public|private|protected|async|static|\s)+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{/);
       if (match && match[1] && !["if", "for", "while", "switch", "catch"].includes(match[1])) {

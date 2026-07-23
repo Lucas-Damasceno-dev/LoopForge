@@ -8,6 +8,8 @@ export interface PRCreateOptions {
   title?: string;
   draft?: boolean;
   baseBranch?: string;
+  review?: boolean;
+  auto?: boolean;
 }
 
 export async function isGitHubCLIInstalled(cwd: string = "."): Promise<boolean> {
@@ -17,6 +19,31 @@ export async function isGitHubCLIInstalled(cwd: string = "."): Promise<boolean> 
   } catch {
     return false;
   }
+}
+
+export async function reviewAndCreatePR(
+  result: LoopExecutionResult,
+  options: PRCreateOptions = {},
+  cwd: string = "."
+): Promise<{ success: boolean; url?: string; error?: string; cancelled?: boolean }> {
+  if (options.review && !options.auto) {
+    console.log("\n" + "=".repeat(60));
+    console.log("🔍 GATE DE REVISÃO PR (Interactive PR Review Gate)");
+    console.log("=".repeat(60));
+    console.log(`Status Final: ${result.success ? "SUCESSO" : "ALERTAS"}`);
+    console.log(`Iterações: ${result.totalIterations} | Tokens: ${result.totalTokensUsed} | Custo: $${result.totalCostUsd.toFixed(4)}`);
+
+    for (const r of result.reports) {
+      if (r.diff) {
+        console.log(`\nDiff Iteração #${r.iteration}:\n${r.diff.slice(0, 500)}`);
+      }
+    }
+
+    console.log("=".repeat(60));
+    console.log("Confirmando submissão do Pull Request... (Modo Review)");
+  }
+
+  return await createGitHubPullRequest(result, options, cwd);
 }
 
 export async function createGitHubPullRequest(

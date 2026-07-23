@@ -1,25 +1,13 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { sendMultiChannelNotification } from "./notifications/index.js";
 
 export async function sendCIWebhookNotification(
   webhookUrl: string,
   payload: { title: string; message: string; status: "success" | "failure" | "breaker" }
 ): Promise<boolean> {
-  try {
-    const body = JSON.stringify({
-      username: "LoopForge CI Bot",
-      content: `**[${payload.title}]** (${payload.status.toUpperCase()})\n${payload.message}`,
-    });
-
-    await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  const res = await sendMultiChannelNotification({ webhookUrl, desktop: { enabled: false } }, payload);
+  return res.webhook;
 }
 
 export async function generateGitHubActionWorkflow(cwd: string = "."): Promise<string> {
@@ -44,6 +32,8 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      - name: CodeQL / Security Check
+        run: npx loopforge audit
       - run: npx loopforge run --create-pr
 `;
 
@@ -52,3 +42,5 @@ jobs:
 
   return workflowPath;
 }
+
+export { sendMultiChannelNotification };

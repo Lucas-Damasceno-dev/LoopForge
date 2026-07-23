@@ -1,6 +1,6 @@
 {
   "name": "loopforge",
-  "version": "0.1.0",
+  "version": "5.0.0",
   "description": "Automated Loop Engineering Engine for AI Agents",
   "main": "dist/index.js",
   "type": "module",
@@ -24,15 +24,21 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^13.0.1",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "js-yaml": "^5.2.1",
+    "node-notifier": "^10.0.1",
+    "nodemailer": "^9.0.3",
     "ws": "^8.21.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.9",
+    "@types/node-notifier": "^8.0.5",
+    "@types/nodemailer": "^8.0.1",
     "@types/ws": "^8.18.1",
     "typescript": "^5.5.2",
     "vitest": "^1.6.0"

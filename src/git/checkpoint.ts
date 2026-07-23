@@ -34,6 +34,16 @@ export async function rollbackToCheckpoint(cwd: string = "."): Promise<boolean> 
   }
 }
 
+export async function getWorkingDiff(cwd: string = "."): Promise<string> {
+  if (!(await isGitRepo(cwd))) return "";
+  try {
+    const { stdout } = await execAsync("git diff --unified=5", { cwd });
+    return stdout.trim();
+  } catch {
+    return "";
+  }
+}
+
 export async function cleanupOldCheckpoints(cwd: string = "."): Promise<number> {
   if (!(await isGitRepo(cwd))) return 0;
   try {

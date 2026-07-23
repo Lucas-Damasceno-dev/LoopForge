@@ -27,6 +27,23 @@ export function renderSummaryDashboard(result: LoopExecutionResult): void {
     console.log(
       `  Iteração #${report.iteration}: ${statusText}${fallbackTag}${rollbackText} (${report.harnessSummary.passedCount}/${report.harnessSummary.totalRunners} runners) - Model: ${report.modelUsed}`
     );
+
+    if (report.diff && report.diff.trim()) {
+      console.log(chalk.bold.gray(`    🔍 Diff da Iteração #${report.iteration}:`));
+      const diffLines = report.diff.split("\n").slice(0, 15);
+      for (const line of diffLines) {
+        if (line.startsWith("+")) {
+          console.log(chalk.green(`      ${line}`));
+        } else if (line.startsWith("-")) {
+          console.log(chalk.red(`      ${line}`));
+        } else {
+          console.log(chalk.gray(`      ${line}`));
+        }
+      }
+      if (report.diff.split("\n").length > 15) {
+        console.log(chalk.gray(`      ... [diff truncado]`));
+      }
+    }
   }
   console.log(chalk.bold.magenta("=").repeat(65) + "\n");
 }

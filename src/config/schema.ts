@@ -30,6 +30,7 @@ export const GuardrailsConfigSchema = z.object({
   maxConsecutiveFailures: z.number().optional().default(3),
   maxTotalIterations: z.number().optional().default(10),
   maxBudgetUsd: z.number().optional().default(5.0),
+  maxCostPerIteration: z.number().optional().default(2.0),
   requireCleanGit: z.boolean().optional().default(true),
 });
 export type GuardrailsConfig = z.infer<typeof GuardrailsConfigSchema>;
@@ -43,6 +44,23 @@ export const LLMConfigSchema = z.object({
 });
 export type LLMConfig = z.infer<typeof LLMConfigSchema>;
 
+export const NotificationConfigSchema = z.object({
+  webhookUrl: z.string().optional(),
+  email: z.object({
+    enabled: z.boolean().optional().default(false),
+    smtpHost: z.string().optional(),
+    smtpPort: z.number().optional().default(587),
+    smtpUser: z.string().optional(),
+    smtpPass: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+  }).optional(),
+  desktop: z.object({
+    enabled: z.boolean().optional().default(true),
+  }).optional(),
+});
+export type NotificationConfig = z.infer<typeof NotificationConfigSchema>;
+
 export const LoopForgeConfigSchema = z.object({
   projectName: z.string(),
   version: z.string().optional().default("3.0.0"),
@@ -50,5 +68,6 @@ export const LoopForgeConfigSchema = z.object({
   memory: MemoryConfigSchema.optional().default({}),
   guardrails: GuardrailsConfigSchema.optional().default({}),
   llm: LLMConfigSchema.optional().default({}),
+  notifications: NotificationConfigSchema.optional(),
 });
 export type LoopForgeConfig = z.infer<typeof LoopForgeConfigSchema>;

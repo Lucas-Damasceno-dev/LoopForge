@@ -25,11 +25,11 @@ export async function generateReleaseNotes(version: string = "5.0.0", cwd: strin
   try {
     existing = await fs.readFile(changelogPath, "utf-8");
   } catch {
-    existing = "# 📜 Changelog do Projeto\n\n";
+    existing = "# 📜 Changelog\n\n";
   }
 
-  const updatedChangelog = existing.includes("# 📜 Changelog do Projeto\n\n")
-    ? existing.replace("# 📜 Changelog do Projeto\n\n", `# 📜 Changelog do Projeto\n\n${newEntry}`)
+  const updatedChangelog = existing.startsWith("# 📜 Changelog")
+    ? existing.replace(/(# 📜 Changelog[^\n]*\n\n)/, `$1${newEntry}`)
     : `${newEntry}${existing}`;
 
   await fs.writeFile(changelogPath, updatedChangelog, "utf-8");

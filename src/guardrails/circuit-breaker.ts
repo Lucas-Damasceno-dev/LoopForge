@@ -12,6 +12,7 @@ export class CircuitBreaker {
   private maxFailures: number;
   private maxIterations: number;
   private maxBudgetUsd: number;
+  private maxCostPerIteration: number;
 
   private consecutiveFailures: number = 0;
   private totalIterations: number = 0;
@@ -21,12 +22,33 @@ export class CircuitBreaker {
     this.maxFailures = config?.maxConsecutiveFailures ?? 3;
     this.maxIterations = config?.maxTotalIterations ?? 10;
     this.maxBudgetUsd = config?.maxBudgetUsd ?? 5.0;
+    this.maxCostPerIteration = config?.maxCostPerIteration ?? 2.0;
+  }
+
+  public checkIterationCost(costUsd: number): { exceeded: boolean; reason?: string } {
+    if (costUsd > this.maxCostPerIteration) {
+      return {
+        exceeded: true,
+        reason: `Custo estimado da iteração ($${costUsd.toFixed(2)}) excede o orçamento por iteração ($${this.maxCostPerIteration.toFixed(2)}).`,
+      };
+    }
+    return { exceeded: false };
   }
 
   public recordSuccess(costUsd: number = 0): CircuitBreakerStatus {
     this.consecutiveFailures = 0;
     this.totalIterations++;
     this.totalCostUsd += costUsd;
+
+    if (costUsd > this.maxCostPerIteration) {
+      return {
+        isOpen: true,
+        consecutiveFailures: this.consecutiveFailures,
+        totalIterations: this.totalIterations,
+        totalCostUsd: this.totalCostUsd,
+        reason: `Custo por iteração excedeu o limite ($${costUsd.toFixed(2)} > $${this.maxCostPerIteration.toFixed(2)}). Circuit Breaker ATIVADO por custo de iteração.`,
+      };
+    }
 
     return this.evaluate();
   }
@@ -35,6 +57,16 @@ export class CircuitBreaker {
     this.consecutiveFailures++;
     this.totalIterations++;
     this.totalCostUsd += costUsd;
+
+    if (costUsd > this.maxCostPerIteration) {
+      return {
+        isOpen: true,
+        consecutiveFailures: this.consecutiveFailures,
+        totalIterations: this.totalIterations,
+        totalCostUsd: this.totalCostUsd,
+        reason: `Custo por iteração excedeu o limite ($${costUsd.toFixed(2)} > $${this.maxCostPerIteration.toFixed(2)}). Circuit Breaker ATIVADO por custo de iteração.`,
+      };
+    }
 
     return this.evaluate();
   }

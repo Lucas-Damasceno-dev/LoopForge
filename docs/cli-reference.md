@@ -12,309 +12,100 @@ loopforge [command] [options] [directory]
 
 | Option | Description |
 |---|---|
-| `-V, --version` | Display version number (4.0.0) |
+| `-V, --version` | Display version number (5.0.0) |
 | `-h, --help` | Display help for command |
 
 ---
 
 ## Commands
 
-### `init`
-
-Inicializa a configuração, memórias e templates de skills no repositório.
-
-```bash
-loopforge init [directory]
-```
-
-**Arguments:**
-| Argument | Description |
-|---|---|
-| `directory` | Target directory (default: current directory) |
-
-**Options:**
-| Option | Description |
-|---|---|
-| `--template <name>` | Skill template to install: `node-typescript`, `python-pytest`, `rust-cargo` |
-
-**Creates:**
-- `.loopforge.json` — Configuração do projeto
-- `.loopforge/handoff.md` — Instruções de transição
-- `.loopforge/lessons.md` — Lições aprendidas
-- `.loopforge/skills/` — Diretório de skills (se template fornecida)
-
----
-
 ### `run`
 
 Executa o ciclo completo do Loop Engine.
 
 ```bash
-loopforge run [directory]
+loopforge run [directory] [options]
 ```
-
-**Arguments:**
-| Argument | Description |
-|---|---|
-| `directory` | Target directory with `.loopforge.json` (default: current directory) |
 
 **Options:**
 | Option | Description |
 |---|---|
-| `--create-pr` | Create a GitHub PR automatically on success |
-
-**Pipeline:**
-1. Harness — Executa runners configurados
-2. Parser — Analisa falhas
-3. Memory — Carrega lessons/handoff
-4. LLM — Envia contexto para o provedor
-5. Sandbox — Isola mudanças em branch
-6. Fallback — Escalona modelo se necessário
-7. Checkpoint — Commita progresso
-8. PR — (opcional) Cria pull request no GitHub
-
----
-
-### `bootstrap`
-
-Gera automaticamente uma suíte de testes baseline para o projeto.
-
-```bash
-loopforge bootstrap
-```
-
-**Alias:** `harness:bootstrap`
-
-**Comportamento:**
-- Analisa a estrutura do repositório
-- Detecta linguagem e framework
-- Gera sensores de qualidade
-- Cria testes baseline para os módulos identificados
+| `--create-pr` | Cria automaticamente um PR no GitHub após sucesso |
+| `--review` | Modo de revisão interativa que exibe diff e solicita confirmação antes de criar PR |
+| `--auto` | Modo automatizado sem confirmação interativa (headless) |
+| `-w, --watch` | Re-executa o ciclo automaticamente sempre que arquivos `.ts` ou arquivos de configuração (`.loopforge.json`/`.yml`) forem alterados |
+| `--format <format>` | Formato de saída no terminal: `text` (padrão) ou `json` |
 
 ---
 
 ### `generate-tests`
 
-Gera suítes de teste unitário para módulos do projeto que ainda não possuem cobertura.
+Gera suítes de teste unitário multi-stack (Vitest para Node.js, pytest para Python e cargo test para Rust).
 
 ```bash
-loopforge generate-tests [directory]
+loopforge generate-tests [directory] [options]
 ```
 
-**Arguments:**
-
-| Argument | Description |
+**Options:**
+| Option | Description |
 |---|---|
-| `directory` | Diretório do projeto (default: diretório atual) |
-
-Gera arquivos `.test.ts` em `tests/` com estrutura Vitest básica (`describe`/`it`/`expect`).
-
----
-
-### `refactor`
-
-Executa o motor de auto-refatoração com isolamento Git Sandbox.
-
-```bash
-loopforge refactor <rule>
-```
-
-**Arguments:**
-| Argument | Description |
-|---|---|
-| `rule` | Regra de refatoração (ex: `"converter para ESM"`, `"extrair service layer"`) |
-
-**Comportamento:**
-- Analisa o código-fonte com base na regra fornecida
-- Isola mudanças em branch dedicada
-- Executa refatoração em lote
-- Valida com o harness após modificações
-- Commita ou reverte conforme resultado
-
----
-
-### `release`
-
-Gera notas de lançamento semânticas e atualiza o CHANGELOG.md do projeto.
-
-```bash
-loopforge release [version] [directory]
-```
-
-**Arguments:**
-
-| Argument | Description |
-|---|---|
-| `version` | Versão para o release (default: `4.0.0`) |
-| `directory` | Diretório do projeto (default: diretório atual) |
-
-Lê os 5 commits mais recentes via `git log --oneline` e insere entrada datada no CHANGELOG.md.
+| `--dry-run` | Simula a criação de testes exibindo a lista e o diff sem gravar arquivos |
+| `--format <format>` | Formato de saída: `text` ou `json` |
 
 ---
 
 ### `workspace`
 
-Orquestra loops em lote através de múltiplos projetos configurados no manifesto.
+Orquestra loops em lote através de múltiplos projetos.
 
 ```bash
-loopforge workspace [workspaceFile]
+loopforge workspace [workspaceFile] [directory] [options]
 ```
 
-**Arguments:**
-| Argument | Description |
+**Options:**
+| Option | Description |
 |---|---|
-| `workspaceFile` | Caminho para o manifesto `loopforge-workspace.json` (default: `loopforge-workspace.json` no diretório atual) |
-
-**Comportamento:**
-- Lê o manifesto com a lista de projetos
-- Instancia o Loop Engine para cada projeto
-- Coleta e exibe resultados agregados
-- Ideal para monorepos e migrações em lote
+| `--parallel` | Executa loops nos projetos do workspace em paralelo via pool concorrente |
+| `-c, --concurrency <number>` | Limite de concorrência simultânea para o modo paralelo (padrão: 3) |
+| `--format <format>` | Formato de saída: `text` ou `json` |
 
 ---
 
 ### `audit`
 
-Scanner de segurança e code smells integrado.
+Scanner de segurança e code smells integrado com capacidade de auto-correção.
 
 ```bash
-loopforge audit [directory]
+loopforge audit [directory] [options]
 ```
 
-**Arguments:**
-| Argument | Description |
+**Options:**
+| Option | Description |
 |---|---|
-| `directory` | Diretório a ser escaneado (default: diretório atual) |
-
-**Detecta:**
-- **Secrets expostos**: `sk-` (API keys), `AKIA` (AWS tokens), JWT
-- **SQL Injection**: strings SQL concatenadas
-- **Código inseguro**: `eval()` e similares
-
-**Scanning:**
-- Varre `.ts`, `.js`, `.py`, `.go` recursivamente
-- Exibe vulnerabilidades por arquivo e linha
-
----
-
-### `wizard`
-
-Assistente interativo de configuração e onboarding para novos usuários.
-
-```bash
-loopforge wizard [directory]
-```
-
-**Arguments:**
-| Argument | Description |
-|---|---|
-| `directory` | Diretório alvo (default: diretório atual) |
-
-**Pipeline:**
-1. Inicializa `.loopforge.json` com template Node/TypeScript
-2. Gera suíte de testes baseline via `bootstrap`
-3. Exibe sumário final da configuração
-
----
-
-### `replay`
-
-Reproduz telemetria quadro-a-quadro de sessões passadas do Loop Engine.
-
-```bash
-loopforge replay <sessionId> [directory]
-```
-
-**Arguments:**
-| Argument | Description |
-|---|---|
-| `sessionId` | ID da sessão a ser reproduzida (obrigatório) |
-| `directory` | Diretório do projeto (default: diretório atual) |
-
-**Comportamento:**
-- Carrega frames de `.loopforge/telemetry/{sessionId}.json`
-- Reproduz em tempo real no terminal com delay de 300ms entre frames
-- Exibe: timestamp, iteração, papel do agente, modelo, status do harness
+| `--fix` | Aplica auto-correção automática para segredos expostos (movendo para `.env`) e chamadas de `eval()` (substituindo por `JSON.parse()`) |
+| `--format <format>` | Formato de saída: `text` ou `json` |
 
 ---
 
 ### `ui`
 
-Inicia o Web Dashboard local para visualização gráfica de relatórios.
+Inicia o Web Dashboard local com histórico SQLite e visualização gráfica de diffs e WebSocket em tempo real.
 
 ```bash
-loopforge ui [directory]
+loopforge ui [directory] [options]
 ```
-
-**Arguments:**
-| Argument | Description |
-|---|---|
-| `directory` | Project directory (default: current directory) |
 
 **Options:**
 | Option | Description |
 |---|---|
-| `-p, --port <port>` | Server port (default: `3000`) |
-
-**Access:**
-- `http://localhost:3000`
-
-**Features:**
-- Relatórios de execução do Loop Engine
-- Histórico de ciclos
-- Métricas de custo por execução
-- Visualização de falhas e taxa de aprovação
+| `-p, --port <port>` | Porta do servidor HTTP (padrão: `3000`) |
 
 ---
 
-### `ci:setup`
+### `release`
 
-Gera pipeline de CI/CD nativo para GitHub Actions.
+Gera notas de lançamento semânticas e atualiza o `CHANGELOG.md` do projeto.
 
 ```bash
-loopforge ci:setup
+loopforge release [version] [directory]
 ```
-
-**Creates:**
-- `.github/workflows/loopforge-ci.yml`
-
-**Geração inclui:**
-- Triggers: `push` e `pull_request` na branch principal
-- Setup Node.js
-- Instalação de dependências
-- Execução do Loop Engine
-
----
-
-### `status`
-
-Exibe painel de status da configuração atual.
-
-```bash
-loopforge status [directory]
-```
-
-**Arguments:**
-| Argument | Description |
-|---|---|
-| `directory` | Project directory (default: current directory) |
-
-**Displays:**
-- Configuração ativa (.loopforge.json)
-- Provedor LLM configurado e modelo
-- Skills ativas e templates disponíveis
-- Estado das memórias (lessons/handoff)
-- Runners do harness
-- Configurações de guardrails
-
----
-
-## Exit Codes
-
-| Code | Meaning |
-|---|---|
-| `0` | Success |
-| `1` | General error |
-| `2` | Circuit breaker tripped |
-| `3` | Harness failure |
-| `4` | Git sandbox error |

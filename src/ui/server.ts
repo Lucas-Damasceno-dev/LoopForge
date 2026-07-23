@@ -22,6 +22,24 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
       return;
     }
 
+    if (req.url === "/api/telemetry/history") {
+      try {
+        const { TelemetryStore } = await import("../telemetry/store.js");
+        const store = await TelemetryStore.getInstance(resolvedDir);
+        const sessions = store.getAllSessions();
+        const costTrend = store.getCostTrend();
+        const passRateTrend = store.getPassRateTrend();
+        store.close();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ sessions, costTrend, passRateTrend }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Falha ao carregar histórico SQLite.", details: msg }));
+      }
+      return;
+    }
+
     const htmlContent = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -35,36 +53,7 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
     .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: bold; font-size: 0.85rem; }
     .badge-success { background: #059669; color: #fff; }
     .metric { font-size: 2rem; font-weight: bold; color: #a7f3d0; margin: 0.5rem 0; }
-    #liveFeed { background: #020617; border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.9rem; max-height: 200px; overflow-y: auto; color: #38bdf8; }
-  </style>
-</head>
-<body>
-  <h1>🚀 LoopForge Web Dashboard (Real-time Live WebSocket)</h1>
-  <div class="card">
-    <h2>Status Geral</h2>
-    <div id="statusBadge" class="badge badge-success">SISTEMA CONECTADO</div>
-    <div class="metric" id="iterationsCount">Iterações Concluídas: --</div>
-  </div>
 
-  <div class="card">
-    <h2>Consumo de Tokens e Custos</h2>
-    <p id="tokenUsage">Carregando métricas...</p>
-  </div>
-
-  <div class="card">
-    <h2>🌊 Live WebSocket Feed</h2>
-    <div id="liveFeed">Aguardando eventos do LoopForge Engine...</div>
-  </div>
-
-  <script>
-    async function loadReport() {
-      try {
-        const res = await fetch('/api/report');
-        if (!res.ok) return;
-        const data = await res.json();
-        document.getElementById('iterationsCount').innerText = 'Iterações Concluídas: ' + data.totalIterations;
-        document.getElementById('tokenUsage').innerText = 'Tokens Consumidos: ' + (data.totalTokensUsed || 0) + ' | Custo Est.: $' + (data.totalCostUsd || 0).toFixed(4);
-      } catch (e) {
         console.warn('Dashboard report load error:', e);
       }
     }

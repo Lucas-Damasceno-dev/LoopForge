@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
 import { Command } from "commander";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../../package.json");
 import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
@@ -23,7 +27,7 @@ const program = new Command();
 program
   .name("loopforge")
   .description("Automated Loop Engineering Engine for AI Agents")
-  .version("5.0.0");
+  .version(pkg.version);
 
 program
   .command("init")
@@ -48,7 +52,8 @@ program
   .description("Gera autonomamente suítes de testes unitários para arquivos de código não cobertos")
   .argument("[directory]", "Diretório do projeto", ".")
   .option("--dry-run", "Simula a criação de testes exibindo a lista e o diff sem gravar arquivos")
-  .action(async (directory: string, options: { dryRun?: boolean }) => {
+  .option("--format <format>", "Formato de saída: text|json", "text")
+  .action(async (directory: string, options: { dryRun?: boolean; format?: "json" | "text" }) => {
     await generateTestsCommand(directory, options);
   });
 
@@ -73,7 +78,7 @@ program
 program
   .command("release")
   .description("Gera notas de lançamento semânticas e atualiza o arquivo CHANGELOG.md")
-  .argument("[version]", "Versão da release", "5.0.0")
+  .argument("[version]", "Versão da release", pkg.version)
   .argument("[directory]", "Diretório do projeto", ".")
   .action(async (version: string, directory: string) => {
     await releaseCommand(version, directory);
@@ -102,16 +107,21 @@ program
   .description("Orquestra execuções de loops em múltiplos repositórios do workspace em lote")
   .argument("[workspaceFile]", "Arquivo manifesto de workspace", "loopforge-workspace.json")
   .argument("[directory]", "Diretório raiz", ".")
-  .action(async (workspaceFile: string, directory: string) => {
-    await workspaceCommand(workspaceFile, directory);
+  .option("--parallel", "Executa loops de workspace em paralelo")
+  .option("-c, --concurrency <number>", "Limite de concorrência simultânea para modo paralelo", "3")
+  .option("--format <format>", "Formato de saída: text|json", "text")
+  .action(async (workspaceFile: string, directory: string, options: { parallel?: boolean; concurrency?: string; format?: "json" | "text" }) => {
+    await workspaceCommand(workspaceFile, directory, options);
   });
 
 program
   .command("audit")
   .description("Executa o scanner de segurança e code smells em busca de segredos expostos e falhas OWASP")
   .argument("[directory]", "Diretório do projeto", ".")
-  .action(async (directory: string) => {
-    await auditCommand(directory);
+  .option("--fix", "Aplica auto-correção automática para segredos expostos e chamadas de eval()")
+  .option("--format <format>", "Formato de saída: text|json", "text")
+  .action(async (directory: string, options: { fix?: boolean; format?: "json" | "text" }) => {
+    await auditCommand(directory, options);
   });
 
 program
@@ -145,8 +155,11 @@ program
   .description("Executa o ciclo do Loop Engine com Harness, Memória, Model Fallback e Git Sandbox")
   .argument("[directory]", "Diretório do projeto", ".")
   .option("--create-pr", "Cria automaticamente um Pull Request no GitHub ao concluir com sucesso")
-  .option("-w, --watch", "Re-executa o ciclo automaticamente sempre que arquivos .ts forem alterados")
-  .action(async (directory: string, options: { createPr?: boolean; watch?: boolean }) => {
+  .option("--review", "Modo de revisão interativa que exibe diff e solicita confirmação antes de criar PR")
+  .option("--auto", "Modo automatizado sem confirmação interativa (headless)")
+  .option("-w, --watch", "Re-executa o ciclo automaticamente sempre que arquivos .ts ou configs forem alterados")
+  .option("--format <format>", "Formato de saída: text|json", "text")
+  .action(async (directory: string, options: { createPr?: boolean; review?: boolean; auto?: boolean; watch?: boolean; format?: "json" | "text" }) => {
     await runCommand(directory, options);
   });
 

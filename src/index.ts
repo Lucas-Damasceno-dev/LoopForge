@@ -7,6 +7,7 @@ export * from "./harness/types.js";
 export * from "./harness/parser.js";
 export * from "./harness/runner.js";
 export * from "./harness/formatter.js";
+export * from "./harness/stack-detector.js";
 export * from "./harness/bootstrap.js";
 export * from "./harness/self-healing.js";
 export * from "./harness/test-generator.js";

@@ -33,6 +33,40 @@ export class LLMEngine {
     this.baseUrl = config?.baseUrl || (this.provider === "ollama" ? "http://localhost:11434" : "http://localhost:8000");
   }
 
+  public async generateEmbedding(text: string): Promise<number[]> {
+    try {
+      const endpoint = process.env.OPENCODE_EMBEDDINGS_URL || `${this.baseUrl}/v1/embeddings`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: text, model: "text-embedding-3-small" }),
+      });
+      if (response.ok) {
+        const data = (await response.json()) as { data?: Array<{ embedding?: number[] }> };
+        if (data.data?.[0]?.embedding) {
+          return data.data[0].embedding;
+        }
+      }
+    } catch {}
+
+    // Fallback deterministic embedding (64 dimensions)
+    const dim = 64;
+    const vec = new Array(dim).fill(0);
+    const words = text.toLowerCase().split(/\W+/).filter(Boolean);
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      let hash = 0;
+      for (let j = 0; j < word.length; j++) {
+        hash = (hash << 5) - hash + word.charCodeAt(j);
+        hash |= 0;
+      }
+      const idx = Math.abs(hash) % dim;
+      vec[idx] += 1;
+    }
+    const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0));
+    return norm === 0 ? vec : vec.map((v) => v / norm);
+  }
+
   public registerHarnessResult(passed: boolean): void {
     if (passed) {
       this.consecutiveFailures = 0;

@@ -4,7 +4,7 @@ import { formatHarnessFeedback } from "../harness/formatter.js";
 import type { HarnessExecutionSummary } from "../harness/types.js";
 import { MemoryManager } from "../memory/manager.js";
 import { CircuitBreaker } from "../guardrails/circuit-breaker.js";
-import { createCheckpoint, rollbackToCheckpoint } from "../git/checkpoint.js";
+import { createCheckpoint, rollbackToCheckpoint, getWorkingDiff } from "../git/checkpoint.js";
 import { createSandboxBranch, mergeSandboxBranch, cleanupSandboxBranch, type SandboxInfo } from "../git/sandbox.js";
 import { LLMEngine, type LLMResponse } from "../llm/provider.js";
 
@@ -22,6 +22,7 @@ export interface IterationReport {
   rollbackExecuted: boolean;
   circuitBreakerTripped: boolean;
   stopReason?: string;
+  diff?: string;
 }
 
 export interface LoopExecutionResult {
@@ -102,7 +103,10 @@ export class LoopEngine {
           llmResponse = await this.llmEngine.generateStep(fullContext);
         }
 
-        // 4. Executar o Harness Engine
+        // 4. Capturar diff das alterações feitas pelo LLM
+        const iterationDiff = await getWorkingDiff(this.cwd);
+
+        // 5. Executar o Harness Engine
         const harnessSummary = await runHarness(this.config.harness, this.cwd);
         this.llmEngine.registerHarnessResult(harnessSummary.allPassed);
 
@@ -126,6 +130,7 @@ export class LoopEngine {
             estimatedCostUsd: llmResponse.estimatedCostUsd,
             rollbackExecuted: false,
             circuitBreakerTripped: breakerStatus.isOpen,
+            diff: iterationDiff,
           };
           reports.push(report);
 
@@ -163,6 +168,7 @@ export class LoopEngine {
             rollbackExecuted,
             circuitBreakerTripped: breakerStatus.isOpen,
             stopReason: breakerStatus.reason,
+            diff: iterationDiff,
           };
           reports.push(report);
 

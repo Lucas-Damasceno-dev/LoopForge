@@ -2,13 +2,24 @@ import * as path from "node:path";
 import chalk from "chalk";
 import { TestGenerator } from "../../harness/test-generator.js";
 
-export async function generateTestsCommand(targetDir: string = ".", options: { dryRun?: boolean } = {}): Promise<void> {
+export async function generateTestsCommand(
+  targetDir: string = ".",
+  options: { dryRun?: boolean; format?: "json" | "text" } = {}
+): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
   const isDry = !!options.dryRun;
 
-  console.log(chalk.cyan(`🧪 Analisando código não coberto para geração de testes com IA (Dry Run: ${isDry ? "SIM" : "NÃO"})...`));
+  if (options.format !== "json") {
+    console.log(chalk.cyan(`🧪 Analisando código não coberto para geração de testes com IA (Dry Run: ${isDry ? "SIM" : "NÃO"})...`));
+  }
+
   const generator = new TestGenerator();
   const created = await generator.generateTestsForUncoveredCode(resolvedDir, isDry);
+
+  if (options.format === "json") {
+    console.log(JSON.stringify({ dryRun: isDry, count: created.length, created }, null, 2));
+    return;
+  }
 
   if (created.length === 0) {
     console.log(chalk.green(`✔ Todos os arquivos de código já possuem testes correspondentes.`));
