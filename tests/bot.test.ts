@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { handleSlackOrDiscordBotCommand } from "../src/ci/bot.js";
 
 describe("LoopForge Slack & Discord Bot Handler", () => {
-  it("deve processar comando /loopforge run", () => {
-    const res = handleSlackOrDiscordBotCommand({
+  it("deve processar comando /loopforge run", async () => {
+    const res = await handleSlackOrDiscordBotCommand({
       command: "/loopforge run",
       user: "lucasd",
       channel: "dev-team",
