@@ -2,7 +2,6 @@ import type { LoopForgeConfig } from "../config/schema.js";
 import { runHarness } from "../harness/runner.js";
 import { formatHarnessFeedback } from "../harness/formatter.js";
 import type { HarnessExecutionSummary } from "../harness/types.js";
-import { loadActiveSkills, formatSkillsPrompt } from "../skills/loader.js";
 import { MemoryManager } from "../memory/manager.js";
 import { CircuitBreaker } from "../guardrails/circuit-breaker.js";
 import { createCheckpoint, rollbackToCheckpoint } from "../git/checkpoint.js";
@@ -56,7 +55,10 @@ export class LoopEngine {
 
     try {
       sandboxInfo = await createSandboxBranch("loopforge/task-", this.cwd);
-    } catch {}
+    } catch {
+      // Sandbox branch creation failed (e.g. not a git repository); fallback to working dir
+      sandboxInfo = null;
+    }
 
     try {
       let iteration = 0;
@@ -177,7 +179,7 @@ export class LoopEngine {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (sandboxInfo) {
         await cleanupSandboxBranch(sandboxInfo.sandboxBranch, sandboxInfo.originalBranch, this.cwd);
       }

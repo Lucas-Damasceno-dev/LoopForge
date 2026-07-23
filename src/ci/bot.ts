@@ -60,7 +60,9 @@ export async function handleSlackOrDiscordBotCommand(payload: BotCommandPayload)
       });
 
       sentToWebhook = res.ok;
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`⚠️ [Bot Webhook] Erro ao disparar mensagem para webhook: ${msg}`);
       sentToWebhook = false;
     }
   }

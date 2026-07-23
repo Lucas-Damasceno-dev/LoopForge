@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
 
-export async function generateReleaseNotes(version: string = "3.1.0", cwd: string = "."): Promise<string> {
+export async function generateReleaseNotes(version: string = "5.0.0", cwd: string = "."): Promise<string> {
   const resolvedDir = path.resolve(cwd);
   const changelogPath = path.join(resolvedDir, "CHANGELOG.md");
 
@@ -13,7 +13,10 @@ export async function generateReleaseNotes(version: string = "3.1.0", cwd: strin
   try {
     const { stdout } = await execAsync("git log -n 5 --oneline", { cwd: resolvedDir });
     if (stdout.trim()) gitLogs = stdout.trim();
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    gitLogs = `Log de histórico indisponível (${msg})`;
+  }
 
   const date = new Date().toISOString().split("T")[0];
   const newEntry = `## [${version}] - ${date}\n\n### 🚀 Alterações Automatizadas:\n\`\`\`text\n${gitLogs}\n\`\`\`\n\n`;

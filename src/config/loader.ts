@@ -22,7 +22,9 @@ export async function loadConfig(configPath?: string, cwd: string = "."): Promis
       rawData = await fs.readFile(p, "utf-8");
       resolvedPath = p;
       break;
-    } catch {}
+    } catch {
+      // Ignore missing files when checking candidate config paths
+    }
   }
 
   if (!resolvedPath || !rawData) {
@@ -30,15 +32,16 @@ export async function loadConfig(configPath?: string, cwd: string = "."): Promis
   }
 
   try {
-    let json: any;
+    let jsonParsed: unknown;
     if (resolvedPath.endsWith(".yml") || resolvedPath.endsWith(".yaml")) {
-      json = yaml.load(rawData);
+      jsonParsed = yaml.load(rawData);
     } else {
-      json = JSON.parse(rawData);
+      jsonParsed = JSON.parse(rawData);
     }
-    return LoopForgeConfigSchema.parse(json);
-  } catch (error: any) {
-    throw new Error(`Validação de configuração falhou em '${resolvedPath}': ${error.message}`);
+    return LoopForgeConfigSchema.parse(jsonParsed);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Validação de configuração falhou em '${path.basename(resolvedPath)}': ${message}`);
   }
 }
 
@@ -46,7 +49,7 @@ export async function createDefaultConfig(targetDir: string = "."): Promise<stri
   const filePath = path.resolve(targetDir, DEFAULT_CONFIG_FILENAME);
   const defaultConfig: LoopForgeConfig = LoopForgeConfigSchema.parse({
     projectName: "LoopForge Project",
-    version: "3.0.0",
+    version: "5.0.0",
     harness: {
       runners: [
         { name: "Unit Tests", type: "unit", command: "npm test", enabled: true },

@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
 import chalk from "chalk";
 
-export async function startWebUIServer(port: number = 3000, cwd: string = "."): Promise<{ server: http.Server; wss: WebSocketServer; broadcast: (msg: any) => void }> {
+export async function startWebUIServer(port: number = 3000, cwd: string = "."): Promise<{ server: http.Server; wss: WebSocketServer; broadcast: (msg: unknown) => void }> {
   const resolvedDir = path.resolve(cwd);
 
   const server = http.createServer(async (req, res) => {
@@ -14,9 +14,10 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
         const reportData = await fs.readFile(reportPath, "utf-8");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(reportData);
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
         res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Nenhum relatório de execução encontrado." }));
+        res.end(JSON.stringify({ error: "Nenhum relatório de execução encontrado.", details: msg }));
       }
       return;
     }
@@ -63,7 +64,9 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
         const data = await res.json();
         document.getElementById('iterationsCount').innerText = 'Iterações Concluídas: ' + data.totalIterations;
         document.getElementById('tokenUsage').innerText = 'Tokens Consumidos: ' + (data.totalTokensUsed || 0) + ' | Custo Est.: $' + (data.totalCostUsd || 0).toFixed(4);
-      } catch {}
+      } catch (e) {
+        console.warn('Dashboard report load error:', e);
+      }
     }
     loadReport();
 
@@ -84,7 +87,7 @@ export async function startWebUIServer(port: number = 3000, cwd: string = "."): 
 
   const wss = new WebSocketServer({ server });
 
-  const broadcast = (msg: any) => {
+  const broadcast = (msg: unknown) => {
     const payload = typeof msg === "string" ? msg : JSON.stringify(msg);
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {

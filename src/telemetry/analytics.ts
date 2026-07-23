@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import chalk from "chalk";
 
 export interface AnalyticsSummary {
   totalSessions: number;
@@ -26,7 +27,10 @@ export async function generateAnalyticsReport(cwd: string = "."): Promise<{ summ
     totalTokensUsed = json.totalTokensUsed || 0;
     totalCostUsd = json.totalCostUsd || 0;
     if (json.success === false) passRatePercent = 50;
-  } catch {}
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(chalk.yellow(`ℹ️ [Analytics] Relatório previo não encontrado (${msg}). Gerando relatório com métricas iniciais.`));
+  }
 
   const summary: AnalyticsSummary = {
     totalSessions: 1,

@@ -42,10 +42,11 @@ export async function createGitHubPullRequest(
     const { stdout } = await execAsync(command, { cwd });
     const url = stdout.trim();
     return { success: true, url };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: error.message || "Falha ao criar o Pull Request no GitHub.",
+      error: msg || "Falha ao criar o Pull Request no GitHub.",
     };
   }
 }
@@ -77,6 +78,7 @@ ${runnerDetails}
 ${result.stopReason}
 
 ---
+
 *Gerado automaticamente pelo [LoopForge Engine](https://github.com/Lucas-Damasceno-dev/LoopForge).*
 `;
 }

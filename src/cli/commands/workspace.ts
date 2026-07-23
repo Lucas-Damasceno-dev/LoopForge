@@ -15,10 +15,11 @@ export async function workspaceCommand(workspaceFile: string = "loopforge-worksp
       if (res.success) {
         console.log(chalk.green(`  ✔ Repositório ${res.project}: CONCLUÍDO COM SUCESSO`));
       } else {
-        console.log(chalk.red(`  ❌ Repositório ${res.project}: FALHOU`));
+        console.log(chalk.red(`  ❌ Repositório ${res.project}: FALHOU (${res.error || "Erro desconhecido"})`));
       }
     }
-  } catch (err: any) {
-    console.error(chalk.red(`❌ Erro ao executar workspace: ${err.message}`));
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(chalk.red(`❌ Erro ao executar workspace: ${msg}`));
   }
 }

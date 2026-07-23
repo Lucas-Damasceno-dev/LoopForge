@@ -20,8 +20,9 @@ export async function bootstrapCommand(targetDir: string = "."): Promise<void> {
         console.log(chalk.gray(`   - ${file}`));
       }
     }
-  } catch (error: any) {
-    console.error(chalk.red(`❌ Falha ao executar Auto-Harness Bootstrap: ${error.message}`));
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`❌ Falha ao executar Auto-Harness Bootstrap: ${msg}`));
     process.exit(1);
   }
 }

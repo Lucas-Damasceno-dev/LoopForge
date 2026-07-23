@@ -15,7 +15,9 @@ export async function loadActiveSkills(
 
   try {
     await fs.mkdir(skillDir, { recursive: true });
-  } catch {}
+  } catch {
+    // Directory creation handled or already exists
+  }
 
   for (const skillName of activeSkills) {
     const fileName = skillName.endsWith(".md") ? skillName : `${skillName}.md`;

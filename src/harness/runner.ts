@@ -1,10 +1,17 @@
-import { exec } from "node:child_process";
+import { exec, type ExecException } from "node:child_process";
 import { promisify } from "node:util";
 import type { HarnessConfig } from "../config/schema.js";
 import type { RunnerResult, HarnessExecutionSummary } from "./types.js";
 import { extractErrorDetails } from "./parser.js";
 
 const execAsync = promisify(exec);
+
+interface ExecError extends ExecException {
+  stdout?: string;
+  stderr?: string;
+  code?: number;
+  killed?: boolean;
+}
 
 export async function runSingleRunner(
   runnerName: string,
@@ -30,10 +37,11 @@ export async function runSingleRunner(
       stdout,
       stderr,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const execErr = error as ExecError;
     const durationMs = Date.now() - startTime;
-    const stdout = error?.stdout || "";
-    const stderr = error?.stderr || "";
+    const stdout = execErr?.stdout || "";
+    const stderr = execErr?.stderr || "";
     const combinedOutput = `${stdout}\n${stderr}`;
     const errorDetails = extractErrorDetails(combinedOutput, runnerType);
 
@@ -42,12 +50,12 @@ export async function runSingleRunner(
       type: runnerType,
       command,
       passed: false,
-      exitCode: error?.code || 1,
+      exitCode: execErr?.code || 1,
       durationMs,
       stdout,
       stderr,
       errorDetails,
-      timedOut: error?.killed || false,
+      timedOut: execErr?.killed || false,
     };
   }
 }

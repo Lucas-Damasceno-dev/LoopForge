@@ -18,8 +18,9 @@ export async function refactorCommand(rule: string, targetDir: string = "."): Pr
     } else {
       console.log(chalk.red(`\n❌ Auto-Refatoração encerrada com avisos: ${result.summary}`));
     }
-  } catch (error: any) {
-    console.error(chalk.red(`❌ Erro ao executar refatoração: ${error.message}`));
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`❌ Erro ao executar refatoração: ${msg}`));
     process.exit(1);
   }
 }

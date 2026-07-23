@@ -36,17 +36,25 @@ export async function initCommand(targetDir: string = ".", templateName?: string
     }
 
     // Criar arquivos iniciais de memória se não existirem
-    await fs.writeFile(
-      lessonsFile,
-      "# 🧠 Lições Aprendidas (Lessons Learned)\n\n*Nenhuma lição registrada ainda.*\n",
-      { flag: "wx" }
-    ).catch(() => {});
+    try {
+      await fs.writeFile(
+        lessonsFile,
+        "# 🧠 Lições Aprendidas (Lessons Learned)\n\n*Nenhuma lição registrada ainda.*\n",
+        { flag: "wx" }
+      );
+    } catch {
+      // File already exists
+    }
 
-    await fs.writeFile(
-      handoffFile,
-      "# 🤝 Instruções de Transição (Handoff)\n\n*Aguardando primeira iteração do loop.*\n",
-      { flag: "wx" }
-    ).catch(() => {});
+    try {
+      await fs.writeFile(
+        handoffFile,
+        "# 🤝 Instruções de Transição (Handoff)\n\n*Aguardando primeira iteração do loop.*\n",
+        { flag: "wx" }
+      );
+    } catch {
+      // File already exists
+    }
 
     console.log(chalk.green("✔ Projeto LoopForge inicializado com sucesso!"));
     console.log(chalk.cyan(`  Template Aplicado: ${appliedTemplate}`));
@@ -55,8 +63,9 @@ export async function initCommand(targetDir: string = ".", templateName?: string
     console.log(chalk.cyan(`  Diretório de Skills: ${skillsDir}`));
     console.log(chalk.cyan(`  Memória Lessons: ${lessonsFile}`));
     console.log(chalk.cyan(`  Memória Handoff: ${handoffFile}`));
-  } catch (error: any) {
-    console.error(chalk.red(`❌ Falha ao inicializar o LoopForge: ${error.message}`));
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`❌ Falha ao inicializar o LoopForge: ${msg}`));
     process.exit(1);
   }
 }

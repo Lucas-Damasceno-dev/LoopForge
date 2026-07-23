@@ -20,7 +20,8 @@ export async function replayCommand(sessionId: string, targetDir: string = "."):
     }
 
     console.log(chalk.green(`\n✔ Replay encerrado com sucesso!`));
-  } catch (err: any) {
-    console.error(chalk.red(`❌ Erro ao reproduzir sessão: ${err.message}`));
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(chalk.red(`❌ Erro ao reproduzir sessão: ${msg}`));
   }
 }
