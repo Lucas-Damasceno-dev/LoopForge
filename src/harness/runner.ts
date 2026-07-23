@@ -32,8 +32,8 @@ export async function runSingleRunner(
     };
   } catch (error: any) {
     const durationMs = Date.now() - startTime;
-    const stdout = error.stdout || "";
-    const stderr = error.stderr || "";
+    const stdout = error?.stdout || "";
+    const stderr = error?.stderr || "";
     const combinedOutput = `${stdout}\n${stderr}`;
     const errorDetails = extractErrorDetails(combinedOutput, runnerType);
 
@@ -42,12 +42,12 @@ export async function runSingleRunner(
       type: runnerType,
       command,
       passed: false,
-      exitCode: error.code || 1,
+      exitCode: error?.code || 1,
       durationMs,
       stdout,
       stderr,
       errorDetails,
-      timedOut: error.killed || false,
+      timedOut: error?.killed || false,
     };
   }
 }
@@ -58,7 +58,7 @@ export async function runHarness(
 ): Promise<HarnessExecutionSummary> {
   const startTime = Date.now();
   const enabledRunners = config.runners.filter((r) => r.enabled !== false);
-  const isParallel = config.parallel !== false;
+  const isParallel = config.parallel !== false && !config.stopOnFirstFailure;
 
   let results: RunnerResult[] = [];
 

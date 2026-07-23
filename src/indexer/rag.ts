@@ -114,11 +114,13 @@ export class CodeIndexer {
     const symbols: CodeSymbol[] = [];
 
     lines.forEach((line, idx) => {
-      const fnMatch = line.match(/(?:function|class|interface|type)\s+([A-Za-z0-9_]+)/);
-      if (fnMatch) {
+      // Extended regex matching functions, classes, interfaces, types, consts, arrow functions, and class methods
+      const match = line.match(/(?:export\s+)?(?:async\s+)?(?:function|class|interface|type|const|let|var)\s+([A-Za-z0-9_]+)/) ||
+                    line.match(/(?:public|private|protected|async|static|\s)+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{/);
+      if (match && match[1] && !["if", "for", "while", "switch", "catch"].includes(match[1])) {
         symbols.push({
-          name: fnMatch[1],
-          kind: line.includes("function") ? "function" : line.includes("class") ? "class" : "interface",
+          name: match[1],
+          kind: line.includes("class") ? "class" : line.includes("interface") ? "interface" : line.includes("const") ? "const" : "function",
           filePath,
           line: idx + 1,
           snippet: line.trim(),

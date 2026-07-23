@@ -9,10 +9,12 @@ const execAsync = promisify(exec);
 export class MemoryManager {
   private lessonsPath: string;
   private handoffPath: string;
+  private maxLessonsPrompt: number;
 
   constructor(config?: MemoryConfig, cwd: string = ".") {
     const lessonsFile = config?.lessonsFile || ".loopforge/lessons.md";
     const handoffFile = config?.handoffFile || ".loopforge/handoff.md";
+    this.maxLessonsPrompt = config?.maxLessonsPrompt || 5;
 
     this.lessonsPath = path.resolve(cwd, lessonsFile);
     this.handoffPath = path.resolve(cwd, handoffFile);
@@ -60,7 +62,9 @@ export class MemoryManager {
       if (stdout.trim()) {
         diffStat = stdout.trim();
       }
-    } catch {}
+    } catch (err) {
+      diffStat = `Erro ao coletar git diff: ${err instanceof Error ? err.message : String(err)}`;
+    }
 
     const content = `# 🔄 LoopForge State Handoff\n\n` +
       `- **Última Atualização**: ${timestamp}\n` +
@@ -74,7 +78,12 @@ export class MemoryManager {
   public async readLessonsPrompt(): Promise<string> {
     try {
       const raw = await fs.readFile(this.lessonsPath, "utf-8");
-      return raw.trim();
+      const blocks = raw.split("### [");
+      if (blocks.length <= 1) return raw.trim();
+
+      const header = blocks[0];
+      const recentLessons = blocks.slice(-this.maxLessonsPrompt);
+      return (header + "### [" + recentLessons.join("### [")).trim();
     } catch {
       return "Nenhuma lição aprendida ainda.";
     }

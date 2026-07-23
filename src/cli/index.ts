@@ -56,10 +56,10 @@ program
   .command("docker")
   .description("Executa comandos no Docker Container Sandbox isolado")
   .argument("<cmd>", "Comando a ser executado dentro do container")
-  .option("-i, --image <image>", "Imagem Docker", "node:20-alpine")
   .argument("[directory]", "Diretório do projeto", ".")
-  .action(async (cmd: string, options: { image?: string }, directory: string) => {
-    await dockerRunCommand(cmd, options.image, directory);
+  .option("-i, --image <image>", "Imagem Docker", "node:20-alpine")
+  .action(async (cmd: string, directory: string, options: { image?: string }) => {
+    await dockerRunCommand(cmd, directory, options);
   });
 
 program

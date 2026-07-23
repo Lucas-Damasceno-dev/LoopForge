@@ -2,11 +2,12 @@ import * as path from "node:path";
 import chalk from "chalk";
 import { runInDockerContainer } from "../../git/docker.js";
 
-export async function dockerRunCommand(command: string, image: string = "node:20-alpine", targetDir: string = "."): Promise<void> {
+export async function dockerRunCommand(command: string, targetDir: string = ".", options: { image?: string } = {}): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
+  const image = options.image || "node:20-alpine";
 
   console.log(chalk.cyan(`🐳 Executando comando no Docker Container (${image}): "${command}"...`));
-  const res = await runInDockerContainer(command, image, resolvedDir);
+  const res = await runInDockerContainer(command, resolvedDir, { image });
 
   if (res.usedFallback) {
     console.log(chalk.yellow(`ℹ️ Executado via fallback local:`));

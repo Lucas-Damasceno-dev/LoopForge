@@ -37,7 +37,8 @@ export class SecurityScanner {
               snippet: line.trim(),
             });
           }
-          if (/(SELECT|INSERT|UPDATE|DELETE).*\$\{/i.test(line)) {
+          // Precise regex for SQL template string interpolation or dynamic concatenation
+          if (/`(?:SELECT|INSERT|UPDATE|DELETE)\s+.*?\$\{/i.test(line) || /"(?:SELECT|INSERT|UPDATE|DELETE)\s+.*?"\s*\+/i.test(line)) {
             vulnerabilities.push({
               file: relativePath,
               line: idx + 1,
@@ -46,7 +47,9 @@ export class SecurityScanner {
             });
           }
         });
-      } catch {}
+      } catch (err) {
+        // Skip unreadable binary files safely
+      }
     }
 
     return vulnerabilities;

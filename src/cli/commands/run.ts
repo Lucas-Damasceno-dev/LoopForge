@@ -7,15 +7,27 @@ import { LoopEngine } from "../../core/loop-engine.js";
 import { logIterationStart, logIterationReport } from "../../ui/logger.js";
 import { renderSummaryDashboard } from "../../ui/dashboard.js";
 import { createGitHubPullRequest } from "../../git/pr.js";
+import { isGitRepo } from "../../git/checkpoint.js";
 
 export async function runCommand(targetDir: string = ".", options: { createPr?: boolean; watch?: boolean } = {}): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
 
-  const executeOnce = async () => {
-    try {
-      const config = await loadConfig(undefined, resolvedDir);
-      console.log(chalk.cyan(`🚀 Iniciando LoopForge Engine para o projeto: '${config.projectName}'`));
+  const config = await loadConfig(undefined, resolvedDir);
+  if (config.guardrails.requireCleanGit) {
+    const isClean = await isGitRepo(resolvedDir);
+    if (!isClean) {
+      console.warn(chalk.yellow("⚠️ [Guardrail]: Repositório Git não está inicializado ou limpo. Prosseguindo em modo permissivo..."));
+    }
+  }
 
+  let isExecuting = false;
+
+  const executeOnce = async () => {
+    if (isExecuting) return;
+    isExecuting = true;
+
+    try {
+      console.log(chalk.cyan(`🚀 Iniciando LoopForge Engine para o projeto: '${config.projectName}'`));
       const engine = new LoopEngine(config, resolvedDir);
 
       const result = await engine.runLoop(async (_context, iteration, llmEngine) => {
@@ -44,8 +56,11 @@ export async function runCommand(targetDir: string = ".", options: { createPr?: 
           console.log(chalk.yellow(`⚠️ Não foi possível criar o PR: ${prResult.error}`));
         }
       }
-    } catch (error: any) {
-      console.error(chalk.red(`❌ Erro ao executar o LoopForge: ${error.message}`));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`❌ Erro ao executar o LoopForge: ${msg}`));
+    } finally {
+      isExecuting = false;
     }
   };
 
@@ -54,7 +69,7 @@ export async function runCommand(targetDir: string = ".", options: { createPr?: 
   if (options.watch) {
     console.log(chalk.yellow(`\n👀 Modo --watch ATIVO: Aguardando modificações em arquivos .ts no diretório...`));
     let debounceTimer: NodeJS.Timeout | null = null;
-    fsSync.watch(resolvedDir, { recursive: true }, (_eventType, filename) => {
+    const watcher = fsSync.watch(resolvedDir, { recursive: true }, (_eventType, filename) => {
       if (filename && filename.endsWith(".ts") && !filename.includes("node_modules") && !filename.includes(".loopforge")) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
@@ -62,6 +77,12 @@ export async function runCommand(targetDir: string = ".", options: { createPr?: 
           executeOnce();
         }, 500);
       }
+    });
+
+    process.on("SIGINT", () => {
+      console.log(chalk.gray("\nEncerrando modo --watch..."));
+      watcher.close();
+      process.exit(0);
     });
   }
 }

@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import chalk from "chalk";
 import { LLMEngine } from "../llm/provider.js";
 
 export interface GeneratedTestFile {
@@ -7,6 +8,7 @@ export interface GeneratedTestFile {
   testFile: string;
   created: boolean;
   contentSnippet: string;
+  hasLlmError?: boolean;
 }
 
 export class TestGenerator {
@@ -33,13 +35,18 @@ export class TestGenerator {
         const prompt = `Gere uma suíte de testes unitários em TypeScript usando Vitest para o seguinte código:\n\n${sourceCode.slice(0, 1000)}`;
         
         let testContent = `import { describe, it, expect } from "vitest";\n\ndescribe("${baseName} Test Suite", () => {\n  it("deve validar o funcionamento basico de ${baseName}", () => {\n    expect(true).toBe(true);\n  });\n});\n`;
-        
+        let hasLlmError = false;
+
         try {
           const llmRes = await this.llm.generateStep(prompt);
           if (llmRes.content && llmRes.content.includes("describe")) {
             testContent = llmRes.content;
           }
-        } catch {}
+        } catch (err) {
+          hasLlmError = true;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.warn(chalk.yellow(`⚠️ [TestGenerator] Falha ao consultar LLM Engine para '${relPath}': ${errMsg}. Usando template de teste seguro.`));
+        }
 
         if (!dryRun) {
           await fs.mkdir(path.dirname(testFilePath), { recursive: true });
@@ -51,6 +58,7 @@ export class TestGenerator {
           testFile: path.relative(resolvedDir, testFilePath),
           created: !dryRun,
           contentSnippet: testContent.slice(0, 150) + "...",
+          hasLlmError,
         });
       }
     }

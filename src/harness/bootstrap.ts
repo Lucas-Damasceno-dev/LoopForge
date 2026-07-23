@@ -69,7 +69,12 @@ describe("Baseline Test Suite (Auto-Harness)", () => {
   try {
     const configPath = path.join(resolvedDir, ".loopforge.json");
     const config = await loadConfig(configPath);
-    config.harness.runners = runnersAdded;
+    const existingNames = new Set(config.harness.runners.map((r) => r.name));
+    for (const newRunner of runnersAdded) {
+      if (!existingNames.has(newRunner.name)) {
+        config.harness.runners.push(newRunner);
+      }
+    }
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
   } catch {}
 
