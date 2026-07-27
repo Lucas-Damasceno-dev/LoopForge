@@ -21,6 +21,17 @@ def developer(state: GraphState) -> dict:
     if not tech_spec:
         raise ValueError("Especificação técnica não encontrada no estado")
 
+    # Mock mode
+    if state.get("mock_llm"):
+        print("--- INFO: Developer modo MOCK ---")
+        mock_code = "# Mock generated code\nprint('Hello from mock developer')"
+        return {
+            **state,
+            "code": mock_code,
+            "next_agent": "qa",
+            "error": None,
+        }
+
     user_stories = state.get("user_stories", [])
     project_dir = state.get("project_dir", os.getcwd())
 
@@ -61,15 +72,14 @@ REGRAS:
 Ao final, execute: npm test || pytest || cargo test (conforme a stack)
 e garanta que os testes passem."""
 
-    runner = OpenCodeRunner(
-        prompt=prompt,
-        cwd=project_dir,
-        timeout_ms=600_000,
-        mock=state.get("mock_llm", False),
-    )
+    runner = OpenCodeRunner(timeout_seconds=600)
 
     print("--- Spawnando OpenCode... ---")
-    result = runner.run()
+    result = runner.run(
+        prompt=prompt,
+        project_root=project_dir,
+        model="opencode/deepseek-v4-flash-free",
+    )
 
     # Extrai código gerado do stdout
     generated_code = result.stdout if result.success else ""
@@ -81,15 +91,16 @@ e garanta que os testes passem."""
             f.write(generated_code)
         print(f"--- INFO: Código salvo em {code_path} ---")
 
+    err_msg = result.error
     if not result.success:
-        print(f"--- AVISO: OpenCode falhou: {result.error} ---")
+        print(f"--- AVISO: OpenCode falhou: {err_msg} ---")
         state["feedback_history"] = state.get("feedback_history", []) + [
-            {"from": "developer", "message": f"OpenCode falhou: {result.error}", "attempt": state.get("attempt_count", 0)}
+            {"from": "developer", "message": f"OpenCode falhou: {err_msg}", "attempt": state.get("attempt_count", 0)}
         ]
 
     return {
         **state,
         "code": generated_code,
         "next_agent": "qa",
-        "error": result.error,
+        "error": err_msg,
     }

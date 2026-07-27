@@ -8,7 +8,7 @@ from typing import Literal
 import json
 
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.memory import InMemorySaver
 
 from .state import GraphState
 from .nodes.cpo import cpo
@@ -54,7 +54,7 @@ def should_retry(state: GraphState) -> Literal["qa", "developer", "__end__"]:
 
 
 def build_graph(
-    checkpointer: SqliteSaver | None = None,
+    checkpointer: InMemorySaver | None = None,
     interrupt_after: list[str] | None = None,
     human_gate_enabled: bool = False,
 ):

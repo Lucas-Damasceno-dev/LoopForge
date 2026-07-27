@@ -13,8 +13,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from ..llm_factory import get_llm_client
 from ...pipeline.state import GraphState
+from ...runner.opencode import call_llm_via_opencode
 
 
 class ValidationResult(BaseModel):
@@ -48,13 +48,7 @@ def tech_lead(state: GraphState) -> dict:
         tech_spec = _mock_tech_spec(user_stories, tech_spec_template, now_date)
         return {**state, "tech_spec": tech_spec, "next_agent": "developer"}
 
-    llm = get_llm_client(
-        state["llm_provider"],
-        state["llm_model_name"],
-        temperature=state.get("llm_temperature", 0.2),
-    )
-    llm_validation = llm.with_structured_output(ValidationResult)
-    print(f"--- INFO: Tech Lead usando {state['llm_provider']}/{state['llm_model_name']} ---")
+    print("--- INFO: Tech Lead usando OpenCode via subprocesso ---")
 
     stories_str = "\n".join(
         f"{us.get('id', 'N/A')}: {us.get('title', '')} — {us.get('as_a', '')} quer {us.get('i_want_to', '')} para {us.get('so_that', '')}"
@@ -62,58 +56,50 @@ def tech_lead(state: GraphState) -> dict:
     )
 
     # Fase 1: Validar user stories
-    validation_prompt = f"""Você é um Tech Lead. Revise as user stories abaixo.
+    try:
+        validation = call_llm_via_opencode(
+            system_prompt="""Você é um Tech Lead. Revise as user stories abaixo.
 
 Critérios de análise:
 - As histórias são claras e sem ambiguidade?
 - Os critérios de aceitação são testáveis?
 - Há informações técnicas faltando?
 
-User Stories:
-{stories_str}
-
 Responda com:
 - needs_feedback: true se alguma história precisa de revisão
 - feedback_message: feedback detalhado
-- approved_stories: IDs das histórias aprovadas"""
+- approved_stories: IDs das histórias aprovadas""",
+            user_prompt=f"User Stories:\n{stories_str}",
+            schema_model=ValidationResult,
+            mock=state.get("mock_llm", False),
+        )
 
-    try:
-        validation = llm_validation.invoke(validation_prompt)
-
-        if validation.needs_feedback:
-            print(f"--- AVISO: Tech Lead solicita feedback: {validation.feedback_message[:100]}... ---")
-            # Gera tech spec mesmo assim com as histórias aprovadas
+        if validation.get("needs_feedback"):
+            print(f"--- AVISO: Tech Lead solicita feedback: {validation.get('feedback_message', '')[:100]}... ---")
             state["feedback_history"] = state.get("feedback_history", []) + [
-                {"from": "tech_lead", "message": validation.feedback_message, "timestamp": now_iso}
+                {"from": "tech_lead", "message": validation.get("feedback_message", ""), "timestamp": now_iso}
             ]
     except Exception as e:
         print(f"--- ERRO TL validação: {e} ---")
-        validation = ValidationResult(needs_feedback=False, feedback_message="", approved_stories=[us.get("id", "") for us in user_stories])
 
     # Fase 2: Gerar tech spec
     print("--- Gerando especificação técnica ---")
-    tech_spec_prompt = f"""Você é um Tech Lead. Crie uma especificação técnica detalhada.
+
+    try:
+        tech_spec = call_llm_via_opencode(
+            system_prompt=f"""Você é um Tech Lead. Crie uma especificação técnica detalhada.
 
 Stack do projeto: {state.get('stack', 'N/A')}
-
-User Stories:
-{stories_str}
 
 Template:
 {tech_spec_template}
 
 Preencha todas as seções do template com informações técnicas precisas.
 Inclua decisões arquiteturais, padrões, e tradeoffs quando apropriado.
-Use o template como guia, não como limite — adicione seções conforme necessário."""
-
-    try:
-        llm_plain = get_llm_client(
-            state["llm_provider"],
-            state["llm_model_name"],
-            temperature=state.get("llm_temperature", 0.2),
+Use o template como guia, não como limite — adicione seções conforme necessário.""",
+            user_prompt=f"User Stories:\n{stories_str}",
+            mock=state.get("mock_llm", False),
         )
-        response = llm_plain.invoke(tech_spec_prompt)
-        tech_spec = response.content if hasattr(response, "content") else str(response)
     except Exception as e:
         print(f"--- ERRO TL tech spec: {e} ---")
         tech_spec = _mock_tech_spec(user_stories, tech_spec_template, now_date)

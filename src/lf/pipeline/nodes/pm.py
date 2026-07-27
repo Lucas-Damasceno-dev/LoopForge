@@ -11,8 +11,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from ..llm_factory import get_llm_client
 from ...pipeline.state import GraphState
+from ...runner.opencode import call_llm_via_opencode
 
 
 class UserStorySchema(BaseModel):
@@ -49,15 +49,9 @@ def product_manager(state: GraphState) -> dict:
         stories = _mock_stories(epic)
         return {**state, "user_stories": stories, "next_agent": "tech_lead"}
 
-    llm = get_llm_client(
-        state["llm_provider"],
-        state["llm_model_name"],
-        temperature=state.get("llm_temperature", 0.3),
-    )
-    llm_structured = llm.with_structured_output(UserStoryList)
-    print(f"--- INFO: PM usando {state['llm_provider']}/{state['llm_model_name']} ---")
+    print("--- INFO: PM usando OpenCode via subprocesso ---")
 
-    prompt = f"""Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
+    system_prompt = f"""Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
 
 Cada user story DEVE ter TODOS os campos:
 - id: {epic.get('id', 'E-001')}-USXXX (sequencial)
@@ -69,9 +63,11 @@ Cada user story DEVE ter TODOS os campos:
 - acceptance_criteria: lista de strings Given-When-Then
 - priority: Medium (padrão)
 - status: Pending (padrão)
-- dates: {{"created_at": "{now_iso}"}}
+- dates: use a data atual
 
-Épico:
+Responda APENAS com o JSON. NÃO inclua texto explicativo."""
+
+    epic_context = f"""Épico:
 Título: {epic.get('title', '')}
 Descrição: {epic.get('description', '')}
 Objetivos: {', '.join(epic.get('business_objectives', []))}
@@ -79,14 +75,19 @@ Escopo IN: {', '.join(epic.get('scope_in', []))}
 Escopo OUT: {', '.join(epic.get('scope_out', []))}"""
 
     try:
-        result = llm_structured.invoke(prompt)
+        result = call_llm_via_opencode(
+            system_prompt=system_prompt,
+            user_prompt=epic_context,
+            schema_model=UserStoryList,
+            mock=state.get("mock_llm", False),
+        )
         stories = []
-        for i, us in enumerate(result.stories):
-            us_dict = us.model_dump()
-            us_dict["id"] = f"{epic.get('id', 'E-001')}-US{i+1:03d}"
-            us_dict["epic_id"] = epic.get("id", "E-001")
-            us_dict["dates"]["created_at"] = now_iso
-            stories.append(us_dict)
+        for i, us in enumerate(result.get("stories", [])):
+            us["id"] = f"{epic.get('id', 'E-001')}-US{i+1:03d}"
+            us["epic_id"] = epic.get("id", "E-001")
+            us["dates"] = us.get("dates", {})
+            us["dates"]["created_at"] = now_iso
+            stories.append(us)
     except Exception as e:
         print(f"--- ERRO PM: {e} ---")
         stories = _mock_stories(epic)

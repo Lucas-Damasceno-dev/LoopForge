@@ -1,7 +1,7 @@
 #-*- coding: utf-8 -*-
 """
 Nó CPO: transforma ideia bruta em épico estruturado.
-Usa Pydantic structured output com o schema do The Foundry.
+Usa OpenCode via subprocesso + Pydantic para structured output.
 """
 from __future__ import annotations
 import json
@@ -11,8 +11,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from ..llm_factory import get_llm_client
 from ...pipeline.state import GraphState
+from ...runner.opencode import call_llm_via_opencode
 
 
 class EpicSchema(BaseModel):
@@ -41,17 +41,11 @@ def cpo(state: GraphState) -> dict:
             "next_agent": "product_manager",
         }
 
-    llm = get_llm_client(
-        state["llm_provider"],
-        state["llm_model_name"],
-        temperature=state.get("llm_temperature", 0.3),
-    )
-    llm_structured = llm.with_structured_output(EpicSchema)
-    print(f"--- INFO: CPO usando {state['llm_provider']}/{state['llm_model_name']} ---")
+    print("--- INFO: CPO usando OpenCode via subprocesso ---")
 
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    prompt = f"""Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
+    system_prompt = """Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
 
 Preencha TODOS os campos obrigatórios:
 - id: gere E-001
@@ -62,16 +56,18 @@ Preencha TODOS os campos obrigatórios:
 - scope_in: itens dentro do escopo
 - scope_out: itens fora do escopo
 - success_metrics: métricas de sucesso
-- stakeholders: {{"owner": "CPO", "consulted": ["Product Manager", "UX/UI Designer", "CTO"]}}
+- stakeholders: {"owner": "CPO", "consulted": ["Product Manager", "UX/UI Designer", "CTO"]}
 - dates: use a data atual
 
-Foque no valor de negócio. Não inclua implementação técnica.
-
-Ideia do usuário: {state.get('idea', '')}"""
+Foque no valor de negócio. Não inclua implementação técnica."""
 
     try:
-        epic_pydantic = llm_structured.invoke(prompt)
-        epic = epic_pydantic.model_dump()
+        epic = call_llm_via_opencode(
+            system_prompt=system_prompt,
+            user_prompt=f"Ideia do usuário: {state.get('idea', '')}",
+            schema_model=EpicSchema,
+            mock=state.get("mock_llm", False),
+        )
         epic["dates"] = {"created_at": now_iso, "started_at": now_iso}
     except Exception as e:
         print(f"--- ERRO CPO: {e} ---")

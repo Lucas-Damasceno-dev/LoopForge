@@ -15,9 +15,11 @@ def plan_cmd(vision: str):
     except FileNotFoundError:
         console.print("[red]No .loopforge.json found. Run 'loopforge init' first.[/red]")
         raise SystemExit(1)
-    plan = create_plan_from_vision(vision)
+    plan = create_plan_from_vision(vision, output_dir=".")
     cfg.plan = plan
     save_config(cfg)
     console.print(f"[bold green]Generated plan with {len(plan.tasks)} tasks.[/bold green]")
     for t in plan.tasks:
-        console.print(f"  • [cyan]{t.id}[/cyan]: {t.title}")
+        tid = t.get("id", t["id"]) if isinstance(t, dict) else t.id
+        ttitle = t.get("title", t["title"]) if isinstance(t, dict) else t.title
+        console.print(f"  • [cyan]{tid}[/cyan]: {ttitle}")

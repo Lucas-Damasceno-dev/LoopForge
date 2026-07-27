@@ -11,8 +11,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from ..llm_factory import get_llm_client
 from ...pipeline.state import GraphState
+from ...runner.opencode import call_llm_via_opencode
 
 
 class TestExecutionReport(BaseModel):
@@ -51,16 +51,21 @@ def qa(state: GraphState) -> dict:
     # Fase 1: Executar harness real no projeto
     harness_result = _run_harness(project_dir)
 
-    # Fase 2: Gerar relatório estruturado com LLM
-    llm = get_llm_client(
-        state["llm_provider"],
-        state["llm_model_name"],
-        temperature=state.get("llm_temperature", 0.1),
-    )
+    # Fase 2: Gerar relatório estruturado via OpenCode
+    try:
+        report = call_llm_via_opencode(
+            system_prompt="""Você é um QA Engineer. Analise o código e resultados de teste abaixo e gere um relatório de execução de testes conforme o schema esperado.
 
-    report_prompt = f"""Você é um QA Engineer. Analise o código e resultados de teste abaixo.
-
-Resultados do Harness:
+O relatório DEVE ter:
+- id: EXEC-YYYY-MM-DD-HHMMSS-XXX
+- user_story_id: ID da user story principal
+- commit_hash: hash do commit
+- execution_timestamp: ISO 8601
+- executed_by: qa.agent
+- environment: {"name": "local", "config_hash": None}
+- summary: {"status": "PASS" ou "FAIL", "total_tests": N, "tests_passed": N, "tests_failed": N, "tests_skipped": N, "flaky_tests_detected": 0, "duration_seconds": N}
+- results_by_suite: lista de suites com detalhes""",
+            user_prompt=f"""Resultados do Harness:
 - Passou: {harness_result.get('passed', 0)}/{harness_result.get('total', 0)} testes
 - Erros: {harness_result.get('errors', [])[:3]}
 - Tempo: {harness_result.get('duration_ms', 0)}ms
@@ -68,21 +73,10 @@ Resultados do Harness:
 Código implementado:
 ```python
 {code[:2000]}
-```
-
-Gere um relatório de execução de testes conforme o schema:
-- id: {report_id}
-- summary.status: PASS se todos passaram, FAIL se algum falhou
-- results_by_suite: detalhamento por suite"""
-
-    try:
-        result_str = llm.invoke(report_prompt)
-        content = result_str.content if hasattr(result_str, "content") else str(result_str)
-        # Tenta parsear como JSON, senão usa mock
-        try:
-            report = json.loads(content)
-        except (json.JSONDecodeError, TypeError):
-            report = _mock_report(report_id, now_iso)
+```""",
+            schema_model=TestExecutionReport,
+            mock=state.get("mock_llm", False),
+        )
     except Exception as e:
         print(f"--- ERRO QA: {e} ---")
         report = _mock_report(report_id, now_iso)

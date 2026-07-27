@@ -126,15 +126,14 @@ class TaskDispatcher:
             pass
 
     def dispatch(self, task: TaskSchema, project_id: str = "project") -> dict:
-        from langgraph.checkpoint.sqlite import SqliteSaver
+        from langgraph.checkpoint.memory import InMemorySaver
         from langgraph.pregel import Pregel
         import os
 
         initial_state = self._build_initial_state(task, project_id)
 
-        # Cria checkpointer com thread_id para suporte a interrupção
-        db_path = f"/tmp/lf_checkpoints_{project_id}.db"
-        checkpointer = SqliteSaver.from_conn_string(db_path)
+        # Use InMemorySaver for simplicity during dogfooding
+        checkpointer = InMemorySaver()
         thread_id = f"{project_id}-{task.id}"
 
         graph = self._get_graph(checkpointer=checkpointer)
@@ -168,12 +167,6 @@ class TaskDispatcher:
 
             # Cria PR com labels do Foundry
             self._create_pr_with_labels(task, result, project_id)
-
-            # Limpa DB temporário
-            try:
-                os.unlink(db_path)
-            except Exception:
-                pass
 
             return result
 
