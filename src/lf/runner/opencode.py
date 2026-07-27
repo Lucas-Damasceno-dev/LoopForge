@@ -44,6 +44,9 @@ class OpenCodeResult:
         return None
 
 
+DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL", "openrouter/openrouter/free")
+
+
 class OpenCodeRunner:
     """Gerencia execução de instâncias OpenCode via subprocesso.
 
@@ -54,9 +57,11 @@ class OpenCodeRunner:
     def __init__(self, timeout_seconds: int = 600):
         self.timeout = timeout_seconds
 
-    def run(self, prompt: str, project_root: str | Path = ".", model: str = "opencode/deepseek-v4-flash-free") -> OpenCodeResult:
+    def run(self, prompt: str, project_root: str | Path = ".", model: str | None = None) -> OpenCodeResult:
+        model_to_use = model or os.environ.get("OPENCODE_MODEL", "openrouter/openrouter/free")
         root = Path(project_root).resolve()
         start_time = time.time()
+
 
         is_mock = os.environ.get("OPENCODE_MOCK", "0") == "1" or not shutil.which("opencode")
 
@@ -76,8 +81,9 @@ class OpenCodeRunner:
         # --dir faz OpenCode carregar contexto do projeto, o que adiciona ~19k tokens
         # Para chamadas LLM puras, evitamos para reduzir latência
         cmd = ["opencode", "run", prompt]
-        if model:
-            cmd.extend(["-m", model])
+        if model_to_use:
+            cmd.extend(["-m", model_to_use])
+
 
         try:
             res = subprocess.run(
@@ -204,11 +210,13 @@ def call_llm_via_opencode(
     system_prompt: str,
     user_prompt: str,
     schema_model=None,
-    model: str = "opencode/deepseek-v4-flash-free",
+    model: str | None = None,
     temperature: float = 0.3,
     mock: bool = False,
     cache: bool = True,
 ) -> str | dict | list:
+    model_to_use = model or os.environ.get("OPENCODE_MODEL", "openrouter/openrouter/free")
+
     """Chama OpenCode como LLM para geração de texto/estruturado.
 
     Args:
@@ -263,7 +271,8 @@ Responda SOMENTE o objeto JSON puro."""
         final_prompt = full_prompt
 
     runner = OpenCodeRunner(timeout_seconds=300)  # 5min for free model
-    result = runner.run(final_prompt, project_root=os.getcwd(), model=model)
+    result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use)
+
 
     if not result.success:
         raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")

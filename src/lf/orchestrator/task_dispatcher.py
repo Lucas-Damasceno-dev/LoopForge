@@ -24,7 +24,15 @@ class TaskDispatcher:
         )
 
     def _build_initial_state(self, task: TaskSchema, project_id: str, shared_state: dict | None = None) -> dict:
-        target_agent = getattr(task, "agent_id", "cpo") or "cpo"
+        target_agent = getattr(task, "agent_id", None) or getattr(task, "persona", None) or "cpo"
+        if target_agent not in ("cpo", "product_manager", "tech_lead", "developer", "qa"):
+            target_agent = "cpo"
+
+        ontology = "examples/the-foundry"
+        if not Path(ontology).exists():
+            repo_ontology = Path(__file__).resolve().parents[3] / "examples" / "the-foundry"
+            if repo_ontology.exists():
+                ontology = str(repo_ontology)
 
         state = {
             "idea": task.title,
@@ -34,10 +42,11 @@ class TaskDispatcher:
             "tech_spec": "",
             "code": "",
             "test_report": {},
-            "ontology_path": "examples/the-foundry",
+            "ontology_path": ontology,
             "project_dir": ".",
             "stack": "python",
             "next_agent": target_agent,
+
             "attempt_count": getattr(task, "attempts", 0),
             "max_retries": getattr(task, "max_retries", 3),
             "error": None,

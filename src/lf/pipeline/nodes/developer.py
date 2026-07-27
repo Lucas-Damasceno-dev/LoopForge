@@ -123,11 +123,13 @@ REGRAS:
     start_time = time.time()
 
     print("--- Spawnando OpenCode... ---")
+    model_name = os.environ.get("OPENCODE_MODEL", "openrouter/openrouter/free")
     result = runner.run(
         prompt=prompt,
         project_root=project_dir,
-        model="opencode/deepseek-v4-flash-free",
+        model=model_name,
     )
+
 
     # Extrai o código fonte real dos arquivos criados/modificados ou stdout
     generated_code = _extract_generated_code(result, project_dir, start_time)
