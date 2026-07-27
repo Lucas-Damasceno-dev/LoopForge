@@ -33,6 +33,11 @@ def cpo(state: GraphState) -> dict:
     """Recebe a ideia e gera um épico estruturado."""
     print("---EXECUTANDO NÓ: CPO---")
 
+    # Reutiliza épico se já gerado em etapa anterior do plano
+    if state.get("epic"):
+        print("--- INFO: CPO reutilizando Épico existente no estado ---")
+        return {**state, "next_agent": "product_manager"}
+
     if state.get("mock_llm"):
         print("--- INFO: CPO modo MOCK ---")
         return {
@@ -40,6 +45,7 @@ def cpo(state: GraphState) -> dict:
             "epic": _mock_epic(state.get("idea", "Mock idea")),
             "next_agent": "product_manager",
         }
+
 
     print("--- INFO: CPO usando OpenCode via subprocesso ---")
 

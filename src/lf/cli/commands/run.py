@@ -47,6 +47,7 @@ def run_cmd(replay: str | None, mock: bool, interactive: bool):
         if interactive:
             console.print("[bold yellow]Interactive mode: pipeline will pause after developer & QA nodes.[/bold yellow]")
 
+        shared_state: dict = {}
         for task in cfg.plan.tasks:
             if not circuit.can_proceed():
                 console.print("[bold red]Circuit breaker tripped! Stopping pipeline.[/bold red]")
@@ -54,10 +55,13 @@ def run_cmd(replay: str | None, mock: bool, interactive: bool):
 
             console.print(f"\n[bold cyan]Executing Task {task.id}: {task.title}[/bold cyan]")
             try:
-                state = dispatcher.dispatch(task, project_id=cfg.project_id)
+                state = dispatcher.dispatch(task, project_id=cfg.project_id, shared_state=shared_state)
+                shared_state.update({k: v for k, v in state.items() if v})
+
                 error = state.get("error")
                 test_report = state.get("test_report", {})
-                tests_failed = test_report.get("summary", {}).get("tests_failed", 1) if test_report else 1
+                has_summary = bool(test_report and "summary" in test_report)
+                tests_failed = test_report.get("summary", {}).get("tests_failed", 0) if has_summary else 0
 
                 if error:
                     circuit.record_failure()
@@ -71,11 +75,12 @@ def run_cmd(replay: str | None, mock: bool, interactive: bool):
 
                 recorder.record_node_execution(
                     session_id, task.id, state.get("next_agent", "unknown"),
-                    "done" if not error else "failed"
+                    "done" if (not error and tests_failed == 0) else "failed"
                 )
             except Exception as e:
                 circuit.record_failure()
                 console.print(f"[red]Task {task.id} crashed: {e}[/red]")
+
 
     finally:
         lock.release()

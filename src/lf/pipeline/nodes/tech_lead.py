@@ -28,9 +28,15 @@ def tech_lead(state: GraphState) -> dict:
     """Valida user stories e gera tech spec."""
     print("---EXECUTANDO NÓ: Tech Lead---")
 
+    # Reutiliza tech spec se já gerada em etapa anterior do plano
+    if state.get("tech_spec"):
+        print("--- INFO: Tech Lead reutilizando Tech Spec existente no estado ---")
+        return {**state, "next_agent": "developer"}
+
     user_stories = state.get("user_stories", [])
     if not user_stories:
         raise ValueError("User stories não encontradas no estado")
+
 
     now_iso = datetime.now(timezone.utc).isoformat()
     now_date = now_iso.split("T")[0]
@@ -86,18 +92,19 @@ Responda com:
     print("--- Gerando especificação técnica ---")
 
     try:
+        # Trunca template e stories para caber no contexto do modelo gratuito
+        truncated_template = tech_spec_template[:1500]
+        truncated_stories = "\n".join(
+            f"{us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:5]
+        )
         tech_spec = call_llm_via_opencode(
-            system_prompt=f"""Você é um Tech Lead. Crie uma especificação técnica detalhada.
+            system_prompt=f"""Você é um Tech Lead. Crie uma especificação técnica.
 
 Stack do projeto: {state.get('stack', 'N/A')}
 
-Template:
-{tech_spec_template}
-
-Preencha todas as seções do template com informações técnicas precisas.
-Inclua decisões arquiteturais, padrões, e tradeoffs quando apropriado.
-Use o template como guia, não como limite — adicione seções conforme necessário.""",
-            user_prompt=f"User Stories:\n{stories_str}",
+Template (use como guia):
+{truncated_template}""",
+            user_prompt=f"User Stories (apenas títulos):\n{truncated_stories}",
             mock=state.get("mock_llm", False),
         )
     except Exception as e:

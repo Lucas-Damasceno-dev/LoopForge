@@ -51,7 +51,10 @@ def qa(state: GraphState) -> dict:
     # Fase 1: Executar harness real no projeto
     harness_result = _run_harness(project_dir)
 
-    # Fase 2: Gerar relatório estruturado via OpenCode
+    # Fase 2: Gerar relatório estruturado via OpenCode (com fallback resiliente para o harness)
+    user_stories = state.get("user_stories", [])
+    user_story_id = user_stories[0].get("id", "US001") if user_stories else "US001"
+
     try:
         report = call_llm_via_opencode(
             system_prompt="""Você é um QA Engineer. Analise o código e resultados de teste abaixo e gere um relatório de execução de testes conforme o schema esperado.
@@ -78,8 +81,9 @@ Código implementado:
             mock=state.get("mock_llm", False),
         )
     except Exception as e:
-        print(f"--- ERRO QA: {e} ---")
-        report = _mock_report(report_id, now_iso)
+        print(f"--- ERRO QA (Construindo relatório direto do Harness): {e} ---")
+        report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
+
 
     # Atualiza campos dinâmicos
     report["id"] = report_id
@@ -147,7 +151,54 @@ def _run_harness(project_dir: str) -> dict:
     return result
 
 
+def _build_report_from_harness(
+    report_id: str,
+    timestamp: str,
+    harness_result: dict,
+    user_story_id: str = "US001",
+) -> dict:
+    """Constrói relatório de teste estruturado e preciso a partir da execução direta do harness."""
+    errors = harness_result.get("errors", [])
+    total = harness_result.get("total", 0)
+    passed = harness_result.get("passed", 0)
+    failed = len(errors)
+    duration_s = harness_result.get("duration_ms", 0) / 1000.0
+
+    status = "PASS" if failed == 0 and (passed > 0 or total == 0) else "FAIL"
+
+    return {
+        "id": report_id,
+        "user_story_id": user_story_id,
+        "commit_hash": "local_head",
+        "execution_timestamp": timestamp,
+        "executed_by": "qa.agent",
+        "environment": {"name": "local", "config_hash": None},
+        "summary": {
+            "status": status,
+            "total_tests": total if total > 0 else (passed + failed),
+            "tests_passed": passed,
+            "tests_failed": failed,
+            "tests_skipped": 0,
+            "flaky_tests_detected": 0,
+            "duration_seconds": duration_s,
+        },
+        "results_by_suite": [
+            {
+                "suite_name": "harness",
+                "suite_type": "unit/integration",
+                "status": status,
+                "duration_seconds": duration_s,
+                "total_tests": total,
+                "failed_tests_details": [{"error": err} for err in errors],
+            }
+        ],
+        "code_coverage": None,
+        "artifacts": None,
+    }
+
+
 def _mock_report(report_id: str, timestamp: str) -> dict:
+
     return {
         "id": report_id,
         "user_story_id": "US001",

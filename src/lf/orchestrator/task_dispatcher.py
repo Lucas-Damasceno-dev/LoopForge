@@ -23,8 +23,10 @@ class TaskDispatcher:
             human_gate_enabled=self.interactive,
         )
 
-    def _build_initial_state(self, task: TaskSchema, project_id: str) -> dict:
-        return {
+    def _build_initial_state(self, task: TaskSchema, project_id: str, shared_state: dict | None = None) -> dict:
+        target_agent = getattr(task, "agent_id", "cpo") or "cpo"
+
+        state = {
             "idea": task.title,
             "output_dir": f"/tmp/loopforge/{project_id}",
             "epic": {},
@@ -35,9 +37,9 @@ class TaskDispatcher:
             "ontology_path": "examples/the-foundry",
             "project_dir": ".",
             "stack": "python",
-            "next_agent": "cpo",
-            "attempt_count": task.attempts,
-            "max_retries": task.max_retries,
+            "next_agent": target_agent,
+            "attempt_count": getattr(task, "attempts", 0),
+            "max_retries": getattr(task, "max_retries", 3),
             "error": None,
             "feedback_history": [],
             "mock_llm": self.mock_llm,
@@ -46,8 +48,16 @@ class TaskDispatcher:
             "llm_temperature": 0.3,
             "is_interactive": self.interactive,
             "expected_schema": None,
-            "persona_id": task.agent_id,
+            "persona_id": getattr(task, "agent_id", None),
         }
+
+        if shared_state:
+            for k, v in shared_state.items():
+                if v and k not in ("error", "next_agent"):
+                    state[k] = v
+
+        return state
+
 
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
         """Manipula interrupção. Retorna False se o usuário abortou."""
@@ -125,12 +135,13 @@ class TaskDispatcher:
         except Exception:
             pass
 
-    def dispatch(self, task: TaskSchema, project_id: str = "project") -> dict:
+    def dispatch(self, task: TaskSchema, project_id: str = "project", shared_state: dict | None = None) -> dict:
         from langgraph.checkpoint.memory import InMemorySaver
         from langgraph.pregel import Pregel
         import os
 
-        initial_state = self._build_initial_state(task, project_id)
+        initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
+
 
         # Use InMemorySaver for simplicity during dogfooding
         checkpointer = InMemorySaver()

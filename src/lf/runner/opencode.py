@@ -51,7 +51,7 @@ class OpenCodeRunner:
     O prompt é um argumento posicional, não --prompt.
     """
 
-    def __init__(self, timeout_seconds: int = 300):
+    def __init__(self, timeout_seconds: int = 600):
         self.timeout = timeout_seconds
 
     def run(self, prompt: str, project_root: str | Path = ".", model: str = "opencode/deepseek-v4-flash-free") -> OpenCodeResult:
@@ -73,7 +73,9 @@ class OpenCodeRunner:
 
         # O comando correto: opencode run "prompt" --dir /path
         # O prompt é argumento posicional, não --prompt
-        cmd = ["opencode", "run", prompt, "--dir", str(root)]
+        # --dir faz OpenCode carregar contexto do projeto, o que adiciona ~19k tokens
+        # Para chamadas LLM puras, evitamos para reduzir latência
+        cmd = ["opencode", "run", prompt]
         if model:
             cmd.extend(["-m", model])
 
@@ -87,10 +89,12 @@ class OpenCodeRunner:
                 env=os.environ.copy(),
             )
             duration = time.time() - start_time
+            changed_files = detect_changed_files(root, start_time)
             return OpenCodeResult(
                 exit_code=res.returncode,
                 stdout=res.stdout,
                 stderr=res.stderr,
+                changed_files=changed_files,
                 duration_seconds=duration,
             )
         except subprocess.TimeoutExpired as exc:
@@ -109,6 +113,69 @@ class OpenCodeRunner:
                 stderr=str(exc),
                 duration_seconds=duration,
             )
+
+
+def detect_changed_files(project_root: str | Path, start_time: float) -> list[str]:
+    """Detecta arquivos criados ou modificados no project_root após start_time."""
+    root = Path(project_root).resolve()
+    ignored_parts = {
+        ".git", ".loopforge", "__pycache__", ".pytest_cache", "node_modules",
+        "venv", ".venv", ".mypy_cache", ".gemini"
+    }
+    ignored_files = {
+        "generated_code.py", ".loopforge.json", "llm_cache.sqlite", ".users.json", "loop.lock"
+    }
+
+    changed: list[str] = []
+
+    # 1. Tenta git status se for um repositório git
+    git_dir = root / ".git"
+    if git_dir.exists():
+        try:
+            res = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(maxsplit=1)
+                    if len(parts) == 2:
+                        rel_path = parts[1].strip('"')
+                        file_path = root / rel_path
+                        if any(part in ignored_parts for part in file_path.parts):
+                            continue
+                        if file_path.name in ignored_files or file_path.name.startswith("test_report_"):
+                            continue
+                        if file_path.is_file():
+                            changed.append(str(file_path))
+        except Exception:
+            pass
+
+    # 2. Fallback / Complemento: verificação de mtime
+    if not changed and root.exists():
+        try:
+            for p in root.rglob("*"):
+                if p.is_file():
+                    if any(part in ignored_parts for part in p.parts):
+                        continue
+                    if p.name in ignored_files or p.name.startswith("test_report_"):
+                        continue
+                    try:
+                        if p.stat().st_mtime >= start_time - 1.0:
+                            changed.append(str(p))
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+
+    return changed
+
 
 
 # ---- Utilitário compartilhado para nós que só precisam de LLM via OpenCode ----
@@ -195,7 +262,7 @@ Responda SOMENTE o objeto JSON puro."""
     else:
         final_prompt = full_prompt
 
-    runner = OpenCodeRunner(timeout_seconds=120)
+    runner = OpenCodeRunner(timeout_seconds=300)  # 5min for free model
     result = runner.run(final_prompt, project_root=os.getcwd(), model=model)
 
     if not result.success:

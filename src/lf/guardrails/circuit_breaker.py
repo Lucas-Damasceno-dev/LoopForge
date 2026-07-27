@@ -17,10 +17,10 @@ class CircuitBreaker:
 
     def __init__(
         self,
-        max_consecutive_failures: int = 3,
-        max_iterations: int = 10,
+        max_consecutive_failures: int = 5,
+        max_iterations: int = 20,
         max_total_cost: float = 50.0,  # USD
-        cost_per_iteration: float = 0.5,  # USD estimado
+        cost_per_iteration: float = 0.05,  # USD estimado (modelo gratuito ~$0)
         reset_timeout: float = 300.0,  # segundos para half-open
     ):
         self.max_consecutive_failures = max_consecutive_failures

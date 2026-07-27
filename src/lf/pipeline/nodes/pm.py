@@ -38,9 +38,15 @@ def product_manager(state: GraphState) -> dict:
     """Recebe épico e gera user stories."""
     print("---EXECUTANDO NÓ: Product Manager---")
 
+    # Reutiliza user stories se já geradas em etapa anterior do plano
+    if state.get("user_stories"):
+        print("--- INFO: PM reutilizando User Stories existentes no estado ---")
+        return {**state, "next_agent": "tech_lead"}
+
     epic = state.get("epic")
     if not epic:
         raise ValueError("Épico não encontrado no estado")
+
 
     now_iso = datetime.now(timezone.utc).isoformat()
 
