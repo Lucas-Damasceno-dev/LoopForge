@@ -1,0 +1,38 @@
+{
+  "id": "E-001",
+  "title": "Implementação de Autenticação de Usuários via Redes Sociais",
+  "description": "Atualmente, nosso processo de cadastro exige que os usuários criem uma conta com e-mail e senha, o que gera atrito e diminui a conversão. Permitir o login via Google e Facebook visa simplificar o acesso, melhorar a experiência do usuário e aumentar a base de usuários cadastrados.",
+  "business_objectives": [
+    "Aumentar a taxa de conversão de cadastro em 15%",
+    "Reduzir o tempo médio para o primeiro login do usuário"
+  ],
+  "hypothesis": "Acreditamos que, ao oferecer login social, para novos usuários, alcançaremos uma maior taxa de adoção e satisfação, refletida no aumento de cadastros e menor abandono do fluxo de entrada.",
+  "scope_in": [
+    "Botão de login com Google na página de entrada.",
+    "Botão de login com Facebook na página de entrada.",
+    "Criação automática de perfil de usuário após o primeiro login social."
+  ],
+  "scope_out": [
+    "Login com Apple ID.",
+    "Funcionalidade 'Esqueci minha senha' para contas sociais (delegado ao provedor).",
+    "Associação de contas sociais a contas de e-mail existentes."
+  ],
+  "success_metrics": [
+    "Taxa de conversão de cadastro (login social vs. e-mail).",
+    "Percentual de novos usuários que optam pelo login social.",
+    "Tempo médio da página de entrada até o dashboard do usuário."
+  ],
+  "stakeholders": {
+    "owner": "[CPO]",
+    "consulted": [
+      "[UX/UI Designer]",
+      "[Arquiteto]",
+      "[AppSec]"
+    ]
+  },
+  "dates": {
+    "created_at": "2025-12-20T10:00:00Z",
+    "started_at": "2025-12-22T14:00:00Z",
+    "completed_at": null
+  }
+}

@@ -11,7 +11,10 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "check": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "start": "node dist/cli/index.js"
   },
   "keywords": [
@@ -40,6 +43,11 @@
     "@types/node-notifier": "^8.0.5",
     "@types/nodemailer": "^8.0.1",
     "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.2",
     "typescript": "^5.5.2",
     "vitest": "^1.6.0"
   }

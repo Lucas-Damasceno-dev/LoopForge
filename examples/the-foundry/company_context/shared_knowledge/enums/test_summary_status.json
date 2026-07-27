@@ -1,0 +1,5 @@
+{
+  "PASS": "Todos os testes passaram.",
+  "FAIL": "Pelo menos um teste crítico falhou.",
+  "UNSTABLE": "Nenhum teste crítico falhou, mas foram detectados testes 'flaky' (instáveis) que passaram após uma nova tentativa."
+}

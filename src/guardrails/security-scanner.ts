@@ -28,7 +28,7 @@ export class SecurityScanner {
         const lines = content.split("\n");
 
         lines.forEach((line, idx) => {
-          if (/(sk-[A-Za-z0-9]{32}|AKIA[0-9A-Z]{16}|bearer\s+[A-Za-z0-9\-\._~\+\/]+=*)/i.test(line)) {
+          if (/(sk-[A-Za-z0-9]{32}|AKIA[0-9A-Z]{16}|bearer\s+[A-Za-z0-9\-._~+/]+=*)/i.test(line)) {
             vulnerabilities.push({
               file: relativePath,
               line: idx + 1,
@@ -53,7 +53,9 @@ export class SecurityScanner {
             });
           }
         });
-      } catch (err) {}
+      } catch {
+        /* ignore file read error */
+      }
     }
 
     return vulnerabilities;
@@ -68,7 +70,9 @@ export class SecurityScanner {
     let envContent = "";
     try {
       envContent = await fs.readFile(envPath, "utf-8");
-    } catch {}
+    } catch {
+      /* ignore env read error */
+    }
 
     const envVarsToAdd: string[] = [];
     let secretCounter = 1;
@@ -91,14 +95,14 @@ export class SecurityScanner {
           const origLine = lines[lineIdx];
 
           if (v.type === "hardcoded_secret") {
-            const match = origLine.match(/(sk-[A-Za-z0-9]{32}|AKIA[0-9A-Z]{16}|bearer\s+[A-Za-z0-9\-\._~\+\/]+=*)/i);
+            const match = origLine.match(/(sk-[A-Za-z0-9]{32}|AKIA[0-9A-Z]{16}|bearer\s+[A-Za-z0-9\-._~+/]+=*)/i);
             if (match) {
               const secretVal = match[1];
               const varName = `LOOPFORGE_SECRET_VAR_${secretCounter++}`;
               envVarsToAdd.push(`${varName}=${secretVal}`);
               
               // Handle quotes surrounding secret literal
-              lines[lineIdx] = origLine.replace(new RegExp(`(["'])${secretVal.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&")}\\1`), `process.env.${varName}`)
+              lines[lineIdx] = origLine.replace(new RegExp(`(["'])${secretVal.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\1`), `process.env.${varName}`)
                                       .replace(secretVal, `process.env.${varName}`);
               fixes.push({
                 file: relFile,
@@ -119,7 +123,9 @@ export class SecurityScanner {
         }
 
         await fs.writeFile(fullPath, lines.join("\n"), "utf-8");
-      } catch {}
+      } catch {
+        /* ignore file write error */
+      }
     }
 
     if (envVarsToAdd.length > 0) {

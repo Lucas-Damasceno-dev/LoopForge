@@ -1,0 +1,6 @@
+{
+  "feature_flag_disable": "A funcionalidade é desativada desligando uma feature flag. É o método mais seguro e rápido.",
+  "revert_code": "Requer um `git revert` do commit da feature, gerando um novo deploy.",
+  "revert_data": "Requer a execução de um script para reverter uma migração de dados.",
+  "full_system_restore": "Caso extremo. Requer a restauração de um backup completo do sistema. Envolve downtime."
+}

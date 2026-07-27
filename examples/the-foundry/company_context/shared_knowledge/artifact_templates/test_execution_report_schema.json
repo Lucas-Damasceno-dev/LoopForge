@@ -1,0 +1,56 @@
+{
+  "id": "string - ID único (ex: 'EXEC-2023-10-27-001').",
+  "user_story_id": "string - ID da história de usuário testada.",
+  "commit_hash": "string - O hash do commit testado (Crucial para bisecting).",
+  "execution_timestamp": "string - ISO 8601.",
+  "executed_by": "string - ID do QA ou da Ferramenta CI (ex: 'jenkins-agent-01').",
+  
+  "environment": {
+    "name": "enum[local, ci, staging, production] - Onde rodou?",
+    "config_hash": "string | null - Hash da configuração/variáveis de ambiente usadas (ajuda a debugar 'funciona na minha máquina')."
+  },
+
+  "summary": {
+    "status": "enum[PASS, FAIL, UNSTABLE] - 'UNSTABLE' é útil para testes 'flaky' (que passam as vezes).",
+    "total_tests": "integer",
+    "tests_passed": "integer",
+    "tests_failed": "integer",
+    "tests_skipped": "integer - Importante saber se algo foi ignorado.",
+    "flaky_tests_detected": "integer - Contagem de testes que falharam e passaram no retry.",
+    "duration_seconds": "float"
+  },
+
+  "results_by_suite": [
+    {
+      "suite_name": "string - (ex: 'AuthService Tests').",
+      "suite_type": "enum[unit, integration, e2e, contract, performance] - Permite filtrar métricas.",
+      "status": "enum[PASS, FAIL, SKIP]",
+      "duration_seconds": "float - Identifica quais suítes estão deixando o build lento.",
+      "total_tests": "integer",
+      "failed_tests_details": [
+        {
+          "test_name": "string",
+          "error_message": "string - Mensagem curta.",
+          "stack_trace_snippet": "string | null - Primeiras 5 linhas do erro.",
+          "is_flaky": "boolean - Se passou após retentativa."
+        }
+      ]
+    }
+  ],
+
+  "code_coverage": {
+    "provider": "string - (ex: 'Jacoco', 'Istanbul', 'Codecov').",
+    "report_url": "string | null",
+    "metrics": {
+      "line_coverage_pct": "float - (0-100).",
+      "branch_coverage_pct": "float - (0-100). Crítico para checar complexidade ciclomática (ifs/loops).",
+      "function_coverage_pct": "float - (0-100)."
+    },
+    "threshold_met": "boolean - Se a cobertura atingiu o mínimo exigido pelo projeto (Gate do DevOps)."
+  },
+
+  "artifacts": {
+    "logs_url": "string | null - Link para o log completo da execução.",
+    "screenshots_url": "array[string] | null - Para testes E2E que falharam."
+  }
+}

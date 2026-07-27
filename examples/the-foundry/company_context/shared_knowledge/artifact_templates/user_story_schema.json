@@ -1,0 +1,16 @@
+{
+  "id": "string - Ver `id_conventions.json` (user_story).",
+  "title": "string - Um título curto e descritivo para a história de usuário.",
+  "epic_id": "string - ID do épico pai. Ver `id_conventions.json` (epic).",
+  "as_a": "string - O tipo de usuário ou persona que se beneficiará da história.",
+  "i_want_to": "string - A funcionalidade que o usuário deseja realizar.",
+  "so_that": "string - O valor ou benefício que o usuário obterá.",
+  "acceptance_criteria": "array[string] - Critérios de aceitação claros, preferencialmente no formato 'Dado-Quando-Então'.",
+  "priority": "string - Ver `enums/priority.json` para os valores possíveis.",
+  "status": "string - Ver `enums/status.json` para os valores possíveis.",
+  "dates": {
+    "created_at": "string (ISO 8601) - Data e hora de criação da história.",
+    "started_at": "string (ISO 8601) - Data e hora em que o desenvolvimento da história foi iniciado.",
+    "completed_at": "string (ISO 8601, opcional) - Data e hora em que a história foi concluída (entregue em produção)."
+  }
+}

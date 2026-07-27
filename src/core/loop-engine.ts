@@ -7,6 +7,8 @@ import { CircuitBreaker } from "../guardrails/circuit-breaker.js";
 import { createCheckpoint, rollbackToCheckpoint, getWorkingDiff } from "../git/checkpoint.js";
 import { createSandboxBranch, mergeSandboxBranch, cleanupSandboxBranch, type SandboxInfo } from "../git/sandbox.js";
 import { LLMEngine, type LLMResponse } from "../llm/provider.js";
+import { AgentExecutor } from "./agent-executor.js";
+import { AgentTools, parseToolCallsFromText } from "./agent-tools.js";
 
 export type AgentStepRunner = (promptContext: string, iteration: number, llmEngine: LLMEngine) => Promise<string>;
 
@@ -63,6 +65,7 @@ export class LoopEngine {
 
     try {
       let iteration = 0;
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         iteration++;
         const status = this.circuitBreaker.evaluate();
@@ -87,7 +90,7 @@ export class LoopEngine {
           .filter(Boolean)
           .join("\n\n");
 
-        // 3. Executar o LLM / Agent Step
+        // 3. Executar o LLM / Agent Step com suporte a Tool Calling
         let llmResponse: LLMResponse;
         if (customStepRunner) {
           const content = await customStepRunner(fullContext, iteration, this.llmEngine);
@@ -100,7 +103,18 @@ export class LoopEngine {
             estimatedCostUsd: activeModelInfo.isFallback ? 0.003 : 0.0,
           };
         } else {
-          llmResponse = await this.llmEngine.generateStep(fullContext);
+          const agentExec = new AgentExecutor(this.cwd);
+          const stepRes = await agentExec.executeAgentStep(fullContext, this.llmEngine, lastHarnessFeedback);
+          llmResponse = stepRes.llmResponse;
+        }
+
+        // Executar quaisquer chamadas de ferramenta presentes na resposta no disco
+        const toolCalls = parseToolCallsFromText(llmResponse.content);
+        if (toolCalls.length > 0) {
+          const tools = new AgentTools(this.cwd);
+          for (const tc of toolCalls) {
+            await tools.executeTool(tc);
+          }
         }
 
         // 4. Capturar diff das alterações feitas pelo LLM

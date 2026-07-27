@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "user_story_id": "US-003",
+  "tech_spec_id": "TS-001",
+  "created_at": "2025-12-27T15:00:00Z",
+  "rollback_strategy": {
+    "type": "feature_flag_disable",
+    "description": "Desativar a feature flag 'enable-new-vendas-api' e reiniciar o serviço de vendas."
+  },
+  "data_rollback_strategy": {
+    "type": "none",
+    "script_id": null,
+    "data_loss_expected": false
+  },
+  "communication_plan": {
+    "stakeholders_to_notify": ["PM", "CTO", "Tech Lead"],
+    "notification_channel": "Slack #incidents"
+  },
+  "dependencies": {
+    "services_to_stop": ["vendas-service"]
+  }
+}

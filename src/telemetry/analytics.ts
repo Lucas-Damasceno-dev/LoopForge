@@ -33,7 +33,7 @@ export async function generateAnalyticsReport(cwd: string = "."): Promise<{ summ
           success: json.success ?? true,
           stopReason: json.stopReason || "Concluído",
         },
-        json.reports.map((r: any) => ({
+        (json.reports || []).map((r: { iteration: number; passed: boolean; modelUsed?: string; tokensUsed?: number; estimatedCostUsd?: number }) => ({
           iteration: r.iteration,
           passed: r.passed,
           modelUsed: r.modelUsed || "default",

@@ -1,0 +1,73 @@
+{
+  "id": "EXEC-2025-12-27-001",
+  "user_story_id": "US-003",
+  "commit_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "execution_timestamp": "2025-12-27T18:00:00Z",
+  "executed_by": "qa.agent",
+  "environment": {
+    "name": "ci",
+    "config_hash": "fgh7i8j9k0l1fgh7i8j9k0l1fgh7i8j9k0l1fgh7i8j9"
+  },
+  "summary": {
+    "status": "FAIL",
+    "total_tests": 124,
+    "tests_passed": 122,
+    "tests_failed": 2,
+    "tests_skipped": 1,
+    "flaky_tests_detected": 0,
+    "duration_seconds": 185.5
+  },
+  "results_by_suite": [
+    {
+      "suite_name": "Unit Tests - Vendas Service",
+      "suite_type": "unit",
+      "status": "PASS",
+      "duration_seconds": 12.2,
+      "total_tests": 80,
+      "failed_tests_details": []
+    },
+    {
+      "suite_name": "Integration Tests - API Gateway",
+      "suite_type": "integration",
+      "status": "FAIL",
+      "duration_seconds": 45.8,
+      "total_tests": 43,
+      "failed_tests_details": [
+        {
+          "test_name": "test_checkout_with_invalid_coupon",
+          "error_message": "AssertionError: Expected status code 400 but got 500",
+          "stack_trace_snippet": "at com.marketos.gateway.CheckoutTest.test_checkout_with_invalid_coupon(CheckoutTest.java:112)",
+          "is_flaky": false
+        },
+        {
+          "test_name": "test_get_user_history_unauthenticated",
+          "error_message": "AssertionError: Expected status code 401 but got 404",
+          "stack_trace_snippet": "at com.marketos.gateway.HistoryTest.test_get_user_history_unauthenticated(HistoryTest.java:54)",
+          "is_flaky": false
+        }
+      ]
+    },
+    {
+      "suite_name": "E2E Tests - Checkout Flow",
+      "suite_type": "e2e",
+      "status": "SKIP",
+      "duration_seconds": 127.5,
+      "total_tests": 1,
+      "failed_tests_details": []
+    }
+  ],
+  "code_coverage": {
+    "provider": "Jacoco",
+    "report_url": "https://ci.foundry.ai/build/123/coverage/index.html",
+    "metrics": {
+      "line_coverage_pct": 89.4,
+      "branch_coverage_pct": 81.2,
+      "function_coverage_pct": 92.0
+    },
+    "threshold_met": true
+  },
+  "artifacts": {
+    "logs_url": "https://ci.foundry.ai/build/123/logs.zip",
+    "screenshots_url": null
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "none": "A funcionalidade não altera dados persistentes, então nenhuma ação de dados é necessária.",
+  "automated_script": "Existe um script de 'downgrade' que pode ser executado automaticamente pelo pipeline.",
+  "manual_intervention": "A reversão dos dados é complexa e exige intervenção manual de um Engenheiro de DevOps ou de Banco de Dados."
+}

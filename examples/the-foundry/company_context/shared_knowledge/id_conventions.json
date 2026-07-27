@@ -1,0 +1,30 @@
+{
+  "epic": {
+    "prefix": "E",
+    "separator": "-",
+    "suffix_regex": "\\d+",
+    "description": "ID para Épicos. Representa uma grande iniciativa de negócio.",
+    "example": "E-001"
+  },
+  "user_story": {
+    "prefix": "US",
+    "separator": "-",
+    "suffix_regex": "\\d+",
+    "description": "ID para Histórias de Usuário. Representa uma unidade de trabalho funcional.",
+    "example": "US-001"
+  },
+  "bug_report": {
+    "prefix": "BUG",
+    "separator": "-",
+    "suffix_regex": "\\d+",
+    "description": "ID para Relatórios de Bug. Representa um defeito encontrado no sistema.",
+    "example": "BUG-001"
+  },
+  "tech_spec": {
+    "prefix": "TS",
+    "separator": "-",
+    "suffix_regex": "\\d+",
+    "description": "ID para Especificações Técnicas. Representa o design técnico de uma User Story.",
+    "example": "TS-001"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "local": "Execução na máquina local de um desenvolvedor.",
+  "ci": "Execução no ambiente de Integração Contínua (ex: GitHub Actions, Jenkins).",
+  "staging": "Execução no ambiente de homologação, uma réplica da produção.",
+  "production": "Execução no ambiente de produção (geralmente para testes de fumaça pós-deploy)."
+}

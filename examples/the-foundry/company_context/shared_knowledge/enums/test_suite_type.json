@@ -1,0 +1,7 @@
+{
+  "unit": "Testes de unidade, validando uma única classe ou função.",
+  "integration": "Testes de integração, validando a comunicação entre dois ou mais componentes.",
+  "e2e": "Testes End-to-End, simulando a jornada completa do usuário.",
+  "contract": "Testes de contrato, garantindo que uma API cumpre o que promete.",
+  "performance": "Testes de carga ou estresse."
+}

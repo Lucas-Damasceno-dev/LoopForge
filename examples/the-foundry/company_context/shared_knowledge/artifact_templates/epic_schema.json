@@ -1,0 +1,19 @@
+{
+  "id": "string (formato: E-XXX) - Identificador único do épico.",
+  "title": "string - Um título curto e descritivo para o épico.",
+  "description": "string - Uma descrição sobre o problema de negócio a ser resolvido.",
+  "business_objectives": "array[string] - Lista de metas de negócio que este épico visa alcançar.",
+  "hypothesis": "string - A hipótese que será validada com a entrega deste épico.",
+  "scope_in": "array[string] - Lista de itens que estão DENTRO do escopo deste épico.",
+  "scope_out": "array[string] - Lista de itens que estão FORA do escopo deste épico.",
+  "success_metrics": "array[string] - Métricas que serão usadas para medir o sucesso do épico.",
+  "stakeholders": {
+    "owner": "string - O agente/papel que é o dono da iniciativa (normalmente, CPO).",
+    "consulted": "array[string] - Lista de agentes/papéis que devem ser consultados."
+  },
+  "dates": {
+    "created_at": "string (ISO 8601) - Data e hora de criação do épico.",
+    "started_at": "string (ISO 8601) - Data e hora em que o trabalho no épico foi iniciado.",
+    "completed_at": "string (ISO 8601, opcional) - Data e hora em que todos os trabalhos do épico foram concluídos."
+  }
+}

@@ -47,7 +47,9 @@ export class LLMEngine {
           return data.data[0].embedding;
         }
       }
-    } catch {}
+    } catch {
+      /* ignore remote embedding fetch failure, fallback to deterministic vector */
+    }
 
     // Fallback deterministic embedding (64 dimensions)
     const dim = 64;
@@ -96,6 +98,18 @@ export class LLMEngine {
           return await this.callAnthropicApi(prompt, model);
         }
 
+        if (this.provider === "openai" || process.env.OPENAI_API_KEY) {
+          return await this.callOpenAiApi(prompt, model, isFallback);
+        }
+
+        if (this.provider === "deepseek" || process.env.DEEPSEEK_API_KEY) {
+          return await this.callDeepSeekApi(prompt, model, isFallback);
+        }
+
+        if (this.provider === "openrouter" || process.env.OPENROUTER_API_KEY) {
+          return await this.callOpenRouterApi(prompt, model, isFallback);
+        }
+
         if (this.provider === "ollama") {
           return await this.callOllamaApi(prompt, model, isFallback);
         }
@@ -108,11 +122,9 @@ export class LLMEngine {
       } catch (err) {
         attempt++;
         if (attempt >= maxRetries) {
-          const msg = err instanceof Error ? err.message : String(err);
-          // Fallback mock safely when external LLM server is un reachable
           const estimatedTokens = Math.ceil(prompt.length / 4) + 100;
           return {
-            content: `[OpenCode Engine Step - Offline Fallback] ${prompt.slice(0, 150)}...`,
+            content: `[LoopForge Engine Step - Offline Fallback] ${prompt.slice(0, 150)}...`,
             modelUsed: model,
             isFallback,
             tokensUsed: estimatedTokens,
@@ -125,6 +137,105 @@ export class LLMEngine {
     }
 
     throw new Error("Erro na comunicação com a API do modelo LLM.");
+  }
+
+  private async callOpenAiApi(prompt: string, model: string, isFallback: boolean): Promise<LLMResponse> {
+    const apiKey = process.env.OPENAI_API_KEY || "mock-openai-key";
+    const endpoint = "https://api.openai.com/v1/chat/completions";
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model.includes("/") ? model.split("/")[1] : model,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro na API OpenAI: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as OpenAICompletionResponse;
+    const content = data.choices?.[0]?.message?.content || "Resposta OpenAI";
+    const tokensUsed = data.usage?.total_tokens || 150;
+
+    return {
+      content,
+      modelUsed: `openai/${model}`,
+      isFallback,
+      tokensUsed,
+      estimatedCostUsd: Number((tokensUsed * 0.000005).toFixed(6)),
+    };
+  }
+
+  private async callDeepSeekApi(prompt: string, model: string, isFallback: boolean): Promise<LLMResponse> {
+    const apiKey = process.env.DEEPSEEK_API_KEY || "mock-deepseek-key";
+    const endpoint = "https://api.deepseek.com/v1/chat/completions";
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro na API DeepSeek: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as OpenAICompletionResponse;
+    const content = data.choices?.[0]?.message?.content || "Resposta DeepSeek";
+    const tokensUsed = data.usage?.total_tokens || 150;
+
+    return {
+      content,
+      modelUsed: `deepseek/${model}`,
+      isFallback,
+      tokensUsed,
+      estimatedCostUsd: Number((tokensUsed * 0.000002).toFixed(6)),
+    };
+  }
+
+  private async callOpenRouterApi(prompt: string, model: string, isFallback: boolean): Promise<LLMResponse> {
+    const apiKey = process.env.OPENROUTER_API_KEY || "mock-openrouter-key";
+    const endpoint = "https://openrouter.ai/api/v1/chat/completions";
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro na API OpenRouter: ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as OpenAICompletionResponse;
+    const content = data.choices?.[0]?.message?.content || "Resposta OpenRouter";
+    const tokensUsed = data.usage?.total_tokens || 150;
+
+    return {
+      content,
+      modelUsed: `openrouter/${model}`,
+      isFallback,
+      tokensUsed,
+      estimatedCostUsd: Number((tokensUsed * 0.000005).toFixed(6)),
+    };
   }
 
   private async callAnthropicApi(prompt: string, model: string): Promise<LLMResponse> {
@@ -158,7 +269,9 @@ export class LLMEngine {
           estimatedCostUsd: Number((tokensUsed * 0.000015).toFixed(6)),
         };
       }
-    } catch {}
+    } catch {
+      /* ignore remote Anthropic API error, fallback to simulated response */
+    }
 
     const estimatedTokens = Math.ceil(prompt.length / 4) + 150;
     return {

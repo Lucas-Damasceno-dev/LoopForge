@@ -1,0 +1,51 @@
+{
+  "id": "E-001",
+  "title": "Plataforma de Gestão de Rotas e Comunicação para Motoristas de Van Escolar",
+  "description": "Motoristas de van escolar enfrentam desafios significativos na gestão e otimização de rotas diárias, bem como na comunicação eficiente com pais e alunos. A dependência de métodos manuais (caderninhos, mensagens avulsas) para confirmar presenças e organizar rotas resulta em ineficiências, rotas subótimas, atrasos frequentes, e uma experiência insatisfatória para todos os envolvidos, gerando estresse e perda de tempo. Há uma clara necessidade de uma solução que automatize e otimize esses processos para garantir pontualidade e transparência.",
+  "business_objectives": [
+    "Aumentar a eficiência operacional dos motoristas em até 30%",
+    "Melhorar a satisfação dos pais e alunos com o serviço de transporte em 20%",
+    "Reduzir o tempo médio de atraso por rota em 15%",
+    "Oferecer maior transparência e segurança percebida no serviço de transporte"
+  ],
+  "hypothesis": "Acreditamos que, ao fornecer uma plataforma que automatiza a criação e otimização de rotas com base na confirmação diária de presença dos alunos, e que oferece comunicação em tempo real e rastreamento da van para pais e alunos, conseguiremos reduzir significativamente os atrasos, aumentar a eficiência do motorista e melhorar a satisfação geral do serviço. Quando motoristas precisam gerenciar rotas complexas e comunicar com pais, eles querem um sistema automatizado e transparente para que possam economizar tempo, reduzir estresse e oferecer um serviço mais pontual e confiável.",
+  "scope_in": [
+    "Cadastro e gerenciamento de alunos com informações básicas e endereços",
+    "Funcionalidade de confirmação diária (ou programada) de presença de alunos via aplicativo para pais/alunos",
+    "Geração automática e otimização de rotas com base nas confirmações de presença",
+    "Interface para o motorista visualizar, iniciar e finalizar a rota otimizada",
+    "Notificações em tempo real para pais/alunos sobre o início da rota e a localização da van",
+    "Estimativa de tempo de chegada (ETA) atualizada para cada ponto de parada (pais/alunos)",
+    "Rastreamento em tempo real da van em um mapa para pais/alunos",
+    "Configuração de parâmetros de atualização de localização da van pelo motorista (administração)",
+    "Histórico de rotas realizadas pelo motorista"
+  ],
+  "scope_out": [
+    "Funcionalidades de pagamento ou cobrança",
+    "Gestão de múltiplos motoristas ou múltiplas vans (foco em motorista individual)",
+    "Funcionalidades de comunicação bidirecional avançada (chat) entre motorista e pais/alunos",
+    "Relatórios financeiros ou fiscais detalhados",
+    "Personalização manual avançada da sequência de paradas em rotas otimizadas",
+    "Integração com sistemas externos de gestão escolar"
+  ],
+  "success_metrics": [
+    "Percentual de redução no tempo médio de atraso por rota",
+    "Taxa de adoção da funcionalidade de confirmação de presença (alunos/pais)",
+    "Aumento na taxa de satisfação do motorista (pesquisas/feedback)",
+    "Aumento na taxa de satisfação dos pais e alunos (pesquisas/feedback)",
+    "Número de rotas geradas e executadas através do sistema por semana",
+    "Engajamento dos pais e alunos com o recurso de rastreamento em tempo real"
+  ],
+  "stakeholders": {
+    "owner": "CPO",
+    "consulted": [
+      "Product Manager",
+      "UX/UI Designer",
+      "CTO"
+    ]
+  },
+  "dates": {
+    "created_at": "2025-12-29T00:20:34.976952+00:00",
+    "started_at": "2025-12-29T00:20:34.976952+00:00"
+  }
+}

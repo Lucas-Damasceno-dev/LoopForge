@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { runSingleRunner, runHarness } from "../src/harness/runner.js";
 import { parseRunnerErrors } from "../src/harness/parser.js";
 import { formatHarnessFeedback } from "../src/harness/formatter.js";
-import type { HarnessConfig, RunnerConfig } from "../src/config/schema.js";
+import type { HarnessConfig } from "../src/config/schema.js";
 
 describe("LoopForge Multi-Runner Harness Engine", () => {
   it("deve executar um runner com sucesso", async () => {

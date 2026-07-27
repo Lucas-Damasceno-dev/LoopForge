@@ -17,7 +17,9 @@ export async function createCheckpoint(message: string, cwd: string = "."): Prom
   try {
     const timestamp = Date.now();
     const tag = `loopforge-ckpt-${timestamp}`;
-    await execAsync(`git stash push -m "${message} (${tag})"`, { cwd });
+    const safeMessage = message.replace(/"/g, '\\"');
+    await execAsync(`git add -A`, { cwd });
+    await execAsync(`git commit -m "${safeMessage} (${tag})"`, { cwd });
     return tag;
   } catch {
     return "";
@@ -27,7 +29,8 @@ export async function createCheckpoint(message: string, cwd: string = "."): Prom
 export async function rollbackToCheckpoint(cwd: string = "."): Promise<boolean> {
   if (!(await isGitRepo(cwd))) return false;
   try {
-    await execAsync("git stash pop", { cwd });
+    await execAsync("git reset --hard HEAD", { cwd });
+    await execAsync("git clean -fd", { cwd });
     return true;
   } catch {
     return false;
@@ -47,25 +50,30 @@ export async function getWorkingDiff(cwd: string = "."): Promise<string> {
 export async function cleanupOldCheckpoints(cwd: string = "."): Promise<number> {
   if (!(await isGitRepo(cwd))) return 0;
   try {
-    const { stdout } = await execAsync("git stash list", { cwd });
-    const lines = stdout.split("\n").filter((l) => l.includes("loopforge-ckpt-"));
+    let cleaned = 0;
+    // 1. Clean up git stashes matching loopforge-ckpt-
+    const { stdout: stashOut } = await execAsync("git stash list", { cwd }).catch(() => ({ stdout: "" }));
+    const stashLines = stashOut.split("\n").filter((l) => l.includes("loopforge-ckpt-"));
 
     const indices: number[] = [];
-    for (const line of lines) {
+    for (const line of stashLines) {
       const match = line.match(/stash@\{(\d+)\}/);
       if (match) {
         indices.push(parseInt(match[1], 10));
       }
     }
-
-    // Sort indices descending so dropping higher indices doesn't shift lower indices
     indices.sort((a, b) => b - a);
-
-    let cleaned = 0;
     for (const index of indices) {
-      await execAsync(`git stash drop stash@{${index}}`, { cwd }).catch(() => {});
+      await execAsync(`git stash drop stash@{${index}}`, { cwd }).catch(() => {
+        /* ignore error */
+      });
       cleaned++;
     }
+
+    // 2. Count checkpoint commits in git log
+    const { stdout: logOut } = await execAsync("git log --oneline --grep=loopforge-ckpt-", { cwd }).catch(() => ({ stdout: "" }));
+    const commitLines = logOut.split("\n").filter(Boolean);
+    cleaned += commitLines.length;
 
     return cleaned;
   } catch {

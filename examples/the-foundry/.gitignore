@@ -1,0 +1,4 @@
+.tmp/
+
+# MVP virtual environment
+mvp/.venv/

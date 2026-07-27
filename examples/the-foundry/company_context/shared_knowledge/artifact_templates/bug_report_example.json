@@ -1,0 +1,43 @@
+{
+  "id": "BUG-001",
+  "title": "Cálculo de desconto falha com valores acima de 100%",
+  "user_story_id": "US-003",
+  "reporter_id": "qa.engineer@foundry.ai",
+  "created_at": "2025-12-27T14:30:00Z",
+  "classification": {
+    "severity": "Critical",
+    "priority": "High",
+    "component": "Vendas",
+    "type": "Functional"
+  },
+  "context": {
+    "build_version": "v1.0.0-alpha-build-42",
+    "environment": {
+      "name": "staging",
+      "device": "Desktop",
+      "os": "Ubuntu 22.04",
+      "browser": "Chrome 115",
+      "architecture": "x86_64"
+    }
+  },
+  "details": {
+    "summary": "Ao aplicar um desconto percentual maior que 100% no endpoint de vendas, a API retorna um erro 500 Internal Server Error em vez de uma validação de input.",
+    "pre_conditions": [
+      "Pelo menos um produto existe no Módulo de Catálogo.",
+      "O estoque do produto é maior que zero."
+    ],
+    "steps_to_reproduce": [
+      "Enviar um POST para /api/sales com um item no carrinho.",
+      "No mesmo request, enviar o campo 'discount_percentage' com o valor 101."
+    ],
+    "expected_result": "A API deve retornar um erro 400 Bad Request com uma mensagem clara, como 'Desconto não pode ser maior que 100%'.",
+    "actual_result": "A API retorna um erro 500 Internal Server Error.",
+    "reproducibility_rate": "5/5"
+  },
+  "evidence": {
+    "attachments": [
+      "https://logs.foundry.ai/screenshots/bug-001/screenshot-error-500.png"
+    ],
+    "logs": "https://logs.foundry.ai/traces/trace-id-xyz-123"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "string - Ver `id_conventions.json` (deploy_req).",
+  "user_story_id": "string - ID da história de usuário.",
+  "created_at": "string - ISO 8601.",
+  
+  "feature_flags": {
+    "required": "boolean - Se true, o deploy não pode prosseguir sem a flag existir.",
+    "name": "string | null - Nome da chave (ex: 'enable_new_checkout').",
+    "default_state": "boolean - Estado inicial da flag (ex: false para 'dark launch')."
+  },
+
+  "rollout_policy": {
+    "strategy": "enum[direct, canary, blue_green] - Estratégia mandatória.",
+    "steps": "array[object] | null - Detalhe para canary (ex: [{'weight': 10, 'pause_min': 15}]).",
+    "downtime_expected": "boolean - Se true, DevOps deve agendar janela de manutenção."
+  },
+
+  "dependencies": {
+    "db_migrations": "array[string] - IDs dos scripts (ex: '20231027_add_users_table').",
+    "infrastructure": "array[string] - Recursos de infra necessários (ex: 'S3 Bucket: user-avatars').",
+    "required_secrets": "array[string] - Lista de chaves de variáveis de ambiente que DEVEM existir (NUNCA os valores, apenas os nomes. Ex: ['STRIPE_PUBLIC_KEY'])."
+  },
+
+  "verification": {
+    "health_check_path": "string - Endpoint para validar sucesso (ex: '/api/v2/status').",
+    "rollback_triggers": "array[string] - Condições de falha (ex: ['Error rate > 1%', 'Latency > 300ms'])."
+  }
+}

@@ -21,6 +21,8 @@ export async function isGitHubCLIInstalled(cwd: string = "."): Promise<boolean> 
   }
 }
 
+import { renderDiffToTerminal } from "../ui/diff-viewer.js";
+
 export async function reviewAndCreatePR(
   result: LoopExecutionResult,
   options: PRCreateOptions = {},
@@ -35,7 +37,7 @@ export async function reviewAndCreatePR(
 
     for (const r of result.reports) {
       if (r.diff) {
-        console.log(`\nDiff Iteração #${r.iteration}:\n${r.diff.slice(0, 500)}`);
+        renderDiffToTerminal(r.diff);
       }
     }
 

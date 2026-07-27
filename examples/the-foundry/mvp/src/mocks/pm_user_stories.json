@@ -1,0 +1,224 @@
+[
+    {
+      "id": "E-001-US001",
+      "title": "Cadastrar novo aluno com informações básicas e endereço",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Cadastrar as informações e o endereço de um novo aluno",
+      "so_that": "Posso incluir o aluno nas minhas rotas e ter seus dados para contato e localização",
+      "acceptance_criteria": [
+        "Dado que estou na tela de cadastro de alunos",
+        "Quando preencho os campos obrigatórios (Nome, Endereço, Telefone do Responsável)",
+        "E salvo o cadastro",
+        "Então o aluno é adicionado à minha lista de alunos e seu endereço é validado no mapa"
+      ],
+      "priority": "High",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US002",
+      "title": "Editar informações de um aluno existente",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Editar as informações de um aluno cadastrado",
+      "so_that": "Posso manter os dados dos meus alunos sempre atualizados, como endereço ou contato",
+      "acceptance_criteria": [
+        "Dado que estou visualizando a lista de alunos",
+        "Quando seleciono um aluno e clico em 'Editar'",
+        "E modifico os campos desejados",
+        "Então as informações do aluno são atualizadas com sucesso"
+      ],
+      "priority": "Medium",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US003",
+      "title": "Confirmar presença diária ou programada de aluno",
+      "epic_id": "E-001",
+      "as_a": "Pai de aluno",
+      "i_want_to": "Confirmar a presença do meu filho para a rota de transporte escolar",
+      "so_that": "O motorista saiba quem estará na van e possa planejar a rota de forma eficiente",
+      "acceptance_criteria": [
+        "Dado que recebi uma notificação para confirmar a presença ou acessei o aplicativo",
+        "Quando seleciono a opção de 'Confirmar Presença' para o dia atual ou futuro",
+        "Então a presença do meu filho é registrada e o motorista é notificado (ou a informação fica disponível para ele)"
+      ],
+      "priority": "High",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US004",
+      "title": "Visualizar presenças confirmadas para a rota do dia",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Visualizar a lista de alunos que confirmaram presença para a rota do dia",
+      "so_that": "Posso ter uma visão clara de quem devo buscar e planejar minha rota adequadamente",
+      "acceptance_criteria": [
+        "Dado que acessei o aplicativo do motorista",
+        "Quando visualizo a tela principal ou de rotas",
+        "Então vejo uma lista clara dos alunos com presença confirmada para o dia atual"
+      ],
+      "priority": "High",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US005",
+      "title": "Gerar e otimizar rota com base nas presenças confirmadas",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Gerar automaticamente uma rota otimizada com base nas presenças confirmadas",
+      "so_that": "Posso realizar o trajeto da forma mais eficiente e rápida possível, economizando tempo e combustível",
+      "acceptance_criteria": [
+        "Dado que existem alunos com presença confirmada e endereços cadastrados",
+        "Quando solicito a geração de rota otimizada",
+        "Então o sistema exibe uma rota sequencial no mapa, priorizando a menor distância/tempo entre os pontos de parada",
+        "E a rota considera todos os alunos com presença confirmada"
+      ],
+      "priority": "Critical",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US006",
+      "title": "Visualizar e iniciar a rota otimizada no aplicativo",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Visualizar a rota otimizada e iniciar a navegação por ela",
+      "so_that": "Posso seguir o caminho mais eficiente e ter o suporte de um guia de navegação durante o trajeto",
+      "acceptance_criteria": [
+        "Dado que uma rota otimizada foi gerada",
+        "Quando seleciono a rota e clico em 'Iniciar Rota'",
+        "Então o mapa mostra o trajeto e as instruções de navegação em tempo real",
+        "E o status da rota muda para 'Em Andamento'"
+      ],
+      "priority": "High",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US007",
+      "title": "Finalizar a rota após completar todos os pontos de parada",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Finalizar a rota no aplicativo após concluir todas as paradas",
+      "so_that": "O sistema registre o término do serviço e eu possa encerrar o ciclo do dia",
+      "acceptance_criteria": [
+        "Dado que estou com uma rota em andamento",
+        "Quando chego ao último ponto de parada e clico em 'Finalizar Rota'",
+        "Então a rota é marcada como concluída e o rastreamento é interrompido",
+        "E o histórico da rota é salvo"
+      ],
+      "priority": "Medium",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US008",
+      "title": "Receber notificação sobre o início da rota da van",
+      "epic_id": "E-001",
+      "as_a": "Pai de aluno",
+      "i_want_to": "Receber uma notificação quando a van iniciar a rota para buscar meu filho",
+      "so_that": "Posso me preparar e deixar meu filho pronto para a chegada da van, evitando atrasos",
+      "acceptance_criteria": [
+        "Dado que o motorista iniciou a rota no aplicativo",
+        "Quando a van começa a se mover e estou em uma rota agendada para meu filho",
+        "Então recebo uma notificação push no meu celular informando que a van iniciou a rota"
+      ],
+      "priority": "High",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US009",
+      "title": "Visualizar estimativa de tempo de chegada (ETA) da van",
+      "epic_id": "E-001",
+      "as_a": "Pai de aluno",
+      "i_want_to": "Ver a estimativa de tempo de chegada (ETA) da van no meu ponto de parada",
+      "so_that": "Posso ter uma ideia precisa de quando a van chegará e me planejar melhor",
+      "acceptance_criteria": [
+        "Dado que a van iniciou a rota e meu filho está incluído nela",
+        "Quando acesso o aplicativo e vejo o status da rota",
+        "Então consigo visualizar um ETA atualizado para a chegada da van no ponto de parada do meu filho"
+      ],
+      "priority": "High",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US010",
+      "title": "Rastrear a localização da van em tempo real no mapa",
+      "epic_id": "E-001",
+      "as_a": "Pai de aluno",
+      "i_want_to": "Rastrear a localização exata da van em um mapa em tempo real",
+      "so_that": "Tenho total transparência sobre onde a van está e posso me sentir mais seguro em relação ao transporte do meu filho",
+      "acceptance_criteria": [
+        "Dado que a van está em rota e o rastreamento está ativo",
+        "Quando abro o aplicativo e seleciono a opção de rastreamento",
+        "Então vejo a posição da van atualizada em tempo real no mapa, juntamente com o percurso da rota"
+      ],
+      "priority": "Critical",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US011",
+      "title": "Configurar a frequência de atualização da localização da van",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Configurar a frequência com que a localização da minha van é atualizada para os pais",
+      "so_that": "Posso gerenciar o consumo de bateria do meu dispositivo e a precisão do rastreamento de acordo com minhas necessidades",
+      "acceptance_criteria": [
+        "Dado que estou nas configurações do aplicativo",
+        "Quando acesso a opção de 'Configurações de Localização'",
+        "E seleciono uma frequência de atualização (ex: a cada 5 segundos, a cada 15 segundos)",
+        "Então a localização da van é enviada para o aplicativo dos pais conforme a frequência configurada"
+      ],
+      "priority": "Medium",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    },
+    {
+      "id": "E-001-US012",
+      "title": "Visualizar histórico de rotas realizadas",
+      "epic_id": "E-001",
+      "as_a": "Motorista de van",
+      "i_want_to": "Acessar o histórico de todas as rotas que realizei",
+      "so_that": "Posso revisar meu desempenho, consultar rotas passadas e ter um registro das minhas atividades",
+      "acceptance_criteria": [
+        "Dado que estou no aplicativo do motorista",
+        "Quando acesso a seção 'Histórico de Rotas'",
+        "Então vejo uma lista de todas as rotas concluídas, incluindo data, hora de início e fim, e a duração"
+      ],
+      "priority": "Low",
+      "status": "Pending",
+      "dates": {
+        "created_at": "2025-12-29T00:20:46.362889+00:00"
+      }
+    }
+]

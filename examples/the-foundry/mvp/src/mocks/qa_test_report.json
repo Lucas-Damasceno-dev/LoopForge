@@ -1,0 +1,44 @@
+{
+  "id": "EXEC-2025-12-29-001",
+  "user_story_id": "E-001-US001",
+  "commit_hash": "mock_commit_hash",
+  "execution_timestamp": "2025-12-29T10:00:00Z",
+  "executed_by": "qa.agent.mock",
+  "environment": {
+    "name": "local",
+    "config_hash": "mock_config_hash"
+  },
+  "summary": {
+    "status": "PASS",
+    "total_tests": 5,
+    "tests_passed": 5,
+    "tests_failed": 0,
+    "tests_skipped": 0,
+    "flaky_tests_detected": 0,
+    "duration_seconds": 1.5
+  },
+  "results_by_suite": [
+    {
+      "suite_name": "Unit Tests - VanTracker",
+      "suite_type": "unit",
+      "status": "PASS",
+      "duration_seconds": 0.5,
+      "total_tests": 5,
+      "failed_tests_details": []
+    }
+  ],
+  "code_coverage": {
+    "provider": "MockCoverage",
+    "report_url": null,
+    "metrics": {
+      "line_coverage_pct": 90.0,
+      "branch_coverage_pct": 80.0,
+      "function_coverage_pct": 95.0
+    },
+    "threshold_met": true
+  },
+  "artifacts": {
+    "logs_url": null,
+    "screenshots_url": null
+  }
+}

@@ -36,7 +36,7 @@ export const GuardrailsConfigSchema = z.object({
 export type GuardrailsConfig = z.infer<typeof GuardrailsConfigSchema>;
 
 export const LLMConfigSchema = z.object({
-  provider: z.enum(["opencode", "ollama", "openai", "anthropic", "custom"]).optional().default("opencode"),
+  provider: z.enum(["opencode", "ollama", "openai", "anthropic", "deepseek", "openrouter", "vllm", "custom"]).optional().default("opencode"),
   model: z.string().optional().default("deepseek-v3"),
   fallbackModel: z.string().optional().default("anthropic/claude-3-5-sonnet"),
   baseUrl: z.string().optional().default("http://localhost:11434"),

@@ -8,7 +8,6 @@ import { sendMultiChannelNotification } from "../src/ci/notifications/index.js";
 import { SecurityScanner } from "../src/guardrails/security-scanner.js";
 import { WorkspaceOrchestrator } from "../src/core/workspace.js";
 import { CircuitBreaker } from "../src/guardrails/circuit-breaker.js";
-import { generateAnalyticsReport } from "../src/telemetry/analytics.js";
 import { TestGenerator } from "../src/harness/test-generator.js";
 
 describe("LoopForge P1 Proposals Verification", () => {

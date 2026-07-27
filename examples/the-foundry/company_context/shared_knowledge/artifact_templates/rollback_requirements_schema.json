@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "user_story_id": "string - ID da história de usuário a que estes requisitos se aplicam.",
+  "tech_spec_id": "string - ID da especificação técnica relacionada (ex: TS-XXX).",
+  "created_at": "string - ISO 8601.",
+
+  "rollback_strategy": {
+    "type": "string - O tipo de estratégia de rollback. Ver `enums/rollback_strategy_type.json`.",
+    "description": "string - Uma descrição detalhada de como o rollback deve ser executado."
+  },
+  "data_rollback_strategy": {
+    "type": "string - Como os dados afetados serão tratados. Ver `enums/data_rollback_strategy_type.json`.",
+    "script_id": "string | null - ID do script de rollback de dados, se aplicável.",
+    "data_loss_expected": "boolean - Indica se há expectativa de perda de dados durante o rollback."
+  },
+  "communication_plan": {
+    "stakeholders_to_notify": "array[string] - Lista de stakeholders a serem notificados em caso de rollback.",
+    "notification_channel": "string - Canal de comunicação (ex: Slack #alerts)."
+  },
+  "dependencies": {
+    "services_to_stop": "array[string] - Lista de serviços que precisam ser parados/reiniciados para o rollback."
+  }
+}

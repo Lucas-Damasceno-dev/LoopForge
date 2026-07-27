@@ -96,22 +96,22 @@ export class TelemetryStore {
   }
 
   public getAllSessions(): SessionRecord[] {
-    const rows = this.db.prepare("SELECT * FROM sessions ORDER BY id DESC").all() as any[];
+    const rows = this.db.prepare("SELECT * FROM sessions ORDER BY id DESC").all() as Array<Record<string, unknown>>;
     return rows.map((r) => ({
-      id: r.id,
-      projectName: r.project_name,
-      timestamp: r.timestamp,
-      totalIterations: r.total_iterations,
-      totalTokensUsed: r.total_tokens,
-      totalCostUsd: r.total_cost_usd,
+      id: Number(r.id),
+      projectName: String(r.project_name),
+      timestamp: String(r.timestamp),
+      totalIterations: Number(r.total_iterations),
+      totalTokensUsed: Number(r.total_tokens),
+      totalCostUsd: Number(r.total_cost_usd),
       success: r.success === 1,
-      stopReason: r.stop_reason,
+      stopReason: String(r.stop_reason || ""),
     }));
   }
 
   public getCostTrend(): { timestamp: string; costUsd: number }[] {
-    const rows = this.db.prepare("SELECT timestamp, total_cost_usd FROM sessions ORDER BY id ASC").all() as any[];
-    return rows.map((r) => ({ timestamp: r.timestamp, costUsd: r.total_cost_usd }));
+    const rows = this.db.prepare("SELECT timestamp, total_cost_usd FROM sessions ORDER BY id ASC").all() as Array<Record<string, unknown>>;
+    return rows.map((r) => ({ timestamp: String(r.timestamp), costUsd: Number(r.total_cost_usd) }));
   }
 
   public getPassRateTrend(): { timestamp: string; passRate: number }[] {
@@ -122,8 +122,8 @@ export class TelemetryStore {
       JOIN iterations i ON i.session_id = s.id
       GROUP BY s.id
       ORDER BY s.id ASC
-    `).all() as any[];
-    return rows.map((r) => ({ timestamp: r.timestamp, passRate: r.passRate || 0 }));
+    `).all() as Array<Record<string, unknown>>;
+    return rows.map((r) => ({ timestamp: String(r.timestamp), passRate: Number(r.passRate || 0) }));
   }
 
   public close(): void {

@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import yaml from "js-yaml";
+import * as jsYaml from "js-yaml";
 import { LoopForgeConfigSchema, type LoopForgeConfig } from "./schema.js";
 
 export const DEFAULT_CONFIG_FILENAME = ".loopforge.json";
@@ -34,7 +34,7 @@ export async function loadConfig(configPath?: string, cwd: string = "."): Promis
   try {
     let jsonParsed: unknown;
     if (resolvedPath.endsWith(".yml") || resolvedPath.endsWith(".yaml")) {
-      jsonParsed = yaml.load(rawData);
+      jsonParsed = jsYaml.load(rawData);
     } else {
       jsonParsed = JSON.parse(rawData);
     }

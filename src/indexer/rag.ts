@@ -55,7 +55,9 @@ export class CodeIndexer {
     try {
       const raw = await fs.readFile(fullIndexPath, "utf-8");
       existingCache = JSON.parse(raw);
-    } catch {}
+    } catch {
+      /* ignore index read error */
+    }
 
     const codeFiles = await this.findCodeFiles(resolvedDir);
     const symbols: CodeSymbol[] = [];
@@ -79,10 +81,14 @@ export class CodeIndexer {
           try {
             const vec = await this.llm.generateEmbedding(`${sym.name} ${sym.snippet}`);
             sym.embedding = vec;
-          } catch {}
+          } catch {
+            /* ignore embedding generation error */
+          }
         }
         symbols.push(...extracted);
-      } catch {}
+      } catch {
+        /* ignore file read error */
+      }
     }
 
     const updatedCache: IndexCache = {

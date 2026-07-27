@@ -1,0 +1,32 @@
+{
+  "id": "DR-001",
+  "user_story_id": "US-FONT-FIX-02",
+  "created_at": "2023-10-28T14:00:00Z",
+  
+  "feature_flags": {
+    "required": true,
+    "name": "use_new_font_rendering_engine",
+    "default_state": false
+  },
+
+  "rollout_policy": {
+    "strategy": "canary",
+    "steps": [
+      { "percentage": 5, "wait_time_minutes": 10 },
+      { "percentage": 20, "wait_time_minutes": 30 },
+      { "percentage": 100, "wait_time_minutes": 0 }
+    ],
+    "downtime_expected": false
+  },
+
+  "dependencies": {
+    "db_migrations": [],
+    "infrastructure": ["Instalar lib 'fontconfig' no container base (Dockerfile)"],
+    "required_secrets": ["FONT_LICENSE_KEY"]
+  },
+
+  "verification": {
+    "health_check_path": "/api/fonts/health",
+    "rollback_triggers": ["Error rate > 0.5%"]
+  }
+}

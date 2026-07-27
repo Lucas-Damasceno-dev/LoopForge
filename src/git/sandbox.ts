@@ -45,7 +45,7 @@ export async function mergeSandboxBranch(
   if (!(await isGitRepo(cwd))) return false;
 
   try {
-    await execAsync(`git checkout ${targetBranch}`, { cwd });
+    await execAsync(`git checkout -f ${targetBranch}`, { cwd });
     await execAsync(`git merge ${sandboxBranch} --no-ff -m "loopforge: merge sandbox ${sandboxBranch}"`, { cwd });
     await execAsync(`git branch -d ${sandboxBranch}`, { cwd });
     return true;
@@ -62,7 +62,7 @@ export async function cleanupSandboxBranch(
   if (!(await isGitRepo(cwd))) return false;
 
   try {
-    await execAsync(`git checkout ${targetBranch}`, { cwd });
+    await execAsync(`git checkout -f ${targetBranch}`, { cwd });
     await execAsync(`git branch -D ${sandboxBranch}`, { cwd });
     return true;
   } catch {

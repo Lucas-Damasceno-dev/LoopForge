@@ -1,0 +1,8 @@
+langgraph
+langchain-openai
+langchain
+python-dotenv
+langgraph-checkpoint-sqlite
+langchain-google-genai
+google-generativeai
+langchain-community

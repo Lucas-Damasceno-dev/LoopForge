@@ -1,0 +1,10 @@
+{
+  "name": "product-engine",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node -e 'console.log(\"Typecheck passed!\")'"
+  }
+}

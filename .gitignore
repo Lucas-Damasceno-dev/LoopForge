@@ -1,12 +1,28 @@
 # Dependencies
 node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
 
 # Build outputs
 dist/
+*.egg-info/
 
 # LoopForge runtime data
-.loopforge/report.json
+.loopforge/
+.opencode/
+scratch/
+examples/.loopforge/
+
+# Deepwork tracking
+.slim/deepwork/
 
 # OS files
 .DS_Store
 *.log
+
+# Runtime
+*.db
+.langchain.db
+output_agent_runs/

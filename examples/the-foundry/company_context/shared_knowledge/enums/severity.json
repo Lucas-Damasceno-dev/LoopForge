@@ -1,0 +1,7 @@
+{
+  "Blocker": "Impede o desenvolvimento ou o teste de uma funcionalidade; nenhuma outra tarefa pode prosseguir.",
+  "Critical": "O aplicativo 'crasha', causa perda de dados ou uma funcionalidade principal está completamente quebrada.",
+  "Major": "Uma funcionalidade principal está significativamente danificada, mas existem 'workarounds' (soluções de contorno).",
+  "Minor": "Um comportamento inesperado que não afeta funcionalidades principais ou um problema de UI mais evidente.",
+  "Trivial": "Pequeno problema de UI, desalinhamento, erro de digitação."
+}

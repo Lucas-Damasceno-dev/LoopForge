@@ -1,0 +1,36 @@
+{
+  "projectName": "LoopForge Project",
+  "version": "5.0.0",
+  "harness": {
+    "runners": [
+      {
+        "name": "Unit Tests",
+        "type": "unit",
+        "command": "npm test",
+        "timeoutMs": 60000,
+        "enabled": true
+      }
+    ],
+    "stopOnFirstFailure": false,
+    "parallel": true
+  },
+  "memory": {
+    "lessonsFile": ".loopforge/lessons.md",
+    "handoffFile": ".loopforge/handoff.md",
+    "maxLessonsPrompt": 5
+  },
+  "guardrails": {
+    "maxConsecutiveFailures": 3,
+    "maxTotalIterations": 10,
+    "maxBudgetUsd": 5,
+    "maxCostPerIteration": 2,
+    "requireCleanGit": true
+  },
+  "llm": {
+    "provider": "opencode",
+    "model": "deepseek-v3",
+    "fallbackModel": "anthropic/claude-3-5-sonnet",
+    "baseUrl": "http://localhost:11434",
+    "temperature": 0.2
+  }
+}

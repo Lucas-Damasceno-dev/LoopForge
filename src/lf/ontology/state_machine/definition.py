@@ -1,0 +1,21 @@
+from enum import Enum
+from typing import Literal
+
+
+class TaskState(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    VALIDATING = "validating"
+    FAILED = "failed"
+    DONE = "done"
+
+
+class PipelineNode(str, Enum):
+    CPO = "cpo"
+    PM = "pm"
+    TECH_LEAD = "tech_lead"
+    DEVELOPER = "developer"
+    QA = "qa"
+    APPSEC = "appsec"
+    DEVOPS = "devops"
+    ROUTER = "router"

@@ -1,0 +1,7 @@
+{
+  "Draft": "A história de usuário está sendo elaborada pelo Product Manager.",
+  "Ready for Dev": "A história está completa e pronta para a especificação técnica pelo Arquiteto.",
+  "In Progress": "A história está em desenvolvimento ativo pela equipe técnica.",
+  "Done": "A funcionalidade foi implementada, testada e entregue em produção.",
+  "Blocked": "O desenvolvimento da história está bloqueado por um impedimento."
+}

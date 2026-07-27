@@ -75,7 +75,9 @@ describe("Baseline Test Suite (Auto-Harness)", () => {
       }
     }
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
-  } catch {}
+  } catch {
+    /* ignore config load/write failure during bootstrap */
+  }
 
   return {
     stackDetected,

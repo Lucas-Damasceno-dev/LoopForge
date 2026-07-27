@@ -1,0 +1,6 @@
+{
+  "Critical": "Bloqueia a funcionalidade principal, sem workaround. Requer atenção imediata.",
+  "High": "Impacta severamente a experiência do usuário ou uma funcionalidade importante.",
+  "Medium": "Bug ou funcionalidade que é importante mas não urgente. Pode ser planejado para o próximo ciclo.",
+  "Low": "Melhoria cosmética, bug de baixo impacto ou funcionalidade 'nice-to-have'."
+}

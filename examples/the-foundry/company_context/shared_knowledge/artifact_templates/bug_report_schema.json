@@ -1,0 +1,39 @@
+{
+  "id": "string - Ver `id_conventions.json` (bug_report).",
+  "title": "string - Um título curto e descritivo para o bug.",
+  "user_story_id": "string | null - ID da história relacionada (null se for bug de regressão antiga ou tech debt).",
+  "reporter_id": "string - ID ou email do QA/Dev que abriu o report.",
+  "created_at": "string - Timestamp ISO 8601 (ex: 2023-10-27T10:00:00Z).",
+  
+  "classification": {
+    "severity": "string - Impacto técnico (ex: Blocker, Critical, Minor). Ver `enums/severity.json`.",
+    "priority": "string - Urgência de negócio (ex: P0 - Fix Now, P3 - Backlog). Ver `enums/priority.json`.",
+    "component": "string - Módulo afetado (ex: Authentication, Checkout, API, UI).",
+    "type": "string - (ex: Functional, Visual, Performance, Security)."
+  },
+
+  "context": {
+    "build_version": "string - A versão exata do software onde o bug ocorreu (ex: v1.2.4-rc1).",
+    "environment": {
+      "name": "string - (ex: staging, production, local).",
+      "device": "string - (ex: Desktop, Pixel 6, iPhone 14).",
+      "os": "string - (ex: Windows 11, iOS 16, Ubuntu 22.04).",
+      "browser": "string | null - (ex: Chrome 114, Firefox).",
+      "architecture": "string | null - Importante dado seu contexto (ex: arm64, x86_64)."
+    }
+  },
+
+  "details": {
+    "summary": "string - Descrição clara e concisa do problema.",
+    "pre_conditions": "array[string] - O estado necessário antes do teste (ex: 'Usuário logado', 'Carrinho com itens').",
+    "steps_to_reproduce": "array[string] - Passos numerados para reproduzir.",
+    "expected_result": "string - O comportamento correto.",
+    "actual_result": "string - O comportamento observado.",
+    "reproducibility_rate": "string - (ex: '5/5' ou 'Intermitente'). Ajuda a identificar 'flaky bugs'."
+  },
+
+  "evidence": {
+    "attachments": "array[string] - Links para screenshots/vídeos.",
+    "logs": "string | null - Link para log file ou snippet do erro (Stack Trace)."
+  }
+}

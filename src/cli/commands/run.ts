@@ -12,7 +12,7 @@ import { sendMultiChannelNotification } from "../../ci/notifications/index.js";
 
 export async function runCommand(
   targetDir: string = ".",
-  options: { createPr?: boolean; review?: boolean; auto?: boolean; watch?: boolean; format?: "json" | "text" } = {}
+  options: { createPr?: boolean; review?: boolean; auto?: boolean; watch?: boolean; format?: "json" | "text"; skipPlan?: boolean } = {}
 ): Promise<void> {
   const resolvedDir = path.resolve(targetDir);
 

@@ -1,0 +1,5 @@
+{
+  "PASS": "A suíte/teste passou com sucesso.",
+  "FAIL": "A suíte/teste falhou.",
+  "SKIP": "A suíte/teste foi ignorada (ex: com @Ignore)."
+}

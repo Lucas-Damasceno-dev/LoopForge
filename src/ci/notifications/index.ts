@@ -29,7 +29,9 @@ export async function sendMultiChannelNotification(
         body,
       });
       results.webhook = true;
-    } catch {}
+    } catch {
+      /* ignore webhook delivery failure */
+    }
   }
 
   // 2. Desktop Notification
@@ -41,7 +43,9 @@ export async function sendMultiChannelNotification(
         sound: payload.status === "failure" || payload.status === "breaker",
       });
       results.desktop = true;
-    } catch {}
+    } catch {
+      /* ignore desktop notification failure */
+    }
   }
 
   // 3. Email Notification
@@ -66,7 +70,9 @@ export async function sendMultiChannelNotification(
         text: payload.message,
       });
       results.email = true;
-    } catch {}
+    } catch {
+      /* ignore email delivery failure */
+    }
   }
 
   return results;
