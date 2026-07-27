@@ -43,6 +43,28 @@ class SQLiteLLMCache:
 
 
 def get_llm(provider: str = "google", model_name: str = "gemini-1.5-flash", temperature: float = 0.2) -> Any:
+    """Returns an LLM instance based on provider string."""
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        # Fallback to FakeListLLM for offline/mock environments
+        responses = [
+            json.dumps({"title": "Mock Epic", "id": "epic-1", "user_stories": ["us-1"]}),
+            json.dumps({"id": "us-1", "title": "Mock User Story", "acceptance_criteria": ["Given x when y then z"]}),
+            "# Tech Spec\n\nMock technical specification.",
+            "Mock code implementation response.",
+            json.dumps({"total_tests": 1, "passed": 1, "failed": 0}),
+        ]
+        return FakeListLLM(responses=responses * 10)
+
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key, temperature=temperature)
+    except Exception:
+        responses = ["Mock LLM response"] * 100
+        return FakeListLLM(responses=responses)
+
+
+def get_llm_client(provider: str = "google", model_name: str = "gemini-2.0-flash", temperature: float = 0.3) -> Any:
     api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         # Fallback to FakeListLLM for offline/mock environments

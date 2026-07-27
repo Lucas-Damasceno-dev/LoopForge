@@ -6,13 +6,13 @@ from lf.telemetry.store import TelemetryStore
 
 
 def test_circuit_breaker():
-    cb = CircuitBreaker(max_consecutive_failures=2, budget_limit_usd=1.0)
+    cb = CircuitBreaker(max_consecutive_failures=2, max_total_cost=1.0)
     assert cb.can_proceed()
 
-    cb.record_failure(0.1)
+    cb.record_failure()
     assert cb.can_proceed()
 
-    cb.record_failure(0.1)
+    cb.record_failure()
     assert not cb.can_proceed()
 
 

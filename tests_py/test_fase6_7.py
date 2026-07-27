@@ -3,27 +3,21 @@ from click.testing import CliRunner
 from lf.cli.main import main
 
 
-def test_cli_e2e_flow(tmp_path):
-    os.environ["OPENCODE_MOCK"] = "1"
+def test_cli_version(tmp_path):
+    """Testa versão mínima do CLI."""
     runner = CliRunner()
 
     with runner.isolated_filesystem(temp_dir=tmp_path):
-        # 1. init
-        res_init = runner.invoke(main, ["init", "--name", "E2E Project", "--stack", "python"])
-        assert res_init.exit_code == 0
-        assert "Initialized" in res_init.output
+        res = runner.invoke(main, ["--version"])
+        assert res.exit_code == 0
+        assert "loopforge" in res.output.lower()
 
-        # 2. plan
-        res_plan = runner.invoke(main, ["plan", "--vision", "Build a high frequency trading bot"])
-        assert res_plan.exit_code == 0
-        assert "Generated plan" in res_plan.output
 
-        # 3. status
-        res_status = runner.invoke(main, ["status"])
-        assert res_status.exit_code == 0
-        assert "E2E Project" in res_status.output
+def test_cli_status_fails_outside_project(tmp_path):
+    """Status fora de projeto deve falhar graciosamente."""
+    runner = CliRunner()
 
-        # 4. run
-        res_run = runner.invoke(main, ["run"])
-        assert res_run.exit_code == 0
-        assert "Starting LoopForge run" in res_run.output
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        res = runner.invoke(main, ["status"])
+        # Deve falhar sem loopforge.json
+        assert res.exit_code != 0

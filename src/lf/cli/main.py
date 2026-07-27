@@ -6,6 +6,7 @@ from lf.cli.commands.status import status_cmd
 
 
 @click.group()
+@click.version_option(version="6.0.0", prog_name="loopforge")
 def main():
     """LoopForge v6 - Autonomous Agent Governance and Pipeline Orchestrator"""
     pass

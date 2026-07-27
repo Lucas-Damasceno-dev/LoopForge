@@ -1,34 +1,96 @@
-from dataclasses import dataclass
-
-
-@dataclass
-class CircuitState:
-    consecutive_failures: int = 0
-    total_spend_usd: float = 0.0
-    is_open: bool = False
+#-*- coding: utf-8 -*-
+"""
+Circuit Breaker com budget embutido (Oracle rec: budget_controller absorvido aqui).
+Três guardas: falhas consecutivas, iterações máximas, custo máximo ($).
+"""
+from __future__ import annotations
+import time
+from typing import Optional
 
 
 class CircuitBreaker:
-    def __init__(self, max_consecutive_failures: int = 3, budget_limit_usd: float = 10.0):
-        self.max_failures = max_consecutive_failures
-        self.budget_limit_usd = budget_limit_usd
-        self.state = CircuitState()
+    """Protege contra loops infinitos e estouro de budget."""
 
-    def record_success(self, estimated_cost_usd: float = 0.01):
-        self.state.consecutive_failures = 0
-        self.state.total_spend_usd += estimated_cost_usd
-        self._check_budget()
+    STATE_CLOSED = "closed"      # Tudo ok
+    STATE_OPEN = "open"          # Circuito aberto (parou)
+    STATE_HALF_OPEN = "half-open"  # Tentando recuperar
 
-    def record_failure(self, estimated_cost_usd: float = 0.01):
-        self.state.consecutive_failures += 1
-        self.state.total_spend_usd += estimated_cost_usd
-        if self.state.consecutive_failures >= self.max_failures:
-            self.state.is_open = True
-        self._check_budget()
+    def __init__(
+        self,
+        max_consecutive_failures: int = 3,
+        max_iterations: int = 10,
+        max_total_cost: float = 50.0,  # USD
+        cost_per_iteration: float = 0.5,  # USD estimado
+        reset_timeout: float = 300.0,  # segundos para half-open
+    ):
+        self.max_consecutive_failures = max_consecutive_failures
+        self.max_iterations = max_iterations
+        self.max_total_cost = max_total_cost
+        self.cost_per_iteration = cost_per_iteration
+        self.reset_timeout = reset_timeout
 
-    def _check_budget(self):
-        if self.state.total_spend_usd >= self.budget_limit_usd:
-            self.state.is_open = True
+        self.state = self.STATE_CLOSED
+        self.consecutive_failures = 0
+        self.total_iterations = 0
+        self.total_cost = 0.0
+        self.last_failure_time: Optional[float] = None
+
+    def record_success(self):
+        """Registra sucesso e reseta falhas consecutivas."""
+        self.consecutive_failures = 0
+        self.state = self.STATE_CLOSED
+
+    def record_failure(self):
+        """Registra falha e verifica se abre circuito."""
+        self.consecutive_failures += 1
+        self.total_iterations += 1
+        self.total_cost += self.cost_per_iteration
+        self.last_failure_time = time.time()
+
+        if self.consecutive_failures >= self.max_consecutive_failures:
+            self.state = self.STATE_OPEN
+        elif self.total_cost >= self.max_total_cost:
+            self.state = self.STATE_OPEN
+
+    def record_iteration(self):
+        """Registra iteração (independente de sucesso/falha)."""
+        self.total_iterations += 1
+        self.total_cost += self.cost_per_iteration
+
+        if self.total_iterations >= self.max_iterations:
+            self.state = self.STATE_OPEN
+        elif self.total_cost >= self.max_total_cost:
+            self.state = self.STATE_OPEN
 
     def can_proceed(self) -> bool:
-        return not self.state.is_open
+        """Verifica se pode executar próxima iteração."""
+        if self.state == self.STATE_CLOSED:
+            return True
+
+        if self.state == self.STATE_OPEN:
+            # Tenta half-open após timeout
+            if self.last_failure_time and (time.time() - self.last_failure_time) >= self.reset_timeout:
+                self.state = self.STATE_HALF_OPEN
+                return True
+            return False
+
+        # half-open: permite 1 tentativa
+        return True
+
+    def to_dict(self) -> dict:
+        return {
+            "state": self.state,
+            "consecutive_failures": self.consecutive_failures,
+            "total_iterations": self.total_iterations,
+            "total_cost": self.total_cost,
+            "max_cost": self.max_total_cost,
+            "max_iterations": self.max_iterations,
+        }
+
+    @property
+    def budget_exceeded(self) -> bool:
+        return self.total_cost >= self.max_total_cost
+
+    @property
+    def iterations_exceeded(self) -> bool:
+        return self.total_iterations >= self.max_iterations

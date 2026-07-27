@@ -10,6 +10,10 @@ console = Console()
 @click.command(name="status")
 def status_cmd():
     """Display project status and task telemetry breakdown."""
+    config_path = Path(".loopforge.json")
+    if not config_path.exists() and not config_path.with_suffix(".yaml").exists():
+        console.print("[red]Error: Not a LoopForge project. Run 'loopforge init' first.[/red]")
+        raise SystemExit(1)
     cfg = load_config()
     console.print(f"[bold blue]Project:[/bold blue] {cfg.project_name} ({cfg.project_id})")
     console.print(f"[bold blue]Stack:[/bold blue] {cfg.stack.language} ({cfg.stack.framework})")

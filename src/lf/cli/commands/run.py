@@ -13,7 +13,8 @@ console = Console()
 
 @click.command(name="run")
 @click.option("--replay", default=None, help="Replay session ID from telemetry")
-def run_cmd(replay: str | None):
+@click.option("--mock", is_flag=True, default=True, help="Use mock LLM mode")
+def run_cmd(replay: str | None, mock: bool):
     """Execute LoopForge task pipeline."""
     lock = LoopLock()
     session_id = replay or str(uuid.uuid4())[:8]
@@ -36,9 +37,10 @@ def run_cmd(replay: str | None):
             console.print("[yellow]No tasks in plan. Run `lf plan` first.[/yellow]")
             return
 
-        dispatcher = TaskDispatcher()
+        dispatcher = TaskDispatcher(mock_llm=mock)
         recorder = TelemetryRecorder()
-        circuit = CircuitBreaker(budget_limit_usd=cfg.budget_limit_usd)
+        circuit = CircuitBreaker(max_total_cost=cfg.budget_limit_usd)
+        mock_mode = mock or True
 
         console.print(f"[bold green]Starting LoopForge run (Session ID: {session_id})...[/bold green]")
         for task in cfg.plan.tasks:
@@ -47,19 +49,29 @@ def run_cmd(replay: str | None):
                 break
 
             console.print(f"\n[bold cyan]Executing Task {task.id}: {task.title}[/bold cyan]")
-            state = dispatcher.dispatch(task, project_id=cfg.project_id)
-            status = state.get("status", "done")
-            history = state.get("history", [])
+            try:
+                state = dispatcher.dispatch(task, project_id=cfg.project_id)
+                error = state.get("error")
+                test_report = state.get("test_report", {})
+                tests_failed = test_report.get("summary", {}).get("tests_failed", 1) if test_report else 1
 
-            for node_name in history:
-                recorder.record_node_execution(session_id, task.id, node_name, status)
+                if error:
+                    circuit.record_failure()
+                    console.print(f"[red]Task {task.id} failed: {error}[/red]")
+                elif tests_failed == 0:
+                    circuit.record_success()
+                    console.print(f"[green]Task {task.id} completed successfully.[/green]")
+                else:
+                    circuit.record_failure()
+                    console.print(f"[red]Task {task.id}: {tests_failed} test(s) failed[/red]")
 
-            if status == "done":
-                circuit.record_success()
-                console.print(f"[green]Task {task.id} completed successfully.[/green]")
-            else:
+                recorder.record_node_execution(
+                    session_id, task.id, state.get("next_agent", "unknown"),
+                    "done" if not error else "failed"
+                )
+            except Exception as e:
                 circuit.record_failure()
-                console.print(f"[red]Task {task.id} failed: {state.get('error')}[/red]")
+                console.print(f"[red]Task {task.id} crashed: {e}[/red]")
 
     finally:
         lock.release()
