@@ -3,6 +3,7 @@ from lf.cli.commands.init import init_cmd
 from lf.cli.commands.plan import plan_cmd
 from lf.cli.commands.run import run_cmd
 from lf.cli.commands.status import status_cmd
+from lf.cli.commands.ui import ui_cmd
 
 
 @click.group()
@@ -16,6 +17,8 @@ main.add_command(init_cmd)
 main.add_command(plan_cmd)
 main.add_command(run_cmd)
 main.add_command(status_cmd)
+main.add_command(ui_cmd)
+
 
 
 if __name__ == "__main__":

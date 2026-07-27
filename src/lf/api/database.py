@@ -47,11 +47,25 @@ async def init_db(settings: APISettings | None = None) -> None:
         kwargs["pool_size"] = settings.db_pool_size
         kwargs["max_overflow"] = settings.db_max_overflow
 
-    engine = create_async_engine(db_url, **kwargs)
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        engine = create_async_engine(db_url, **kwargs)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        if not is_sqlite:
+            # Fallback automático para SQLite se PostgreSQL não estiver acessível
+            print(f"--- AVISO: Falha ao conectar ao PostgreSQL ({e}). Usando SQLite fallback em .loopforge/api.db ---")
+            fallback_url = "sqlite+aiosqlite:///.loopforge/api.db"
+            os.makedirs(".loopforge", exist_ok=True)
+            engine = create_async_engine(fallback_url, echo=settings.debug)
+            session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        else:
+            raise e
+
 
 
 async def close_db() -> None:

@@ -22,6 +22,10 @@ from lf.api.schemas import (
 )
 
 
+from fastapi.responses import HTMLResponse
+from lf.api.dashboard_html import DASHBOARD_HTML
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Gerencia ciclo de vida da aplicação: init e close do DB."""
@@ -35,16 +39,24 @@ def create_app() -> FastAPI:
     """Factory da aplicação FastAPI."""
     app = FastAPI(
         title="LoopForge API",
-        description="API REST para gerenciamento de pipelines do LoopForge",
+        description="API REST e Dashboard Web para gerenciamento de pipelines do LoopForge",
         version="6.0.0",
         lifespan=lifespan,
     )
+
+    # ─── Dashboard Web UI ───────────────────────────────────────────
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+    async def render_dashboard():
+        """Serves the modern Glassmorphic Web Dashboard UI."""
+        return HTMLResponse(content=DASHBOARD_HTML)
 
     # ─── Health ─────────────────────────────────────────────────────
     @app.get("/health", response_model=HealthResponse, tags=["System"])
     async def health_check():
         """Verifica se a API e o banco estão operacionais."""
         return HealthResponse()
+
 
     # ─── CRUD Runs ──────────────────────────────────────────────────
     @app.post("/api/runs", response_model=RunResponse, status_code=201, tags=["Runs"])
