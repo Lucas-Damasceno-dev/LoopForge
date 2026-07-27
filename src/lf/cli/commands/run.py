@@ -13,8 +13,10 @@ console = Console()
 
 @click.command(name="run")
 @click.option("--replay", default=None, help="Replay session ID from telemetry")
-@click.option("--mock", is_flag=True, default=True, help="Use mock LLM mode")
-def run_cmd(replay: str | None, mock: bool):
+@click.option("--mock", is_flag=True, default=False, help="Use mock LLM mode")
+@click.option("--interactive", "-i", is_flag=True, default=False,
+              help="Pause after key nodes for human approval/adjustment")
+def run_cmd(replay: str | None, mock: bool, interactive: bool):
     """Execute LoopForge task pipeline."""
     lock = LoopLock()
     session_id = replay or str(uuid.uuid4())[:8]
@@ -37,12 +39,14 @@ def run_cmd(replay: str | None, mock: bool):
             console.print("[yellow]No tasks in plan. Run `lf plan` first.[/yellow]")
             return
 
-        dispatcher = TaskDispatcher(mock_llm=mock)
+        dispatcher = TaskDispatcher(mock_llm=mock, interactive=interactive)
         recorder = TelemetryRecorder()
         circuit = CircuitBreaker(max_total_cost=cfg.budget_limit_usd)
-        mock_mode = mock or True
 
         console.print(f"[bold green]Starting LoopForge run (Session ID: {session_id})...[/bold green]")
+        if interactive:
+            console.print("[bold yellow]Interactive mode: pipeline will pause after developer & QA nodes.[/bold yellow]")
+
         for task in cfg.plan.tasks:
             if not circuit.can_proceed():
                 console.print("[bold red]Circuit breaker tripped! Stopping pipeline.[/bold red]")

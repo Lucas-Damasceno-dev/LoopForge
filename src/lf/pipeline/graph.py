@@ -53,8 +53,18 @@ def should_retry(state: GraphState) -> Literal["qa", "developer", "__end__"]:
     return END
 
 
-def build_graph(checkpointer: SqliteSaver | None = None):
-    """Constrói e compila o grafo com checkpointing."""
+def build_graph(
+    checkpointer: SqliteSaver | None = None,
+    interrupt_after: list[str] | None = None,
+    human_gate_enabled: bool = False,
+):
+    """Constrói e compila o grafo com checkpointing e human-in-the-loop opcional.
+
+    Args:
+        checkpointer: SqliteSaver para checkpoint/persistência.
+        interrupt_after: Lista de nós que devem pausar para aprovação humana.
+        human_gate_enabled: Se True, adiciona nó de gate humano após developer/qa.
+    """
     workflow = StateGraph(GraphState)
 
     # Adiciona nós
@@ -94,4 +104,11 @@ def build_graph(checkpointer: SqliteSaver | None = None):
         "__end__": END,
     })
 
-    return workflow.compile(checkpointer=checkpointer)
+    # Se human_gate_enabled, pausa após developer e qa para aprovação manual
+    gates = list(interrupt_after) if interrupt_after else []
+    if human_gate_enabled:
+        for n in ("developer", "qa"):
+            if n not in gates:
+                gates.append(n)
+
+    return workflow.compile(checkpointer=checkpointer, interrupt_after=gates or None)

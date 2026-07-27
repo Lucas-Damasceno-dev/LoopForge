@@ -10,7 +10,11 @@ console = Console()
 @click.option("--vision", prompt="Project vision", help="High level project vision")
 def plan_cmd(vision: str):
     """Generate a task execution plan from project vision."""
-    cfg = load_config()
+    try:
+        cfg = load_config()
+    except FileNotFoundError:
+        console.print("[red]No .loopforge.json found. Run 'loopforge init' first.[/red]")
+        raise SystemExit(1)
     plan = create_plan_from_vision(vision)
     cfg.plan = plan
     save_config(cfg)

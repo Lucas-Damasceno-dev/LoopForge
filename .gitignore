@@ -26,3 +26,4 @@ examples/.loopforge/
 *.db
 .langchain.db
 output_agent_runs/
+uv.lock
