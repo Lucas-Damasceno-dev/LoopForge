@@ -1,6 +1,5 @@
-import pytest
-from lf.ontology.state_machine.definition import TaskState, PipelineNode
-from lf.ontology.state_machine.labels import get_git_label, STATE_LABELS
+from lf.ontology.state_machine.definition import PipelineNode, TaskState
+from lf.ontology.state_machine.labels import get_git_label
 
 
 def test_task_state_and_pipeline_node_enums():

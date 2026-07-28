@@ -1,8 +1,13 @@
-import pytest
 import os
-from lf.pipeline.graph import build_graph
+
+import pytest
+
 from lf.orchestrator.plan_creator import create_plan_from_vision
-from lf.pipeline.llm_factory import call_openrouter_api, DEFAULT_OPENROUTER_KEY, DEFAULT_OPENROUTER_MODEL
+from lf.pipeline.graph import build_graph
+from lf.pipeline.llm_factory import (
+    DEFAULT_OPENROUTER_MODEL,
+    call_openrouter_api,
+)
 
 
 def test_adaptive_routing_full_path():

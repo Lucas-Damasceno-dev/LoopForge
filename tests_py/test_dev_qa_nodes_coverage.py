@@ -1,12 +1,9 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+from unittest.mock import patch
 
-from lf.pipeline.nodes.developer import developer, _extract_generated_code
-from lf.pipeline.nodes.qa import qa, _mock_report, _build_report_from_harness
 from lf.orchestrator.plan_creator import create_plan_from_epic
+from lf.pipeline.nodes.developer import _extract_generated_code, developer
+from lf.pipeline.nodes.qa import _mock_report, qa
 from lf.runner.opencode.models import OpenCodeResult
-
 
 
 def test_extract_generated_code(tmp_path):

@@ -1,26 +1,26 @@
-#-*- coding: utf-8 -*-
 """
 Nó do QA.
 """
-import os
 import json
-from datetime import datetime, timezone
-from typing import List, Optional
-from ..utils import Agent, StateKey
-from ..llm_factory import get_llm_client # Import the factory
+import os
+from datetime import UTC, datetime
 
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
+from ..llm_factory import get_llm_client  # Import the factory
+from ..utils import Agent, StateKey
+
+
 # --- Pydantic Models for Test Execution Report ---
 class Environment(BaseModel):
     name: str = Field(..., description="The environment where the tests ran (e.g., 'local', 'ci', 'staging', 'production').")
-    config_hash: Optional[str] = Field(None, description="Hash of the configuration/environment variables used. Helps debug 'it works on my machine' issues.")
+    config_hash: str | None = Field(None, description="Hash of the configuration/environment variables used. Helps debug 'it works on my machine' issues.")
 
 class FailedTestDetails(BaseModel):
     test_name: str
     error_message: str
-    stack_trace_snippet: Optional[str] = None
+    stack_trace_snippet: str | None = None
     is_flaky: bool = False
 
 class ResultsBySuite(BaseModel):
@@ -29,7 +29,7 @@ class ResultsBySuite(BaseModel):
     status: str = Field(..., description="Status of the test suite ('PASS', 'FAIL', 'SKIP').")
     duration_seconds: float
     total_tests: int
-    failed_tests_details: List[FailedTestDetails] = Field(default_factory=list)
+    failed_tests_details: list[FailedTestDetails] = Field(default_factory=list)
 
 class Summary(BaseModel):
     status: str = Field(..., description="Overall status ('PASS', 'FAIL', 'UNSTABLE'). 'UNSTABLE' is useful for flaky tests.")
@@ -42,13 +42,13 @@ class Summary(BaseModel):
 
 class CodeCoverage(BaseModel):
     provider: str
-    report_url: Optional[str] = None
+    report_url: str | None = None
     metrics: dict
     threshold_met: bool = False
 
 class Artifacts(BaseModel):
-    logs_url: Optional[str] = None
-    screenshots_url: Optional[List[str]] = None
+    logs_url: str | None = None
+    screenshots_url: list[str] | None = None
 
 class TestExecutionReportSchema(BaseModel):
     id: str = Field(..., description="Unique ID for the test execution (e.g., 'EXEC-2023-10-27-001').")
@@ -58,9 +58,9 @@ class TestExecutionReportSchema(BaseModel):
     executed_by: str = Field(..., description="ID of the QA or CI Tool (e.g., 'qa.agent', 'jenkins-agent-01').")
     environment: Environment
     summary: Summary
-    results_by_suite: List[ResultsBySuite] = Field(default_factory=list)
-    code_coverage: Optional[CodeCoverage] = None
-    artifacts: Optional[Artifacts] = None
+    results_by_suite: list[ResultsBySuite] = Field(default_factory=list)
+    code_coverage: CodeCoverage | None = None
+    artifacts: Artifacts | None = None
 
 # Mock data for QA
 MOCK_QA_TEST_REPORT_DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'mocks', 'qa_test_report.json')
@@ -81,7 +81,7 @@ def qa(state):
         raise ValueError("User Stories não encontradas no estado para o QA.")
 
     # Get current time for test report dates
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     # Simple ID generation for now. Could be more robust.
     report_id = f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
     

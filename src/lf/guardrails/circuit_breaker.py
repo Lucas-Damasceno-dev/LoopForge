@@ -1,11 +1,10 @@
-#-*- coding: utf-8 -*-
 """
 Circuit Breaker com budget embutido (Oracle rec: budget_controller absorvido aqui).
 Três guardas: falhas consecutivas, iterações máximas, custo máximo ($).
 """
 from __future__ import annotations
+
 import time
-from typing import Optional
 
 
 class CircuitBreaker:
@@ -33,7 +32,7 @@ class CircuitBreaker:
         self.consecutive_failures = 0
         self.total_iterations = 0
         self.total_cost = 0.0
-        self.last_failure_time: Optional[float] = None
+        self.last_failure_time: float | None = None
 
     def record_success(self):
         """Registra sucesso e reseta falhas consecutivas."""
@@ -47,9 +46,7 @@ class CircuitBreaker:
         self.total_cost += self.cost_per_iteration
         self.last_failure_time = time.time()
 
-        if self.consecutive_failures >= self.max_consecutive_failures:
-            self.state = self.STATE_OPEN
-        elif self.total_cost >= self.max_total_cost:
+        if self.consecutive_failures >= self.max_consecutive_failures or self.total_cost >= self.max_total_cost:
             self.state = self.STATE_OPEN
 
     def record_iteration(self):
@@ -57,9 +54,7 @@ class CircuitBreaker:
         self.total_iterations += 1
         self.total_cost += self.cost_per_iteration
 
-        if self.total_iterations >= self.max_iterations:
-            self.state = self.STATE_OPEN
-        elif self.total_cost >= self.max_total_cost:
+        if self.total_iterations >= self.max_iterations or self.total_cost >= self.max_total_cost:
             self.state = self.STATE_OPEN
 
     def can_proceed(self) -> bool:

@@ -1,8 +1,8 @@
-#-*- coding: utf-8 -*-
 """
 Este arquivo contém utilitários e constantes compartilhadas para o estado do grafo.
 """
 from enum import Enum
+
 
 class Agent(Enum):
     """

@@ -1,9 +1,10 @@
 import hashlib
 import json
 import os
+from datetime import UTC
 
 from ...pipeline.llm_factory import SQLiteLLMCache
-from .runner import OpenCodeRunner, DEFAULT_OPENCODE_MODEL
+from .runner import DEFAULT_OPENCODE_MODEL, OpenCodeRunner
 
 
 def call_llm_via_opencode(
@@ -72,7 +73,11 @@ Responda SOMENTE o objeto JSON puro."""
     else:
         final_prompt = full_prompt
 
-    from ...pipeline.llm_factory import call_openrouter_api, DEFAULT_OPENROUTER_KEY, DEFAULT_OPENROUTER_MODEL
+    from ...pipeline.llm_factory import (
+        DEFAULT_OPENROUTER_KEY,
+        DEFAULT_OPENROUTER_MODEL,
+        call_openrouter_api,
+    )
     openrouter_key = os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
 
     raw_response_text = ""
@@ -145,8 +150,8 @@ def _extract_json_from_text(text: str) -> dict | list | None:
 
 def _mock_response(schema_model) -> dict:
     """Gera resposta mock baseada no schema Pydantic."""
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
+    from datetime import datetime
+    now = datetime.now(UTC).isoformat()
     mock = {}
     for name, field in schema_model.model_fields.items():
         ann = field.annotation

@@ -1,15 +1,12 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+from unittest.mock import patch
 
-from lf.pipeline.nodes.cpo import cpo, _mock_epic
-from lf.pipeline.nodes.pm import product_manager, _mock_stories
-from lf.pipeline.nodes.tech_lead import tech_lead, _mock_tech_spec
-from lf.pipeline.nodes.developer import developer
-from lf.pipeline.nodes.qa import qa
-from lf.orchestrator.task_dispatcher import TaskDispatcher
 from lf.config.schema import TaskSchema
-
+from lf.orchestrator.task_dispatcher import TaskDispatcher
+from lf.pipeline.nodes.cpo import _mock_epic, cpo
+from lf.pipeline.nodes.developer import developer
+from lf.pipeline.nodes.pm import _mock_stories, product_manager
+from lf.pipeline.nodes.qa import qa
+from lf.pipeline.nodes.tech_lead import tech_lead
 
 
 def test_cpo_node(tmp_path):

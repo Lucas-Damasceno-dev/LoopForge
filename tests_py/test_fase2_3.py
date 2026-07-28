@@ -1,7 +1,8 @@
 import os
+
 from lf.pipeline.graph import build_graph
-from lf.runner.opencode import OpenCodeRunner
 from lf.pipeline.state import GraphState
+from lf.runner.opencode import OpenCodeRunner
 
 
 def test_opencode_mock_runner():

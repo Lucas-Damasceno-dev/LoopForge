@@ -1,13 +1,12 @@
-#-*- coding: utf-8 -*-
 """
 Nó Product Manager: quebra épico em user stories estruturadas.
 Usa Pydantic structured output com schema do The Foundry.
 """
 from __future__ import annotations
+
 import json
 import os
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -48,7 +47,7 @@ def product_manager(state: GraphState) -> dict:
         raise ValueError("Épico não encontrado no estado")
 
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     if state.get("mock_llm"):
         print("--- INFO: PM modo MOCK ---")
@@ -111,7 +110,7 @@ Escopo OUT: {', '.join(epic.get('scope_out', []))}"""
 
 
 def _mock_stories(epic: dict) -> list[dict]:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return [
         {
             "id": f"{epic.get('id', 'E-001')}-US001",

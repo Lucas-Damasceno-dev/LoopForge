@@ -1,9 +1,10 @@
 from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
+
 from lf.config.loader import load_config
-from lf.telemetry.store import TelemetryStore
 
 console = Console()
 

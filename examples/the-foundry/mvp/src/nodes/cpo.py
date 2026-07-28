@@ -1,12 +1,13 @@
-import os
-from datetime import datetime, timezone
-from typing import Optional
 import json
-from ..utils import Agent, StateKey
-from ..llm_factory import get_llm_client
+import os
+from datetime import UTC, datetime
 
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
+
+from ..llm_factory import get_llm_client
+from ..utils import Agent, StateKey
+
 
 # Define Pydantic models for structured output
 class Stakeholders(BaseModel):
@@ -16,7 +17,7 @@ class Stakeholders(BaseModel):
 class Dates(BaseModel):
     created_at: str = Field(..., description="Date and time of epic creation in ISO 8601 format.")
     started_at: str = Field(..., description="Date and time when work on the epic was started in ISO 8601 format.")
-    completed_at: Optional[str] = Field(None, description="Date and time when all work for the epic was completed in ISO 8601 format.")
+    completed_at: str | None = Field(None, description="Date and time when all work for the epic was completed in ISO 8601 format.")
 
 class EpicSchema(BaseModel):
     id: str = Field(..., description="Unique identifier for the epic (format: E-XXX).")
@@ -46,7 +47,7 @@ def cpo(state):
         generated_epic = MOCK_CPO_EPIC_DATA
     else:
         # Get current time for epic dates (only for actual LLM generation)
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         # 1. Carrega o modelo de linguagem (LLM) configurado para saída estruturada
         llm = get_llm_client(state['llm_provider'], state['llm_model_name'], temperature=0)
@@ -56,7 +57,7 @@ def cpo(state):
 
         # 2. Define o prompt para o CPO
         prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""Você é um CPO (Chief Product Officer) experiente e tem a tarefa de transformar uma ideia bruta do usuário em um épico de produto bem estruturado **em formato JSON**.
+            ("system", """Você é um CPO (Chief Product Officer) experiente e tem a tarefa de transformar uma ideia bruta do usuário em um épico de produto bem estruturado **em formato JSON**.
              A saída JSON deve aderir estritamente ao esquema de saída esperado para o épico.
              
              Preencha todos os campos obrigatórios.

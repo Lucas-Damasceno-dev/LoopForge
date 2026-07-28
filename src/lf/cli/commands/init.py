@@ -1,5 +1,6 @@
 import click
 from rich.console import Console
+
 from lf.config.loader import save_config
 from lf.config.schema import LoopForgeConfig, TechStack
 

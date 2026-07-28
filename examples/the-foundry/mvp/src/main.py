@@ -1,19 +1,17 @@
-import os
 import argparse
-import json # New import
-from typing import TypedDict, Annotated, Literal, Optional
+import json  # New import
+import os
+from datetime import datetime  # New import
+from typing import Literal, TypedDict
+
 from dotenv import load_dotenv
-from datetime import datetime # New import
-
-import langchain # New import
-from langchain_core.globals import set_llm_cache # New import
-from langchain_community.cache import SQLiteCache # New import
-
-from langgraph.graph import StateGraph, END
+from langchain_community.cache import SQLiteCache  # New import
+from langchain_core.globals import set_llm_cache  # New import
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, StateGraph
 
+from .nodes import cpo, developer, product_manager, qa, tech_lead
 from .utils import Agent, StateKey
-from .nodes import cpo, product_manager, tech_lead, developer, qa
 
 # --- Carregamento de Variáveis de Ambiente ---
 # Carrega o .env do caminho absoluto para evitar ambiguidades
@@ -41,8 +39,8 @@ class GraphState(TypedDict):
     code: str
     test_report: dict
     output_dir: str
-    pm_feedback: Optional[str]
-    tech_lead_feedback: Optional[str]
+    pm_feedback: str | None
+    tech_lead_feedback: str | None
     mock_llm: bool # New field for mock LLM flag # New field for Tech Lead feedback
     
     # A chave que o nosso router (transitionTo) usará para decidir o próximo passo
@@ -163,7 +161,7 @@ if __name__ == '__main__':
 
         # --- Modo de Teste (Não Interativo) ---
         if args.idea:
-            print(f"\n--- MODO DE TESTE ---")
+            print("\n--- MODO DE TESTE ---")
             print(f"Processando a ideia: '{args.idea}'")
             try:
                 # Define o input inicial para o grafo

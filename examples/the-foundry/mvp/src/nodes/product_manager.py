@@ -1,14 +1,14 @@
-import os
-from datetime import datetime, timezone
-from typing import List
 import json
-from ..utils import Agent, StateKey
-from ..llm_factory import get_llm_client
+import os
+from datetime import UTC, datetime
 
+from langchain_core.messages import BaseMessage  # Re-introduce BaseMessage import
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from langchain_core.messages import BaseMessage # Re-introduce BaseMessage import
+from ..llm_factory import get_llm_client
+from ..utils import Agent, StateKey
+
 
 # Utility to generate IDs (for demonstration, can be more robust)
 def generate_user_story_id(epic_id: str, index: int) -> str:
@@ -22,7 +22,7 @@ class UserStorySchema(BaseModel):
     as_a: str = Field(..., description="The type of user or persona who will benefit from the story. E.g., 'motorista de van', 'pai de aluno'.")
     i_want_to: str = Field(..., description="The functionality the user wants to perform. E.g., 'rastrear a van em tempo real'.")
     so_that: str = Field(..., description="The value or benefit the user will get. E.g., 'saber onde meu filho está'.")
-    acceptance_criteria: List[str] = Field(..., description="Clear acceptance criteria, preferably in 'Given-When-Then' format.")
+    acceptance_criteria: list[str] = Field(..., description="Clear acceptance criteria, preferably in 'Given-When-Then' format.")
     priority: str = Field(..., description="Priority of the user story. Possible values: 'Low', 'Medium', 'High', 'Critical'.")
     status: str = Field(..., description="Status of the user story. Possible values: 'Pending', 'In Progress', 'Done', 'Blocked'.")
     dates: dict = Field(..., description="Dates related to the user story lifecycle. E.g., {'created_at': 'ISO 8601 string'}")
@@ -30,7 +30,7 @@ class UserStorySchema(BaseModel):
 
 # Define a wrapper Pydantic model for a list of User Stories
 class UserStoryListSchema(BaseModel):
-    stories: List[UserStorySchema] = Field(..., description="A list of user stories for the epic.")
+    stories: list[UserStorySchema] = Field(..., description="A list of user stories for the epic.")
 
 # Mock data for Product Manager (User Stories)
 MOCK_PM_USER_STORIES_DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'mocks', 'pm_user_stories.json')
@@ -47,7 +47,7 @@ def product_manager(state):
         raise ValueError("Épico não encontrado no estado para o Product Manager.")
 
     # Get current time for user story dates (defined unconditionally)
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     if state.get('mock_llm'):
         print("--- INFO: Product Manager operando em modo MOCK. Carregando user stories pré-definidas. ---")
@@ -141,8 +141,7 @@ def product_manager(state):
                 f.write(f"**Eu quero:** {us_dict['i_want_to']}\n")
                 f.write(f"**Para que:** {us_dict['so_that']}\n\n")
                 f.write("**Critérios de Aceitação:**\n")
-                for criteria in us_dict['acceptance_criteria']:
-                    f.write(f"- {criteria}\n")
+                f.writelines(f"- {criteria}\n" for criteria in us_dict['acceptance_criteria'])
                 f.write(f"\n**Prioridade:** {us_dict['priority']}\n")
                 f.write(f"**Status:** {us_dict['status']}\n")
                 f.write(f"**Data de Criação:** {us_dict['dates']['created_at']}\n")

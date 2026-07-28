@@ -1,13 +1,12 @@
-#-*- coding: utf-8 -*-
 """
 Nó CPO: transforma ideia bruta em épico estruturado.
 Usa OpenCode via subprocesso + Pydantic para structured output.
 """
 from __future__ import annotations
+
 import json
 import os
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -49,7 +48,7 @@ def cpo(state: GraphState) -> dict:
 
     print("--- INFO: CPO usando OpenCode via subprocesso ---")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
 
     system_prompt = """Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
 
@@ -102,6 +101,6 @@ def _mock_epic(idea: str) -> dict:
         "scope_out": ["Recursos avançados"],
         "success_metrics": ["Métrica 1", "Métrica 2"],
         "stakeholders": {"owner": "CPO", "consulted": ["Product Manager", "UX/UI Designer", "CTO"]},
-        "dates": {"created_at": datetime.now(timezone.utc).isoformat(),
-                  "started_at": datetime.now(timezone.utc).isoformat()},
+        "dates": {"created_at": datetime.now(UTC).isoformat(),
+                  "started_at": datetime.now(UTC).isoformat()},
     }

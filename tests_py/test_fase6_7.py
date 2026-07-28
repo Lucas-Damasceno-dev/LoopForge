@@ -1,5 +1,5 @@
-import os
 from click.testing import CliRunner
+
 from lf.cli.main import main
 
 

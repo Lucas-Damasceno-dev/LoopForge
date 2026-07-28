@@ -1,14 +1,14 @@
-#-*- coding: utf-8 -*-
 """
 Validador de artefatos contra schemas do The Foundry.
 Compila schemas JSON em Pydantic models dinâmicos.
 """
 from __future__ import annotations
+
 import json
-import os
 from pathlib import Path
 from typing import Any
-from pydantic import BaseModel, Field, create_model
+
+from pydantic import BaseModel, create_model
 
 
 class ValidationResult:

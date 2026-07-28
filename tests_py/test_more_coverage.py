@@ -1,14 +1,13 @@
-import pytest
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from lf.ontology.artifact_validator import ArtifactValidator, ValidationResult
-from lf.ontology.schema_loader import OntologySchemaLoader
-from lf.pipeline.llm_factory import get_llm, call_openrouter_api
+import pytest
+
 from lf.config.loader import load_config, save_config
 from lf.config.schema import LoopForgeConfig
-
+from lf.ontology.artifact_validator import ArtifactValidator
+from lf.ontology.schema_loader import OntologySchemaLoader
+from lf.pipeline.llm_factory import call_openrouter_api
 
 
 def test_artifact_validator(tmp_path):

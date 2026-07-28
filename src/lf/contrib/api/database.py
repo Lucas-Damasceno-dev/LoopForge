@@ -14,7 +14,6 @@ from lf.contrib.api.config import APISettings
 
 class Base(DeclarativeBase):
     """Base declarativa compartilhada para todos os modelos ORM."""
-    pass
 
 
 def _build_database_url(settings: APISettings) -> str:

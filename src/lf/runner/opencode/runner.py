@@ -1,11 +1,10 @@
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import time
+from pathlib import Path
 
 from .models import OpenCodeResult
-
 
 DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL", "openrouter/openrouter/free")
 

@@ -1,15 +1,15 @@
-#-*- coding: utf-8 -*-
 """
 Nó do Developer.
 """
 
 import os
 import re
-from ..utils import Agent, StateKey
-from ..llm_factory import get_llm_client # Import the factory
 
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
+from ..llm_factory import get_llm_client  # Import the factory
+from ..utils import Agent, StateKey
 
 # Mock data for Developer
 MOCK_DEV_CODE_DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'mocks', 'dev_code.py')

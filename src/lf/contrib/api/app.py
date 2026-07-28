@@ -6,12 +6,14 @@ Expõe endpoints REST para gerenciar execuções de pipeline (runs).
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, Depends
-from sqlalchemy import select, func
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lf.contrib.api.config import APISettings
-from lf.contrib.api.database import Base, close_db, get_session, init_db
+from lf.contrib.api.dashboard_html import DASHBOARD_HTML
+from lf.contrib.api.database import close_db, get_session, init_db
 from lf.contrib.api.models import PipelineRun
 from lf.contrib.api.schemas import (
     HealthResponse,
@@ -20,10 +22,6 @@ from lf.contrib.api.schemas import (
     RunResponse,
     RunUpdate,
 )
-
-
-from fastapi.responses import HTMLResponse
-from lf.contrib.api.dashboard_html import DASHBOARD_HTML
 
 
 @asynccontextmanager

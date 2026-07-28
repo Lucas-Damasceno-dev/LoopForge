@@ -1,9 +1,9 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import sqlite3
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
 from langchain_core.language_models.fake import FakeListLLM
 
@@ -26,7 +26,7 @@ class SQLiteLLMCache:
                 """
             )
 
-    def get(self, prompt: str) -> Optional[str]:
+    def get(self, prompt: str) -> str | None:
         h = hashlib.sha256(prompt.encode()).hexdigest()
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.execute("SELECT response FROM cache WHERE prompt_hash = ?", (h,))
@@ -111,8 +111,4 @@ def get_llm(provider: str = "openrouter", model_name: str = DEFAULT_OPENROUTER_M
         return FakeListLLM(responses=responses)
 
 
-def get_llm_client(provider: str = "openrouter", model_name: str = DEFAULT_OPENROUTER_MODEL, temperature: float = 0.3) -> Any:
-    import warnings
-    warnings.warn("get_llm_client is deprecated, use get_llm() instead", DeprecationWarning, stacklevel=2)
-    return get_llm(provider=provider, model_name=model_name, temperature=temperature)
 

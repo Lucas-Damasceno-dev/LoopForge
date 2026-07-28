@@ -1,21 +1,20 @@
-#-*- coding: utf-8 -*-
 """
 Grafo LangGraph: StateGraph, router condicional, build_graph.
 Centraliza toda a lógica de roteamento (evita acoplamento com dispatcher/iteration).
 """
 from __future__ import annotations
+
 from typing import Literal
-import json
 
-from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import END, StateGraph
 
-from .state import GraphState
 from .nodes.cpo import cpo
-from .nodes.pm import product_manager
-from .nodes.tech_lead import tech_lead
 from .nodes.developer import developer
+from .nodes.pm import product_manager
 from .nodes.qa import qa
+from .nodes.tech_lead import tech_lead
+from .state import GraphState
 
 
 # --- Router Centralizado ---
@@ -94,7 +93,7 @@ def build_graph(
         "developer": "developer",
     })
 
-    # Arestas condicionais — TODO roteamento centralizado
+    # Arestas condicionais — Roteamento centralizado
     workflow.add_conditional_edges("cpo", router, {
         "pm": "pm",
         "__end__": END,

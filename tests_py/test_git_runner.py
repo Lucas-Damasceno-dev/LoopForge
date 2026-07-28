@@ -1,6 +1,4 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from lf.runner.git.checkpoint import GitCheckpointManager
 from lf.runner.git.pr import create_github_pr

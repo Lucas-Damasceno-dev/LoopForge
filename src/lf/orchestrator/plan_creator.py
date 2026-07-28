@@ -1,4 +1,3 @@
-#-*- coding: utf-8 -*-
 """
 Plan Creator: lê um documento de visão ou interage com CPO no pipeline
 para gerar um plano de tasks com dependências DAG.
@@ -7,9 +6,9 @@ NÃO é hardcoded — delega ao CPO node do pipeline LangGraph para gerar
 o épico e extrair tasks de lá.
 """
 from __future__ import annotations
+
 import json
 import os
-from typing import Any
 
 
 class Plan:
@@ -23,7 +22,7 @@ class Plan:
         return {"tasks": self.tasks, "graph": self.graph}
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Plan":
+    def from_dict(cls, data: dict) -> Plan:
         return cls(tasks=data.get("tasks", []), graph=data.get("graph", {}))
 
 

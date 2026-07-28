@@ -4,10 +4,9 @@ Representa o domínio principal: execução de pipelines (runs).
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Float, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lf.contrib.api.database import Base

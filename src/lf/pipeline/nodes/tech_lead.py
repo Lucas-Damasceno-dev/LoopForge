@@ -1,15 +1,12 @@
-#-*- coding: utf-8 -*-
 """
 Nó Tech Lead: valida user stories e gera especificação técnica.
 Usa template tech_spec_template.md do The Foundry e Pydantic para feedback.
 """
 from __future__ import annotations
-import json
+
 import os
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -38,7 +35,7 @@ def tech_lead(state: GraphState) -> dict:
         raise ValueError("User stories não encontradas no estado")
 
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     now_date = now_iso.split("T")[0]
 
     # Carrega template tech_spec.md do Foundry se disponível

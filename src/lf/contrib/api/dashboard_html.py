@@ -1,4 +1,3 @@
-#-*- coding: utf-8 -*-
 """
 Dashboard Web Dashboard HTML/CSS/JS do LoopForge v6.
 """

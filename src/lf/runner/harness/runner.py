@@ -1,6 +1,6 @@
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
 
 from .parser import parse_test_output
 

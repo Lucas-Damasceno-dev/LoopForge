@@ -1,9 +1,10 @@
 import sys
+
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 from rich.prompt import Prompt
+from rich.table import Table
 
 from lf.config.loader import load_config, save_config
 from lf.orchestrator.plan_creator import create_plan_from_vision

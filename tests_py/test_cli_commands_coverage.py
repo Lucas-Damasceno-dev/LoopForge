@@ -1,10 +1,10 @@
-import pytest
 from click.testing import CliRunner
+
 from lf.cli.commands.audit import audit_cmd
-from lf.cli.commands.release import release_cmd
 from lf.cli.commands.generate_tests import generate_tests_cmd
-from lf.cli.commands.status import status_cmd
 from lf.cli.commands.init import init_cmd
+from lf.cli.commands.release import release_cmd
+from lf.cli.commands.status import status_cmd
 
 
 def test_cli_audit_cmd(tmp_path):

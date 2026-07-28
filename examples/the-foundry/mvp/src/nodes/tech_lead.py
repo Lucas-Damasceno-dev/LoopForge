@@ -1,18 +1,17 @@
-#-*- coding: utf-8 -*-
 """
 Nó do Tech Lead.
 """
-import os
 import json
-from datetime import datetime, timezone
-from typing import List, Optional
+import os
+from datetime import UTC, datetime
 
-from ..utils import Agent, StateKey
-from ..llm_factory import get_llm_client # Import the factory
-
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
+
+from ..llm_factory import get_llm_client  # Import the factory
+from ..utils import Agent, StateKey
+
 
 # Define Pydantic model for Tech Lead's validation feedback
 class TechLeadValidationResult(BaseModel):
@@ -42,7 +41,7 @@ def tech_lead(state):
     print("---EXECUTANDO NÓ: Tech Lead---")
     
     # Get current time for consistent date handling
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     now_date = now_iso.split('T')[0] # Date part only for template replacement
 
     # Mock mode check
@@ -52,7 +51,7 @@ def tech_lead(state):
         # Process MOCK_TL_VALIDATION_RESULT
         validation_result_mock = MOCK_TL_VALIDATION_RESULT
         if validation_result_mock["needs_feedback"]:
-            print(f"--- Tech Lead (MOCK): Feedback para o Product Manager ---")
+            print("--- Tech Lead (MOCK): Feedback para o Product Manager ---")
             state['pm_feedback'] = validation_result_mock["feedback_message"]
             state[str(StateKey.NEXT_AGENT)] = Agent.PRODUCT_MANAGER.value
             print(f"--- INFO: Feedback enviado ao PM (MOCK): {validation_result_mock['feedback_message']} ---")
@@ -138,7 +137,7 @@ def tech_lead(state):
             validation_result = validation_chain.invoke({"user_stories": user_stories_str})
 
             if validation_result.needs_feedback:
-                print(f"--- AVISO: Tech Lead precisa de feedback. Parametrizando dúvidas e prosseguindo para o Developer. ---")
+                print("--- AVISO: Tech Lead precisa de feedback. Parametrizando dúvidas e prosseguindo para o Developer. ---")
                 state['tech_lead_feedback'] = f"Feedback parametrizado pelo TL: {validation_result.feedback_message}"
                 state['pm_feedback'] = None # Clear PM feedback
                 state['tech_spec'] = "Especificação Técnica básica gerada com base em User Stories parametrizadas (feedback não resolvido)." # Set placeholder tech_spec
@@ -162,7 +161,7 @@ def tech_lead(state):
                     epic_id = state['user_stories'][0]['epic_id'] if state['user_stories'] else "UNKNOWN_EPIC"
                     
                     # Generate a timestamp for uniqueness
-                    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+                    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
                     tech_spec_filename = os.path.join(output_dir, f"tech_spec_{epic_id}_{timestamp}.md")
                     
                     with open(tech_spec_filename, 'w', encoding='utf-8') as f:

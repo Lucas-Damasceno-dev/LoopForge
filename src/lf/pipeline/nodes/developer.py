@@ -1,18 +1,16 @@
-#-*- coding: utf-8 -*-
 """
 Nó Developer: recebe tech spec e gera código REAL via OpenCode.
 Usa subprocesso para invocar OpenCode com contexto completo.
 """
 from __future__ import annotations
-import json
+
 import os
-from pathlib import Path
 import re
 import time
-from typing import Optional
+from pathlib import Path
 
-from ...runner.opencode import OpenCodeRunner, OpenCodeResult, detect_changed_files
 from ...pipeline.state import GraphState
+from ...runner.opencode import OpenCodeResult, OpenCodeRunner, detect_changed_files
 
 
 def _extract_generated_code(

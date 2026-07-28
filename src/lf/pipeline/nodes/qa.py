@@ -1,13 +1,12 @@
-#-*- coding: utf-8 -*-
 """
 Nó QA: executa testes reais via harness e gera relatório estruturado.
 Integra com runner, parser, formatter do módulo harness.
 """
 from __future__ import annotations
+
 import json
 import os
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -25,8 +24,8 @@ class TestExecutionReport(BaseModel):
     environment: dict = Field(..., description="name + config_hash")
     summary: dict = Field(..., description="status, total_tests, passed, failed")
     results_by_suite: list[dict] = Field(default_factory=list)
-    code_coverage: Optional[dict] = None
-    artifacts: Optional[dict] = None
+    code_coverage: dict | None = None
+    artifacts: dict | None = None
 
 
 def qa(state: GraphState) -> dict:
@@ -40,7 +39,7 @@ def qa(state: GraphState) -> dict:
     if not code and not state.get("mock_llm"):
         raise ValueError("Código não encontrado no estado para QA")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     report_id = f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
 
     if state.get("mock_llm"):
@@ -105,7 +104,7 @@ O relatório DEVE ter:
     next_agent = "FINISH" if is_pass else "developer"
 
     if not is_pass:
-        print(f"--- AVISO: Testes falharam. Reportando ao Developer. ---")
+        print("--- AVISO: Testes falharam. Reportando ao Developer. ---")
         state["feedback_history"] = state.get("feedback_history", []) + [
             {"from": "qa", "message": f"{report.get('summary', {}).get('tests_failed', 0)} teste(s) falharam", "timestamp": now_iso}
         ]
@@ -146,7 +145,7 @@ def _run_harness(project_dir: str) -> dict:
                 stderr = proc.stderr[-500:] if proc.stderr else ""
                 result["errors"].append(f"{name}: {stderr[:200]}")
             result["total"] += 1
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        except (FileNotFoundError, subprocess.TimeoutExpired):
             # Comando não encontrado ou timeout não é erro — stack não tem esse runner
             pass
 

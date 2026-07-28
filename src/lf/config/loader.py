@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
-from typing import Any, Union
-import yaml
+
+import yaml  # type: ignore[import-untyped]
 
 from lf.config.schema import LoopForgeConfig
 
 
-def load_config(config_path: Union[str, Path] = ".loopforge.json") -> LoopForgeConfig:
+def load_config(config_path: str | Path = ".loopforge.json") -> LoopForgeConfig:
     path = Path(config_path)
     if not path.exists():
         # Fallback to yaml if json not found
@@ -25,7 +25,7 @@ def load_config(config_path: Union[str, Path] = ".loopforge.json") -> LoopForgeC
     return LoopForgeConfig(**data)
 
 
-def save_config(config: LoopForgeConfig, config_path: Union[str, Path] = ".loopforge.json") -> Path:
+def save_config(config: LoopForgeConfig, config_path: str | Path = ".loopforge.json") -> Path:
     path = Path(config_path)
     data = config.model_dump(mode="json")
     if path.suffix in [".yaml", ".yml"]:

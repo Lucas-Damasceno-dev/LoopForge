@@ -1,10 +1,8 @@
-import pytest
 import json
-from pathlib import Path
-from unittest.mock import MagicMock
-from lf.telemetry.store import TelemetryStore
-from lf.telemetry.analytics import render_analytics_summary, export_analytics_json
+
+from lf.telemetry.analytics import export_analytics_json, render_analytics_summary
 from lf.telemetry.recorder import TelemetryRecorder
+from lf.telemetry.store import TelemetryStore
 
 
 def test_telemetry_store_and_recorder(tmp_path):

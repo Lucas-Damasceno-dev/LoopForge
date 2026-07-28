@@ -1,13 +1,14 @@
-import pytest
 import time
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from lf.runner.harness.runner import TestHarnessRunner, TestHarnessResult
-from lf.runner.opencode.runner import OpenCodeRunner, OpenCodeResult, detect_changed_files
-from lf.runner.opencode.models import OpenCodeResult as ModelsResult
-from lf.runner.opencode.llm import call_llm_via_opencode, _extract_json_from_text, _mock_response
 from pydantic import BaseModel, Field
+
+from lf.runner.harness.runner import TestHarnessRunner
+from lf.runner.opencode.llm import (
+    _extract_json_from_text,
+    call_llm_via_opencode,
+)
+from lf.runner.opencode.runner import OpenCodeRunner, detect_changed_files
 
 
 class SampleModel(BaseModel):

@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field
 import json
 import re
+from dataclasses import dataclass, field
 
 
 def strip_ansi(text: str) -> str:

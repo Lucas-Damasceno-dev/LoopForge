@@ -1,13 +1,13 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 from pydantic import BaseModel, Field
 
-from lf.runner.opencode.llm import call_llm_via_opencode
-from lf.orchestrator.task_dispatcher import TaskDispatcher
 from lf.config.schema import TaskSchema
-from lf.pipeline.llm_factory import SQLiteLLMCache
 from lf.guardrails.circuit_breaker import CircuitBreaker
+from lf.orchestrator.task_dispatcher import TaskDispatcher
+from lf.pipeline.llm_factory import SQLiteLLMCache
+from lf.runner.opencode.llm import call_llm_via_opencode
 
 
 class SimpleSchema(BaseModel):
@@ -75,7 +75,9 @@ def test_task_dispatcher_create_pr_with_labels(tmp_path):
     task = TaskSchema(id="T-001", title="Test Task", persona="developer")
     final_state = {"test_report": {"summary": {"tests_failed": 0}}}
 
-    with patch("lf.orchestrator.task_dispatcher.GitCheckpointManager") as mock_checkpoint:
-        with patch("lf.orchestrator.task_dispatcher.create_github_pr") as mock_pr:
-            dispatcher._create_pr_with_labels(task, final_state, project_id="proj1")
-            assert mock_pr.called is True
+    with patch("lf.orchestrator.task_dispatcher.GitCheckpointManager"), patch(
+        "lf.orchestrator.task_dispatcher.create_github_pr"
+    ) as mock_pr:
+        dispatcher._create_pr_with_labels(task, final_state, project_id="proj1")
+        assert mock_pr.called is True
+

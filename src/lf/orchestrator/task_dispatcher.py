@@ -1,13 +1,11 @@
-import json
 from pathlib import Path
-from typing import Any
+
 from lf.config.schema import TaskSchema
-from lf.pipeline.graph import build_graph
-from lf.pipeline.state import GraphState
-from lf.ontology.state_machine.labels import get_git_label
 from lf.ontology.state_machine.definition import TaskState
-from lf.runner.git.pr import create_github_pr
+from lf.ontology.state_machine.labels import get_git_label
+from lf.pipeline.graph import build_graph
 from lf.runner.git.checkpoint import GitCheckpointManager
+from lf.runner.git.pr import create_github_pr
 
 
 class TaskDispatcher:
@@ -89,7 +87,7 @@ class TaskDispatcher:
         elif node_name == "qa":
             report = state.get("test_report", {})
             summary = report.get("summary", {})
-            console.print(f"\n[bold]Relatório de Testes:[/bold]")
+            console.print("\n[bold]Relatório de Testes:[/bold]")
             console.print(f"  Total: {summary.get('total_tests', '?')}")
             console.print(f"  Passaram: {summary.get('tests_passed', '?')}")
             console.print(f"  Falharam: {summary.get('tests_failed', '?')}")
@@ -150,10 +148,10 @@ class TaskDispatcher:
             pass
 
     def dispatch(self, task: TaskSchema, project_id: str = "project", shared_state: dict | None = None) -> dict:
-        from langgraph.checkpoint.sqlite import SqliteSaver
-        from pathlib import Path
         import sqlite3
-        import os
+        from pathlib import Path
+
+        from langgraph.checkpoint.sqlite import SqliteSaver
 
         initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
 

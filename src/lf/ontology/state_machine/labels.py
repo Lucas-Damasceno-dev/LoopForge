@@ -1,6 +1,5 @@
 from lf.ontology.state_machine.definition import TaskState
 
-
 STATE_LABELS: dict[TaskState, str] = {
     TaskState.PENDING: "foundry:status:pending",
     TaskState.RUNNING: "foundry:status:in-progress",

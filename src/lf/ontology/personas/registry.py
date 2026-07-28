@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -66,7 +65,7 @@ class PersonaRegistry:
             ),
         }
 
-    def get_profile(self, agent_id: str) -> Optional[AgentProfile]:
+    def get_profile(self, agent_id: str) -> AgentProfile | None:
         return self._profiles.get(agent_id.lower())
 
     def resolve(self, agent_id: str) -> AgentProfile:

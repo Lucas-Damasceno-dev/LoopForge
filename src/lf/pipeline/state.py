@@ -1,9 +1,9 @@
-#-*- coding: utf-8 -*-
 """
 GraphState TypedDict — o estado compartilhado entre todos os nós do pipeline.
 """
 from __future__ import annotations
-from typing import TypedDict, Optional, Any
+
+from typing import TypedDict
 
 
 class GraphState(TypedDict):
@@ -29,7 +29,7 @@ class GraphState(TypedDict):
     next_agent: str
     attempt_count: int
     max_retries: int
-    error: Optional[str]
+    error: str | None
     feedback_history: list[dict]
 
     # Config de LLM
@@ -44,7 +44,7 @@ class GraphState(TypedDict):
     task_type: str     # "feature", "bugfix", "refactor", "simple", "full", "fast"
 
     # Schema esperado para validação do próximo artefato
-    expected_schema: Optional[str]
+    expected_schema: str | None
 
     # Referência da persona ativa (carregada do ontology)
-    persona_id: Optional[str]
+    persona_id: str | None

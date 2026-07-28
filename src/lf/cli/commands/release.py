@@ -1,6 +1,7 @@
-import click
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+import click
 from rich.console import Console
 
 console = Console()
@@ -11,7 +12,7 @@ console = Console()
 @click.option("--dry-run", is_flag=True, default=False, help="Apenas exibe as notas sem atualizar o CHANGELOG.md")
 def release_cmd(version: str, dry_run: bool):
     """Gera notas de release semânticas e atualiza o CHANGELOG.md."""
-    now_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_date = datetime.now(UTC).strftime("%Y-%m-%d")
     
     release_notes = f"""## [{version}] - {now_date}
 

@@ -4,6 +4,7 @@ Exercita o grafo completo: build → invoke → verifica transições de estado.
 Usa mock_llm=True para evitar dependência de LLM/subprocesso.
 """
 import pytest
+
 from lf.pipeline.graph import build_graph
 from lf.pipeline.state import GraphState
 
@@ -137,8 +138,10 @@ def test_pipeline_e2e_max_retries_exhausted(initial_state: GraphState):
 
 def test_opencode_package_imports():
     """Verifica que o pacote opencode/ mantém a API pública."""
-    from lf.runner.opencode import OpenCodeResult, OpenCodeRunner
-    from lf.runner.opencode import detect_changed_files, call_llm_via_opencode
+    from lf.runner.opencode import (
+        OpenCodeResult,
+        OpenCodeRunner,
+    )
 
     # OpenCodeResult
     r = OpenCodeResult(exit_code=0, stdout="ok", stderr="")
