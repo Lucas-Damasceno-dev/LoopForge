@@ -6,6 +6,7 @@ from lf.cli.commands.init import init_cmd
 from lf.cli.commands.plan import plan_cmd
 from lf.cli.commands.release import release_cmd
 from lf.cli.commands.run import run_cmd
+from lf.cli.commands.serve import serve_cmd
 from lf.cli.commands.status import status_cmd
 
 
@@ -22,6 +23,8 @@ main.add_command(status_cmd)
 main.add_command(audit_cmd)
 main.add_command(release_cmd)
 main.add_command(generate_tests_cmd)
+main.add_command(serve_cmd)
+
 
 
 if __name__ == "__main__":

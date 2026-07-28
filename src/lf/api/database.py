@@ -1,15 +1,14 @@
-"""Configuração assíncrona do SQLAlchemy para PostgreSQL.
+"""Configuração assíncrona do SQLAlchemy para o Banco Único do LoopForge.
 
-Suporta SQLite como fallback para testes locais sem banco externo.
+Unifica a persistência REST e Telemetria em `.loopforge/telemetry.sqlite`.
 """
-
 import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from lf.contrib.api.config import APISettings
+from lf.api.config import APISettings
 
 
 class Base(DeclarativeBase):
@@ -17,11 +16,7 @@ class Base(DeclarativeBase):
 
 
 def _build_database_url(settings: APISettings) -> str:
-    """Converte a URL para async SQLAlchemy.
-
-    Se a variável LF_API_TEST estiver definida, usa SQLite em memória
-    para testes sem dependência externa de PostgreSQL.
-    """
+    """Retorna URL do banco. Se LF_API_TEST estiver setado, usa SQLite em memória."""
     if os.getenv("LF_API_TEST"):
         return "sqlite+aiosqlite:///:memory:"
     return settings.database_url
@@ -32,7 +27,7 @@ session_factory = None
 
 
 async def init_db(settings: APISettings | None = None) -> None:
-    """Inicializa engine e session factory, cria tabelas."""
+    """Inicializa engine e session factory, cria tabelas no banco único."""
     global engine, session_factory
 
     if settings is None:
@@ -41,30 +36,19 @@ async def init_db(settings: APISettings | None = None) -> None:
     db_url = _build_database_url(settings)
     is_sqlite = db_url.startswith("sqlite")
 
+    if is_sqlite and not os.getenv("LF_API_TEST"):
+        os.makedirs(".loopforge", exist_ok=True)
+
     kwargs = {"echo": settings.debug}
     if not is_sqlite:
         kwargs["pool_size"] = settings.db_pool_size
         kwargs["max_overflow"] = settings.db_max_overflow
 
-    try:
-        engine = create_async_engine(db_url, **kwargs)
-        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    engine = create_async_engine(db_url, **kwargs)
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    except Exception as e:
-        if not is_sqlite:
-            # Fallback automático para SQLite se PostgreSQL não estiver acessível
-            print(f"--- AVISO: Falha ao conectar ao PostgreSQL ({e}). Usando SQLite fallback em .loopforge/api.db ---")
-            fallback_url = "sqlite+aiosqlite:///.loopforge/api.db"
-            os.makedirs(".loopforge", exist_ok=True)
-            engine = create_async_engine(fallback_url, echo=settings.debug)
-            session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-        else:
-            raise e
-
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 async def close_db() -> None:
