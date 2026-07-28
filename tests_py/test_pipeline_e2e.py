@@ -70,6 +70,14 @@ def test_pipeline_e2e_full_flow(initial_state: GraphState):
     assert "summary" in result["test_report"]
     assert "total_tests" in result["test_report"]["summary"]
 
+    # AppSec gerou revisão de segurança
+    assert result.get("security_review"), "AppSec should generate a security review"
+    assert "status" in result["security_review"]
+
+    # DevOps gerou manifesto de deployabilidade
+    assert result.get("devops_manifest"), "DevOps should generate a devops manifest"
+    assert "status" in result["devops_manifest"]
+
     # Pipeline finalizou (next_agent == FINISH ou __end__)
     assert result.get("next_agent") in ("FINISH", "__end__"), \
         f"Pipeline should finish, got next_agent={result.get('next_agent')}"
@@ -79,7 +87,7 @@ def test_pipeline_e2e_full_flow(initial_state: GraphState):
 
 
 def test_pipeline_e2e_router_sequence(initial_state: GraphState):
-    """Verifica que o router segue a ordem CPO → PM → Tech Lead → Developer → QA."""
+    """Verifica que o router segue a ordem CPO → PM → Tech Lead → Developer → QA → AppSec → DevOps."""
     graph = build_graph()
 
     result = graph.invoke(initial_state)
@@ -87,11 +95,14 @@ def test_pipeline_e2e_router_sequence(initial_state: GraphState):
     # O router sempre passa por CPO primeiro
     assert result.get("epic"), "CPO should have run first"
 
-    # Verifica que tech_spec veio das user stories
+    # Verifica a sequência completa de 7 agentes
     assert result.get("user_stories"), "PM should have run"
     assert result.get("tech_spec"), "Tech Lead should have run"
     assert result.get("code"), "Developer should have run"
     assert result.get("test_report"), "QA should have run"
+    assert result.get("security_review"), "AppSec should have run"
+    assert result.get("devops_manifest"), "DevOps should have run"
+
 
 
 def test_pipeline_e2e_no_crash_on_missing_fields():

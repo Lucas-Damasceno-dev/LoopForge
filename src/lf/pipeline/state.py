@@ -19,6 +19,9 @@ class GraphState(TypedDict):
     tech_spec: str
     code: str
     test_report: dict
+    security_review: dict
+    devops_manifest: dict
+
 
     # Metadados do projeto (carregados do ontology)
     ontology_path: str  # caminho pra examples/the-foundry/

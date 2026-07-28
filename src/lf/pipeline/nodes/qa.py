@@ -45,7 +45,7 @@ def qa(state: GraphState) -> dict:
     if state.get("mock_llm"):
         print("--- INFO: QA modo MOCK ---")
         report = _mock_report(report_id, now_iso)
-        return {**state, "test_report": report, "next_agent": "FINISH"}
+        return {**state, "test_report": report, "next_agent": "appsec"}
 
     # Fase 1: Executar harness real no projeto
     harness_result = _run_harness(project_dir)
@@ -101,7 +101,7 @@ O relatório DEVE ter:
 
     # Decide próximo passo baseado no resultado
     is_pass = report.get("summary", {}).get("tests_failed", 1) == 0
-    next_agent = "FINISH" if is_pass else "developer"
+    next_agent = "appsec" if is_pass else "developer"
 
     if not is_pass:
         print("--- AVISO: Testes falharam. Reportando ao Developer. ---")
@@ -110,6 +110,7 @@ O relatório DEVE ter:
         ]
 
     return {**state, "test_report": report, "next_agent": next_agent}
+
 
 
 def _run_harness(project_dir: str) -> dict:

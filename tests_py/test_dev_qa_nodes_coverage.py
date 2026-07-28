@@ -70,8 +70,9 @@ def test_qa_node_llm_execution(tmp_path):
         with patch("lf.pipeline.nodes.qa.call_llm_via_opencode") as mock_llm:
             mock_llm.return_value = _mock_report("EXEC-123", "2026-07-28")
             res = qa(state)
-            assert res["next_agent"] == "FINISH"
+            assert res["next_agent"] == "appsec"
             assert res["test_report"]["summary"]["tests_passed"] == 10
+
 
 
 

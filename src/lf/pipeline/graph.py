@@ -9,8 +9,10 @@ from typing import Literal
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 
+from .nodes.appsec import appsec
 from .nodes.cpo import cpo
 from .nodes.developer import developer
+from .nodes.devops import devops
 from .nodes.pm import product_manager
 from .nodes.qa import qa
 from .nodes.tech_lead import tech_lead
@@ -26,39 +28,38 @@ def entry_router(state: GraphState) -> Literal["cpo", "developer"]:
 
     # Fast-Path: pula CPO, PM e Tech Lead para tarefas rápidas, bugs ou refatorações
     if routing_mode == "fast" or task_type in ("fast", "bugfix", "refactor", "simple"):
-        print("--- ROTEAMENTO ADAPTATIVO: Ativando FAST-PATH (Developer -> QA) ---")
+        print("--- ROTEAMENTO ADAPTATIVO: Ativando FAST-PATH (Developer -> QA -> AppSec -> DevOps) ---")
         return "developer"
 
-    print("--- ROTEAMENTO ADAPTATIVO: Ativando FULL-PATH (CPO -> PM -> Tech Lead -> Dev -> QA) ---")
+    print("--- ROTEAMENTO ADAPTATIVO: Ativando FULL-PATH (CPO -> PM -> Tech Lead -> Dev -> QA -> AppSec -> DevOps) ---")
     return "cpo"
 
 
-def router(state: GraphState) -> Literal["cpo", "pm", "tech_lead",
-                                          "developer", "qa", "__end__"]:
+def router(
+    state: GraphState,
+) -> Literal["cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops", "__end__"]:
     """Router único: decide próximo nó baseado no estado."""
     next_agent = state.get("next_agent", "cpo")
-    attempt = state.get("attempt_count", 0)
-    max_retries = state.get("max_retries", 3)
 
     if next_agent == "FINISH":
         return END
 
-    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa"):
+    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops"):
         return next_agent
 
     # Fallback seguro
     return "cpo"
 
 
-def should_retry(state: GraphState) -> Literal["qa", "developer", "__end__"]:
-    """Decide após QA se deve retentar ou finalizar."""
+def should_retry(state: GraphState) -> Literal["appsec", "developer", "__end__"]:
+    """Decide após QA se deve prosseguir para AppSec ou retentar."""
     test_report = state.get("test_report", {})
     tests_failed = test_report.get("summary", {}).get("tests_failed", 1)
     attempt = state.get("attempt_count", 0)
     max_retries = state.get("max_retries", 3)
 
     if tests_failed == 0:
-        return END
+        return "appsec"
 
     if attempt < max_retries:
         return "developer"
@@ -71,61 +72,102 @@ def build_graph(
     interrupt_after: list[str] | None = None,
     human_gate_enabled: bool = False,
 ):
-    """Constrói e compila o grafo com checkpointing, roteamento adaptativo e human-in-the-loop opcional.
-
-    Args:
-        checkpointer: SqliteSaver para checkpoint/persistência.
-        interrupt_after: Lista de nós que devem pausar para aprovação humana.
-        human_gate_enabled: Se True, adiciona nó de gate humano após developer/qa.
-    """
+    """Constrói e compila o grafo com checkpointing, roteamento adaptativo e human-in-the-loop opcional."""
     workflow = StateGraph(GraphState)
 
-    # Adiciona nós
+    # Adiciona nós (Pipeline completo de 7 agentes: CPO, PM, Tech Lead, Dev, QA, AppSec, DevOps)
     workflow.add_node("cpo", cpo)
     workflow.add_node("pm", product_manager)
     workflow.add_node("tech_lead", tech_lead)
     workflow.add_node("developer", developer)
     workflow.add_node("qa", qa)
+    workflow.add_node("appsec", appsec)
+    workflow.add_node("devops", devops)
 
     # Entry point condicional — Roteamento adaptativo (Fast-Path vs Full-Path)
-    workflow.set_conditional_entry_point(entry_router, {
-        "cpo": "cpo",
-        "developer": "developer",
-    })
+    workflow.set_conditional_entry_point(
+        entry_router,
+        {
+            "cpo": "cpo",
+            "developer": "developer",
+        },
+    )
 
     # Arestas condicionais — Roteamento centralizado
-    workflow.add_conditional_edges("cpo", router, {
-        "pm": "pm",
-        "__end__": END,
-    })
+    workflow.add_conditional_edges(
+        "cpo",
+        router,
+        {
+            "pm": "pm",
+            "__end__": END,
+        },
+    )
 
-    workflow.add_conditional_edges("pm", router, {
-        "tech_lead": "tech_lead",
-        "__end__": END,
-    })
+    workflow.add_conditional_edges(
+        "pm",
+        router,
+        {
+            "tech_lead": "tech_lead",
+            "__end__": END,
+        },
+    )
 
-    workflow.add_conditional_edges("tech_lead", router, {
-        "developer": "developer",
-        "__end__": END,
-    })
+    workflow.add_conditional_edges(
+        "tech_lead",
+        router,
+        {
+            "developer": "developer",
+            "__end__": END,
+        },
+    )
 
-    workflow.add_conditional_edges("developer", router, {
-        "qa": "qa",
-        "__end__": END,
-    })
+    workflow.add_conditional_edges(
+        "developer",
+        router,
+        {
+            "qa": "qa",
+            "__end__": END,
+        },
+    )
 
-    # QA decide: passou → FIM, falhou → retry developer
-    workflow.add_conditional_edges("qa", should_retry, {
-        "developer": "developer",
-        "__end__": END,
-    })
+    # QA decide: passou → appsec, falhou → retry developer
+    workflow.add_conditional_edges(
+        "qa",
+        should_retry,
+        {
+            "appsec": "appsec",
+            "developer": "developer",
+            "__end__": END,
+        },
+    )
 
-    # Se human_gate_enabled, pausa após developer e qa para aprovação manual
+    # AppSec decide: passou → devops, falhou → retry developer
+    workflow.add_conditional_edges(
+        "appsec",
+        router,
+        {
+            "devops": "devops",
+            "developer": "developer",
+            "__end__": END,
+        },
+    )
+
+    # DevOps -> FIM
+    workflow.add_conditional_edges(
+        "devops",
+        router,
+        {
+            "__end__": END,
+        },
+    )
+
+    # Se human_gate_enabled, pausa após developer/qa/appsec para aprovação manual
     gates = list(interrupt_after) if interrupt_after else []
     if human_gate_enabled:
-        for n in ("developer", "qa"):
+        for n in ("developer", "qa", "appsec"):
             if n not in gates:
                 gates.append(n)
 
     return workflow.compile(checkpointer=checkpointer, interrupt_after=gates or None)
+
 
