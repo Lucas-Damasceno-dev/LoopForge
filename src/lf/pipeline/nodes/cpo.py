@@ -36,14 +36,14 @@ def cpo(state: GraphState) -> dict:
     # Reutiliza épico se já gerado em etapa anterior do plano
     if state.get("epic"):
         print("--- INFO: CPO reutilizando Épico existente no estado ---")
-        return {**state, "next_agent": "product_manager"}
+        return {**state, "next_agent": "pm"}
 
     if state.get("mock_llm"):
         print("--- INFO: CPO modo MOCK ---")
         return {
             **state,
             "epic": _mock_epic(state.get("idea", "Mock idea")),
-            "next_agent": "product_manager",
+            "next_agent": "pm",
         }
 
 
@@ -73,11 +73,12 @@ Foque no valor de negócio. Não inclua implementação técnica."""
             user_prompt=f"Ideia do usuário: {state.get('idea', '')}",
             schema_model=EpicSchema,
             mock=state.get("mock_llm", False),
+            circuit_breaker=state.get("circuit_breaker"),
         )
         epic["dates"] = {"created_at": now_iso, "started_at": now_iso}
     except Exception as e:
         print(f"--- ERRO CPO: {e} ---")
-        return {**state, "epic": _mock_epic(state.get("idea", "")), "next_agent": "product_manager", "error": str(e)}
+        return {**state, "epic": _mock_epic(state.get("idea", "")), "next_agent": "pm", "error": str(e)}
 
     output_dir = state.get("output_dir", ".")
     if output_dir:
@@ -87,7 +88,7 @@ Foque no valor de negócio. Não inclua implementação técnica."""
             json.dump(epic, f, indent=2, ensure_ascii=False)
         print(f"--- INFO: Épico salvo em {path} ---")
 
-    return {**state, "epic": epic, "next_agent": "product_manager"}
+    return {**state, "epic": epic, "next_agent": "pm"}
 
 
 def _mock_epic(idea: str) -> dict:

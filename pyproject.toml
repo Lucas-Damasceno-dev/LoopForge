@@ -48,3 +48,8 @@ where = ["src"]
 testpaths = ["tests_py"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src/lf"]
+omit = ["src/lf/contrib/*"]
+fail_under = 55

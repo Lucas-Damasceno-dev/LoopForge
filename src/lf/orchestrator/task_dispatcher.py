@@ -11,9 +11,10 @@ from lf.runner.git.checkpoint import GitCheckpointManager
 
 
 class TaskDispatcher:
-    def __init__(self, mock_llm: bool = True, interactive: bool = False):
+    def __init__(self, mock_llm: bool = True, interactive: bool = False, circuit_breaker=None):
         self.mock_llm = mock_llm
         self.interactive = interactive
+        self.circuit_breaker = circuit_breaker
         self._last_graph = None
 
     def _get_graph(self, checkpointer=None):
@@ -25,7 +26,7 @@ class TaskDispatcher:
 
     def _build_initial_state(self, task: TaskSchema, project_id: str, shared_state: dict | None = None) -> dict:
         target_agent = getattr(task, "agent_id", None) or getattr(task, "persona", None) or "cpo"
-        if target_agent not in ("cpo", "product_manager", "tech_lead", "developer", "qa"):
+        if target_agent not in ("cpo", "pm", "tech_lead", "developer", "qa"):
             target_agent = "cpo"
 
         ontology = "examples/the-foundry"
@@ -55,10 +56,14 @@ class TaskDispatcher:
             "llm_provider": "google",
             "llm_model_name": "gemini-2.0-flash",
             "llm_temperature": 0.3,
+            "routing_mode": getattr(task, "routing_mode", "full"),
+            "task_type": getattr(task, "task_type", "feature"),
             "is_interactive": self.interactive,
             "expected_schema": None,
             "persona_id": getattr(task, "agent_id", None),
         }
+
+
 
         if shared_state:
             for k, v in shared_state.items():
@@ -145,15 +150,17 @@ class TaskDispatcher:
             pass
 
     def dispatch(self, task: TaskSchema, project_id: str = "project", shared_state: dict | None = None) -> dict:
-        from langgraph.checkpoint.memory import InMemorySaver
-        from langgraph.pregel import Pregel
+        from langgraph.checkpoint.sqlite import SqliteSaver
+        from pathlib import Path
+        import sqlite3
         import os
 
         initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
 
 
-        # Use InMemorySaver for simplicity during dogfooding
-        checkpointer = InMemorySaver()
+        checkpoint_path = str(Path(".loopforge/checkpoints.sqlite").resolve())
+        conn = sqlite3.connect(checkpoint_path, check_same_thread=False)
+        checkpointer = SqliteSaver(conn)
         thread_id = f"{project_id}-{task.id}"
 
         graph = self._get_graph(checkpointer=checkpointer)

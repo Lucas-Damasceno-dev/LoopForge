@@ -59,7 +59,7 @@ def test_graph_builds():
     assert graph is not None
     # Verifica que tem os nós esperados
     assert "cpo" in graph.nodes
-    assert "product_manager" in graph.nodes
+    assert "pm" in graph.nodes
     assert "tech_lead" in graph.nodes
     assert "developer" in graph.nodes
     assert "qa" in graph.nodes

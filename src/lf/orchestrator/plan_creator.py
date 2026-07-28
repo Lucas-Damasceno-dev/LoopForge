@@ -27,26 +27,28 @@ class Plan:
         return cls(tasks=data.get("tasks", []), graph=data.get("graph", {}))
 
 
-def create_plan_from_vision(vision_path: str, output_dir: str) -> Plan:
-    """Lê documento de visão e gera plano (futuro: LLM extrai tasks)."""
-    if os.path.exists(vision_path):
-        with open(vision_path) as f:
+def create_plan_from_vision(vision_path_or_text: str, output_dir: str, routing_mode: str = "full") -> Plan:
+    """Lê documento de visão/texto e gera plano em DAG com suporte a Fast-Path / Full-Path."""
+    if os.path.exists(vision_path_or_text):
+        with open(vision_path_or_text) as f:
             vision = f.read()
     else:
-        vision = "Projeto descrito no documento de visão"
+        vision = vision_path_or_text
 
-    # Gera 1 task por persona do Foundry, em ordem
-    # O pipeline LangGraph executa a sequência real
-    persona_flow = ["cpo", "product_manager", "tech_lead", "developer", "qa"]
+    if routing_mode == "fast":
+        persona_flow = ["developer", "qa"]
+    else:
+        persona_flow = ["cpo", "pm", "tech_lead", "developer", "qa"]
 
     tasks = []
     for i, persona in enumerate(persona_flow):
         tasks.append({
             "id": f"T-{i+1:03d}",
-            "title": f"Executar {persona}",
+            "title": f"Executar {persona}: {vision[:40]}",
             "persona": persona,
+            "routing_mode": routing_mode,
             "status": "pending",
-            "depends_on": [f"T-{j+1:03d}" for j in range(i)],  # Depende de todas anteriores
+            "depends_on": [f"T-{j+1:03d}" for j in range(i)],
             "max_retries": 3,
             "attempts": 0,
         })
@@ -64,9 +66,10 @@ def create_plan_from_vision(vision_path: str, output_dir: str) -> Plan:
     return plan
 
 
+
 def create_plan_from_epic(epic: dict, output_dir: str) -> Plan:
     """Cria plano a partir de um épico já gerado (via pipeline CPO)."""
-    persona_flow = ["product_manager", "tech_lead", "developer", "qa"]
+    persona_flow = ["pm", "tech_lead", "developer", "qa"]
 
     tasks = []
     for i, persona in enumerate(persona_flow):

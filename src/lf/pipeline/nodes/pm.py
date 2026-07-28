@@ -86,6 +86,7 @@ Escopo OUT: {', '.join(epic.get('scope_out', []))}"""
             user_prompt=epic_context,
             schema_model=UserStoryList,
             mock=state.get("mock_llm", False),
+            circuit_breaker=state.get("circuit_breaker"),
         )
         stories = []
         for i, us in enumerate(result.get("stories", [])):

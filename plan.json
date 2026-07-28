@@ -2,8 +2,9 @@
   "tasks": [
     {
       "id": "T-001",
-      "title": "Executar cpo",
-      "persona": "cpo",
+      "title": "Executar developer: Criar um modulo python chamado math_util",
+      "persona": "developer",
+      "routing_mode": "fast",
       "status": "pending",
       "depends_on": [],
       "max_retries": 3,
@@ -11,50 +12,12 @@
     },
     {
       "id": "T-002",
-      "title": "Executar product_manager",
-      "persona": "product_manager",
+      "title": "Executar qa: Criar um modulo python chamado math_util",
+      "persona": "qa",
+      "routing_mode": "fast",
       "status": "pending",
       "depends_on": [
         "T-001"
-      ],
-      "max_retries": 3,
-      "attempts": 0
-    },
-    {
-      "id": "T-003",
-      "title": "Executar tech_lead",
-      "persona": "tech_lead",
-      "status": "pending",
-      "depends_on": [
-        "T-001",
-        "T-002"
-      ],
-      "max_retries": 3,
-      "attempts": 0
-    },
-    {
-      "id": "T-004",
-      "title": "Executar developer",
-      "persona": "developer",
-      "status": "pending",
-      "depends_on": [
-        "T-001",
-        "T-002",
-        "T-003"
-      ],
-      "max_retries": 3,
-      "attempts": 0
-    },
-    {
-      "id": "T-005",
-      "title": "Executar qa",
-      "persona": "qa",
-      "status": "pending",
-      "depends_on": [
-        "T-001",
-        "T-002",
-        "T-003",
-        "T-004"
       ],
       "max_retries": 3,
       "attempts": 0
@@ -64,21 +27,6 @@
     "T-001": [],
     "T-002": [
       "T-001"
-    ],
-    "T-003": [
-      "T-001",
-      "T-002"
-    ],
-    "T-004": [
-      "T-001",
-      "T-002",
-      "T-003"
-    ],
-    "T-005": [
-      "T-001",
-      "T-002",
-      "T-003",
-      "T-004"
     ]
   }
 }

@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 
+from .parser import parse_test_output
+
 
 @dataclass
 class TestHarnessResult:
@@ -26,11 +28,12 @@ class TestHarnessRunner:
                 text=True,
                 timeout=120,
             )
+            parsed = parse_test_output(res.stdout + "\n" + res.stderr)
             success = res.returncode == 0
             return TestHarnessResult(
-                total=1 if success else 1,
-                passed=1 if success else 0,
-                failed=0 if success else 1,
+                total=parsed["total"],
+                passed=parsed["passed"],
+                failed=parsed["failed"],
                 output=res.stdout + "\n" + res.stderr,
                 success=success,
             )

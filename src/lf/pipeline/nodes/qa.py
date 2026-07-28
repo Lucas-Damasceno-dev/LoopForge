@@ -56,6 +56,15 @@ def qa(state: GraphState) -> dict:
     user_story_id = user_stories[0].get("id", "US001") if user_stories else "US001"
 
     try:
+        qa_prompt = f"""Resultados do Harness:
+- Passou: {harness_result.get('passed', 0)}/{harness_result.get('total', 0)} testes
+- Erros: {harness_result.get('errors', [])[:3]}
+- Tempo: {harness_result.get('duration_ms', 0)}ms
+
+Código implementado:
+```python
+{code[:2000]}
+```"""
         report = call_llm_via_opencode(
             system_prompt="""Você é um QA Engineer. Analise o código e resultados de teste abaixo e gere um relatório de execução de testes conforme o schema esperado.
 
@@ -68,17 +77,10 @@ O relatório DEVE ter:
 - environment: {"name": "local", "config_hash": None}
 - summary: {"status": "PASS" ou "FAIL", "total_tests": N, "tests_passed": N, "tests_failed": N, "tests_skipped": N, "flaky_tests_detected": 0, "duration_seconds": N}
 - results_by_suite: lista de suites com detalhes""",
-            user_prompt=f"""Resultados do Harness:
-- Passou: {harness_result.get('passed', 0)}/{harness_result.get('total', 0)} testes
-- Erros: {harness_result.get('errors', [])[:3]}
-- Tempo: {harness_result.get('duration_ms', 0)}ms
-
-Código implementado:
-```python
-{code[:2000]}
-```""",
+            user_prompt=qa_prompt,
             schema_model=TestExecutionReport,
             mock=state.get("mock_llm", False),
+            circuit_breaker=state.get("circuit_breaker"),
         )
     except Exception as e:
         print(f"--- ERRO QA (Construindo relatório direto do Harness): {e} ---")

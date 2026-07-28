@@ -78,6 +78,7 @@ Responda com:
             user_prompt=f"User Stories:\n{stories_str}",
             schema_model=ValidationResult,
             mock=state.get("mock_llm", False),
+            circuit_breaker=state.get("circuit_breaker"),
         )
 
         if validation.get("needs_feedback"):
@@ -106,6 +107,7 @@ Template (use como guia):
 {truncated_template}""",
             user_prompt=f"User Stories (apenas títulos):\n{truncated_stories}",
             mock=state.get("mock_llm", False),
+            circuit_breaker=state.get("circuit_breaker"),
         )
     except Exception as e:
         print(f"--- ERRO TL tech spec: {e} ---")

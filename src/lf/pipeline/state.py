@@ -38,8 +38,10 @@ class GraphState(TypedDict):
     llm_model_name: str
     llm_temperature: float
 
-    # Modo interativo (human-in-the-loop)
+    # Modo interativo (human-in-the-loop) e Roteamento Adaptativo
     is_interactive: bool
+    routing_mode: str  # "full" ou "fast"
+    task_type: str     # "feature", "bugfix", "refactor", "simple", "full", "fast"
 
     # Schema esperado para validação do próximo artefato
     expected_schema: Optional[str]

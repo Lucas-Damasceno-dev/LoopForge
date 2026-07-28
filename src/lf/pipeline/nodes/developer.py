@@ -79,9 +79,7 @@ def developer(state: GraphState) -> dict:
     """Recebe tech spec e gera código via OpenCode."""
     print("---EXECUTANDO NÓ: Developer---")
 
-    tech_spec = state.get("tech_spec")
-    if not tech_spec:
-        raise ValueError("Especificação técnica não encontrada no estado")
+    tech_spec = state.get("tech_spec") or f"# Fast-Path Task Specification\n\nIdea/Instruction: {state.get('idea', 'Implement requested task')}"
 
     # Mock mode
     if state.get("mock_llm"):
@@ -128,6 +126,7 @@ REGRAS:
         prompt=prompt,
         project_root=project_dir,
         model=model_name,
+        circuit_breaker=state.get("circuit_breaker"),
     )
 
 

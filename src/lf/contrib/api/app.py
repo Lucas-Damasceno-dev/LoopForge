@@ -10,10 +10,10 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lf.api.config import APISettings
-from lf.api.database import Base, close_db, get_session, init_db
-from lf.api.models import PipelineRun
-from lf.api.schemas import (
+from lf.contrib.api.config import APISettings
+from lf.contrib.api.database import Base, close_db, get_session, init_db
+from lf.contrib.api.models import PipelineRun
+from lf.contrib.api.schemas import (
     HealthResponse,
     RunCreate,
     RunListResponse,
@@ -23,7 +23,7 @@ from lf.api.schemas import (
 
 
 from fastapi.responses import HTMLResponse
-from lf.api.dashboard_html import DASHBOARD_HTML
+from lf.contrib.api.dashboard_html import DASHBOARD_HTML
 
 
 @asynccontextmanager

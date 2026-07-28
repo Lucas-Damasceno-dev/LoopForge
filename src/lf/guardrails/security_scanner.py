@@ -43,3 +43,35 @@ class SecurityScanner:
                 continue
 
         return vulnerabilities
+
+    def fix_vulnerabilities(self, root_dir: str | Path = ".") -> int:
+        """Autocorrige vulnerabilidades simples encontradas nos arquivos."""
+        root = Path(root_dir)
+        fixed_count = 0
+
+        for p in root.rglob("*.py"):
+            if ".venv" in p.parts or "node_modules" in p.parts:
+                continue
+            try:
+                content = p.read_text(encoding="utf-8")
+                new_lines = []
+                modified = False
+                for line in content.splitlines():
+                    # Neutraliza eval/exec com warning comment
+                    if "eval(" in line and "# SEC-FIX" not in line:
+                        line = line.replace("eval(", "# SEC-FIX: eval neutralized\n# eval(")
+                        modified = True
+                        fixed_count += 1
+                    elif "exec(" in line and "# SEC-FIX" not in line:
+                        line = line.replace("exec(", "# SEC-FIX: exec neutralized\n# exec(")
+                        modified = True
+                        fixed_count += 1
+                    new_lines.append(line)
+
+                if modified:
+                    p.write_text("\n".join(new_lines), encoding="utf-8")
+            except Exception:
+                continue
+
+        return fixed_count
+

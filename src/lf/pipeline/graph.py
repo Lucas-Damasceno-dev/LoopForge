@@ -20,7 +20,21 @@ from .nodes.qa import qa
 
 # --- Router Centralizado ---
 # Toda decisão de roteamento está AQUI, não no dispatcher nem no iteration_manager.
-def router(state: GraphState) -> Literal["cpo", "product_manager", "tech_lead",
+def entry_router(state: GraphState) -> Literal["cpo", "developer"]:
+    """Decide o nó de entrada inicial (Fast-Path vs Full-Path)."""
+    routing_mode = state.get("routing_mode", "full")
+    task_type = state.get("task_type", "feature")
+
+    # Fast-Path: pula CPO, PM e Tech Lead para tarefas rápidas, bugs ou refatorações
+    if routing_mode == "fast" or task_type in ("fast", "bugfix", "refactor", "simple"):
+        print("--- ROTEAMENTO ADAPTATIVO: Ativando FAST-PATH (Developer -> QA) ---")
+        return "developer"
+
+    print("--- ROTEAMENTO ADAPTATIVO: Ativando FULL-PATH (CPO -> PM -> Tech Lead -> Dev -> QA) ---")
+    return "cpo"
+
+
+def router(state: GraphState) -> Literal["cpo", "pm", "tech_lead",
                                           "developer", "qa", "__end__"]:
     """Router único: decide próximo nó baseado no estado."""
     next_agent = state.get("next_agent", "cpo")
@@ -30,7 +44,7 @@ def router(state: GraphState) -> Literal["cpo", "product_manager", "tech_lead",
     if next_agent == "FINISH":
         return END
 
-    if next_agent in ("cpo", "product_manager", "tech_lead", "developer", "qa"):
+    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa"):
         return next_agent
 
     # Fallback seguro
@@ -58,7 +72,7 @@ def build_graph(
     interrupt_after: list[str] | None = None,
     human_gate_enabled: bool = False,
 ):
-    """Constrói e compila o grafo com checkpointing e human-in-the-loop opcional.
+    """Constrói e compila o grafo com checkpointing, roteamento adaptativo e human-in-the-loop opcional.
 
     Args:
         checkpointer: SqliteSaver para checkpoint/persistência.
@@ -69,21 +83,24 @@ def build_graph(
 
     # Adiciona nós
     workflow.add_node("cpo", cpo)
-    workflow.add_node("product_manager", product_manager)
+    workflow.add_node("pm", product_manager)
     workflow.add_node("tech_lead", tech_lead)
     workflow.add_node("developer", developer)
     workflow.add_node("qa", qa)
 
-    # Entry point
-    workflow.set_entry_point("cpo")
+    # Entry point condicional — Roteamento adaptativo (Fast-Path vs Full-Path)
+    workflow.set_conditional_entry_point(entry_router, {
+        "cpo": "cpo",
+        "developer": "developer",
+    })
 
     # Arestas condicionais — TODO roteamento centralizado
     workflow.add_conditional_edges("cpo", router, {
-        "product_manager": "product_manager",
+        "pm": "pm",
         "__end__": END,
     })
 
-    workflow.add_conditional_edges("product_manager", router, {
+    workflow.add_conditional_edges("pm", router, {
         "tech_lead": "tech_lead",
         "__end__": END,
     })
@@ -112,3 +129,4 @@ def build_graph(
                 gates.append(n)
 
     return workflow.compile(checkpointer=checkpointer, interrupt_after=gates or None)
+

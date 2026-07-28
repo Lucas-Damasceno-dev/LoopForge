@@ -8,8 +8,8 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lf.api.app import create_app
-from lf.api.database import init_db, close_db, Base, engine, session_factory
+from lf.contrib.api.app import create_app
+from lf.contrib.api.database import init_db, close_db, Base, engine, session_factory
 
 
 @pytest.fixture(autouse=True)

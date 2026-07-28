@@ -1,151 +1,124 @@
-# 🚀 LoopForge
+# 🚀 LoopForge v6
 
-**Automated Loop Engineering Engine for AI Agents**
+**Autonomous Agent Governance and Pipeline Orchestrator**
 
-LoopForge é um motor autônomo de Loop Engineering projetado para criar, executar, refatorar e monitorar ciclos de desenvolvimento orientados a IA com resiliência industrial, guardrails rigorosos, telemetria SQLite e observabilidade completa.
+LoopForge é um motor autônomo de *Loop Engineering* e orquestrador de governança para agentes de IA. Construído em Python 3.12+ com **LangGraph**, **Pydantic v2** e ontologia do **The Foundry**, ele gerencia o ciclo de desenvolvimento autônomo com resiliência industrial, guardrails orçamentários, roteamento adaptativo e telemetria SQLite.
 
-> **Versão atual:** 5.0.0
-> **License:** MIT
+> **Versão Atual:** 6.0.0  
+> **Arquitetura Base:** Python + LangGraph (`StateGraph`)  
+> **Provedores de LLM:** OpenRouter (`inclusionai/ling-3.0-flash:free`), Google GenAI (Gemini), OpenCode  
+> **License:** MIT  
 
 ---
 
-## Funcionalidades
+## 🌟 Principais Funcionalidades da v6
 
-| Fase | Módulo | Status |
+| Módulo | Descrição | Status |
 |---|---|---|
-| **1** | Fundação & Sistema de Configuração (Node.js + TypeScript ESM + Zod) | ✅ |
-| **2** | Harness de Validação Multi-Runner (bash, parser, formatter) | ✅ |
-| **3** | Gerenciamento de Memória & Guardrails (Circuit Breaker, Lessons/Handoff) | ✅ |
-| **4** | Provedores LLM, Skill Presets & Git Sandbox (OpenCode, fallback, auto-PR, bootstrap) | ✅ |
-| **5** | Swarm Multi-Agente, TUI & RAG Local (indexação semântica com embeddings e cosseno) | ✅ |
-| **6** | Auto-Refatoração, Web Dashboard, Self-Healing Tests & CI/CD Nativo | ✅ |
-| **7** | Workspace Orquestrador, Security Scanner, Budget Guard, Local LLM, Telemetry & Wizard | ✅ |
-| **8** | Docker Sandbox, Test Generator Multi-Stack, Release/Bot, Context Compressor, Loop Lock | ✅ |
-| **9** | **Propostas de Melhoria (P1)**: Telemetria SQLite, Interactive Review Gate, Auto-Fix Security, Notificações Multi-canal (Email, Desktop, Webhook), Parallel Workspaces, Config Hot-Reload, Pipeline npm & CLI JSON Output | ✅ |
+| **LangGraph Pipeline** | Stateful Graph com papéis de **CPO**, **PM**, **Tech Lead**, **Developer** e **QA** | ✅ |
+| **Roteamento Adaptativo** | Suporte a **Full-Path** (hierarquia completa) e **Fast-Path** (Dev → QA direto) | ✅ |
+| **Spec Review Gate** | Gate interativo em CLI (`lf plan`) para aprovação e edição de especificações | ✅ |
+| **Integração OpenRouter** | Chamada direta ao modelo **Ling 3.0 Flash Free** com parsing de JSON resiliente | ✅ |
+| **Guardrails & Circuit Breaker** | Limite orçamentário (USD), controle de falhas e travamento via `loop.lock` | ✅ |
+| **Security Scanner** | Auditoria de código em busca de secrets e funções perigosas com opção `--fix` | ✅ |
+| **Telemetria SQLite & Checkpointing** | Persistência de sessões, histórico de requisições LLM e suporte a `run --replay` | ✅ |
 
 ---
 
-## Instalação
-
-```bash
-# Instalar globalmente via npm
-npm install -g loopforge
-
-# Ou usar diretamente com npx
-npx loopforge --help
-```
+## 💻 Instalação
 
 ### Pré-requisitos
-
-- **Node.js** >= 18 (ES2022)
-- **Git** (para Git Sandbox e auto-PR)
-- **GitHub CLI `gh`** (opcional, para criação de PRs)
-
----
-
-## Quick Start
+- **Python** >= 3.12
+- **uv** ou **pip**
 
 ```bash
-# Inicializar config, memórias e templates no repositório atual
-loopforge init
+# Clone o repositório
+git clone https://github.com/Lucas-Damasceno-dev/LoopForge.git
+cd LoopForge
 
-# Inicializar com template de skills
-loopforge init --template node-typescript
+# Instalar dependências e CLI em modo editável com uv
+uv pip install -e .
 
-# Executar o ciclo do Loop Engine
-loopforge run
-
-# Executar com revisão interativa antes do PR
-loopforge run --create-pr --review
-
-# Modo watch com hot-reload de configurações
-loopforge run --watch
+# Ou via pip padrão
+pip install -e .
 ```
 
 ---
 
-## CLI Reference
+## ⚡ Quick Start
+
+```bash
+# 1. Inicializar configuração no repositório atual
+lf init
+
+# 2. Criar e revisar uma especificação de projeto (Spec Review Gate)
+lf plan --vision "Criar um módulo Python de utilitários matemáticos" --mode full
+
+# 3. Executar o ciclo do pipeline agentico
+lf run
+
+# 4. Executar uma tarefa rápida em Fast-Path (direto Dev -> QA)
+lf plan --vision "Corrigir cálculo de desconto" --mode fast
+lf run
+
+# 5. Auditar segurança do código gerado
+lf audit . --fix
+
+# 6. Exibir o status das tarefas e telemetria
+lf status
+```
+
+---
+
+## 📋 Referência da CLI (`lf` / `loopforge`)
 
 | Comando | Descrição |
 |---|---|
-| `init [directory]` | Inicializa `.loopforge.json`, memórias e skills templates |
-| `run [directory]` | Executa o ciclo do Loop Engine (`--create-pr`, `--review`, `--auto`, `-w/--watch`, `--format json\|text`) |
-| `bootstrap` | Gera suíte de testes baseline automaticamente |
-| `generate-tests` | Gera suítes de teste unitário multi-stack (Node, Python, Rust) (`--dry-run`, `--format json\|text`) |
-| `refactor <rule>` | Executa auto-refatoração com isolamento Git Sandbox |
-| `release [version]` | Gera notas de lançamento semânticas e atualiza CHANGELOG.md |
-| `workspace [manifest]` | Orquestra loops em múltiplos projetos (`--parallel`, `-c/--concurrency <n>`, `--format json\|text`) |
-| `audit [directory]` | Scanner de segurança com auto-correção (`--fix`, `--format json\|text`) |
-| `wizard [directory]` | Assistente interativo de configuração e onboarding |
-| `replay <sessionId>` | Reproduz telemetria quadro-a-quadro de sessões passadas |
-| `ui [directory]` | Inicia Web Dashboard em `http://localhost:3000` |
-| `ci:setup` | Gera `.github/workflows/loopforge-ci.yml` com etapa CodeQL/Audit |
-| `status [directory]` | Exibe painel de status de config, LLM, skills e memórias |
+| `lf init [dir]` | Inicializa a configuração `.loopforge.json` e ambiente do projeto |
+| `lf plan` | Gera plano de tarefas com Spec Review Gate interativo (`--mode full\|fast`) |
+| `lf run` | Executa o pipeline de agentes (`--mock`, `-i/--interactive`, `--replay <session>`) |
+| `lf status` | Exibe o painel de status do plano, tarefas e telemetria das sessões |
+| `lf audit [dir]` | Executa o scanner de segurança em busca de vulnerabilidades e secrets (`--fix`) |
+| `lf generate-tests` | Gera suítes de teste unitário baseline para módulos do projeto |
+| `lf release [version]` | Gera notas de lançamento semânticas e atualiza o `CHANGELOG.md` |
 
 ---
 
-## Configuração
+## ⚙️ Configuração (`.loopforge.json`)
 
-O LoopForge é configurado via arquivo `.loopforge.json` na raiz do projeto:
+Exemplo de arquivo de configuração `.loopforge.json`:
 
 ```json
 {
-  "projectName": "Meu Projeto",
-  "version": "5.0.0",
-  "harness": {
-    "runners": [
-      { "name": "Unit Tests", "type": "unit", "command": "npm test", "timeoutMs": 60000 },
-      { "name": "Linter", "type": "linter", "command": "npm run lint", "timeoutMs": 30000 }
-    ],
-    "parallel": true,
-    "stopOnFirstFailure": false
-  },
-  "guardrails": {
-    "maxTotalIterations": 10,
-    "maxConsecutiveFailures": 3,
-    "maxBudgetUsd": 5.0,
-    "maxCostPerIteration": 2.0,
-    "requireCleanGit": true
-  },
-  "memory": {
-    "lessonsFile": ".loopforge/lessons.md",
-    "handoffFile": ".loopforge/handoff.md",
-    "maxLessonsPrompt": 5
-  },
-  "notifications": {
-    "webhookUrl": "https://discord.com/api/webhooks/...",
-    "desktop": { "enabled": true },
-    "email": {
-      "enabled": false,
-      "smtpHost": "smtp.gmail.com",
-      "smtpPort": 587,
-      "to": "dev@exemplo.com"
-    }
-  },
-  "llm": {
-    "provider": "opencode",
-    "model": "deepseek-v3",
-    "fallbackModel": "anthropic/claude-3-5-sonnet",
-    "temperature": 0.2
+  "project_id": "meu-projeto",
+  "vision": "Aplicação autônoma gerenciada por agentes de IA",
+  "stack": "python",
+  "budget_limit_usd": 10.0,
+  "max_retries_per_task": 3,
+  "llm_provider": "openrouter",
+  "llm_model": "inclusionai/ling-3.0-flash:free",
+  "plan": {
+    "tasks": [
+      {
+        "id": "T-001",
+        "title": "Executar developer: Módulo principal",
+        "persona": "developer",
+        "routing_mode": "fast",
+        "status": "pending"
+      }
+    ]
   }
 }
 ```
 
 ---
 
-## Desenvolvimento & Testes
+## 🧪 Testes
 
 ```bash
-# Build
-npm run build
-
-# Testes
-npm test
-
-# Type-check
-npm run check
+# Executar a suíte de testes completa do Python v6
+uv run pytest
 ```
 
-- **26 arquivos** de teste em `tests/`
-- **46/46 testes aprovados** (incluindo testes de RAG semântico, SQLite, paralelo, auto-fix e notificações)
-- **0 erros** no build TypeScript (`tsc --noEmit`)
+- **36/36 testes aprovados** em `tests_py/`
+- Cobertura completa de Roteamento Adaptativo, LangGraph, OpenRouter Ling 3.0 Flash Free, Security Scanner e Telemetria SQLite.

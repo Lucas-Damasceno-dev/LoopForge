@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from lf.api.config import APISettings
+from lf.contrib.api.config import APISettings
 
 
 class Base(DeclarativeBase):
