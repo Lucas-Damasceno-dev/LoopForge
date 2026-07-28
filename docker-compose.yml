@@ -1,0 +1,25 @@
+services:
+  loopforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loopforge_engine
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-inclusionai/ling-3.0-flash:free}
+      - LF_API_HOST=0.0.0.0
+      - LF_API_PORT=8000
+    volumes:
+      - loopforge_data:/app/.loopforge
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  loopforge_data:
+    driver: local
