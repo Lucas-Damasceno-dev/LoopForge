@@ -15,10 +15,16 @@ from lf.cli.commands.serve import serve_cmd
 async def setup_test_db():
     """Configura banco SQLite em memória para cada teste."""
     os.environ["LF_API_TEST"] = "1"
+    os.environ["LF_API_REQUIRE_AUTH"] = "false"
+    from lf.api.config import get_api_settings
+    get_api_settings.cache_clear()
     await init_db()
     yield
     await close_db()
     os.environ.pop("LF_API_TEST", None)
+    os.environ.pop("LF_API_REQUIRE_AUTH", None)
+    get_api_settings.cache_clear()
+
 
 
 @pytest.fixture
