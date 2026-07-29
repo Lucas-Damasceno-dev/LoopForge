@@ -1,8 +1,10 @@
 import asyncio
 import json
+import os
 import select
 import shutil
 import sqlite3
+
 import subprocess
 import sys
 import uuid
@@ -104,9 +106,10 @@ class TaskDispatcher:
             "error": None,
             "feedback_history": [],
             "mock_llm": self.mock_llm,
-            "llm_provider": "google",
-            "llm_model_name": "gemini-2.0-flash",
+            "llm_provider": "openrouter" if os.getenv("OPENROUTER_API_KEY") else "google",
+            "llm_model_name": os.getenv("OPENROUTER_MODEL") or os.getenv("OPENCODE_MODEL") or ("inclusionai/ling-3.0-flash:free" if os.getenv("OPENROUTER_API_KEY") else "gemini-2.0-flash"),
             "llm_temperature": 0.3,
+
             "routing_mode": getattr(task, "routing_mode", "full"),
             "task_type": getattr(task, "task_type", "feature"),
             "is_interactive": self.interactive,
