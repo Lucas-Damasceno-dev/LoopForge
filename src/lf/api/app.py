@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lf.api.auth import verify_authentication
 from lf.api.config import get_api_settings
-from lf.api.dashboard_html import DASHBOARD_HTML
+from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
+
 from lf.api.models import PipelineRun
 from lf.api.schemas import (
     HealthResponse,
@@ -69,7 +70,8 @@ def create_app() -> FastAPI:
     @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
     async def render_dashboard():
         """Serves the modern Glassmorphic Web Dashboard UI."""
-        return HTMLResponse(content=DASHBOARD_HTML)
+        return HTMLResponse(content=get_dashboard_html())
+
 
     # ─── Health ─────────────────────────────────────────────────────
     @app.get("/health", response_model=HealthResponse, tags=["System"])

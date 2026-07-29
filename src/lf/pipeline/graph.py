@@ -16,6 +16,7 @@ from .nodes.devops import devops
 from .nodes.pm import product_manager
 from .nodes.qa import qa
 from .nodes.tech_lead import tech_lead
+from .plugins import get_registered_nodes
 from .state import GraphState
 
 
@@ -37,18 +38,20 @@ def entry_router(state: GraphState) -> Literal["cpo", "developer"]:
 
 def router(
     state: GraphState,
-) -> Literal["cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops", "__end__"]:
+) -> str:
     """Router único: decide próximo nó baseado no estado."""
     next_agent = state.get("next_agent", "cpo")
 
-    if next_agent == "FINISH":
+    if next_agent in ("FINISH", "__end__", None):
         return END
 
-    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops"):
+    custom_nodes = get_registered_nodes()
+    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops") or next_agent in custom_nodes:
         return next_agent
 
     # Fallback seguro: se next_agent for desconhecido ou FINISH, encerra o fluxo
     return END
+
 
 
 
@@ -84,6 +87,17 @@ def build_graph(
     workflow.add_node("qa", qa)
     workflow.add_node("appsec", appsec)
     workflow.add_node("devops", devops)
+
+    # Adiciona nós customizados de plugins registrados
+    custom_nodes = get_registered_nodes()
+    for custom_name, custom_func in custom_nodes.items():
+        workflow.add_node(custom_name, custom_func)
+        workflow.add_conditional_edges(
+            custom_name,
+            router,
+            {"__end__": END},
+        )
+
 
     # Entry point condicional — Roteamento adaptativo (Fast-Path vs Full-Path)
     workflow.set_conditional_entry_point(
