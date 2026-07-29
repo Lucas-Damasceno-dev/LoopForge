@@ -16,7 +16,7 @@ def compress_prompt(text: str, max_chars: int = 6000) -> str:
     # Remove múltiplas quebras de linha sequenciais
     compressed = re.sub(r"\n{3,}", "\n\n", text)
     # Compacta espaços múltiplos em cada linha mantendo a indentação essencial
-    compressed = "\n".join(re.sub(r"[ \t]{2,}", " ", line) for line in compressed.splitlines())
+    compressed = "\n".join(re.sub(r"(?<=\S)[ \t]{2,}", " ", line) for line in compressed.splitlines())
     if len(compressed) > max_chars:
         half = max_chars // 2
         compressed = compressed[:half] + "\n\n[... PROMPT COMPRESSÃO SEMÂNTICA LOOPFORGE ...]\n\n" + compressed[-half:]
@@ -98,6 +98,7 @@ def call_openrouter_api(
     api_key: str | None = None,
     timeout: float | None = None,
     compress: bool = True,
+    system_prompt: str | None = None,
 ) -> str:
     """Realiza uma chamada à API do OpenRouter via httpx com compressão de prompt e fallback de modelos."""
     import httpx
@@ -130,9 +131,13 @@ def call_openrouter_api(
     last_exception = None
 
     for m in models_to_try:
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
         payload = {
             "model": m,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "temperature": temperature,
             "stream": False,
         }

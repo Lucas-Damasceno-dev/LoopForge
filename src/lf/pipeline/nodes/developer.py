@@ -19,7 +19,7 @@ def _clean_code(raw: str) -> str:
     if code.endswith("```"):
         code = code[:-3].strip()
     first_line = code.split("\n", 1)[0].strip()
-    if first_line.lower() in ("java", "python", "javascript", "go", "rust", "typescript", "xml", "toml", "json"):
+    if not first_line.startswith(("{", "[")) and first_line.lower() in ("java", "python", "javascript", "go", "rust", "typescript", "xml", "toml", "json"):
         code = code.split("\n", 1)[-1] if "\n" in code else code
     return code.strip()
 

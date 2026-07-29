@@ -35,7 +35,6 @@ def call_llm_via_opencode(
     model_to_use = model or os.environ.get("OPENCODE_MODEL", DEFAULT_OPENCODE_MODEL)
 
     full_prompt = f"{system_prompt}\n\n{user_prompt}"
-    prompt_hash = hashlib.sha256(full_prompt.encode()).hexdigest()
 
     # Cache check
     if cache and not mock:
@@ -87,7 +86,10 @@ Responda SOMENTE o objeto JSON puro."""
     if openrouter_key:
         model_name = model or DEFAULT_OPENROUTER_MODEL
         try:
-            raw_response_text = call_openrouter_api(final_prompt, model=model_name, api_key=openrouter_key)
+            raw_response_text = call_openrouter_api(
+                final_prompt, model=model_name, api_key=openrouter_key,
+                system_prompt=system_prompt,
+            )
         except Exception as e:
             if is_default_or:
                 print(f"--- AVISO: OpenRouter API falhou ({e}), tentando OpenCodeRunner fallback ---")

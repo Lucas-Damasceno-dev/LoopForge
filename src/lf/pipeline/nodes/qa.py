@@ -224,7 +224,7 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
             for d in dirs_to_check:
                 go_files.extend(list(Path(d).glob("*.go")))
             if go_files:
-                _exec_cmd(["go", "vet", str(go_files[0])], str(go_files[0].parent), "go vet", result)
+                _exec_cmd(["go", "vet", "./..."], str(go_files[0].parent), "go vet", result)
             else:
                 result["errors"].append("Nenhum arquivo .go encontrado para testar.")
         return result
