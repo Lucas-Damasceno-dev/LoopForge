@@ -9,27 +9,31 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Code Formatting & Linting (Ruff)
+      - name: Code Formatting & Linting (Ruff - E,F,W,I,N,UP,SIM)
         run: |
-          python -m ruff check --select E,F,W,I src/lf tests_py
+          python -m ruff check --select E,F,W,I,N,UP,SIM src/lf tests_py
 
       - name: Type Checking (Mypy)
         run: |
-          python -m mypy src/lf --ignore-missing-imports
+          python -m mypy src/lf
 
       - name: Unit Tests & Coverage Threshold Enforcement (>= 75%)
         run: |

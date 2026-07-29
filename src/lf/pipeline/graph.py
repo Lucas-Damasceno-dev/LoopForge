@@ -47,8 +47,9 @@ def router(
     if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops"):
         return next_agent
 
-    # Fallback seguro
-    return "cpo"
+    # Fallback seguro: se next_agent for desconhecido ou FINISH, encerra o fluxo
+    return END
+
 
 
 def should_retry(state: GraphState) -> Literal["appsec", "developer", "__end__"]:

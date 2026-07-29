@@ -1,8 +1,5 @@
 #-*- coding: utf-8 -*-
-"""
-Nó AppSec: revisão de segurança do código gerado.
-Integra com o SecurityScanner e realiza auditoria estática e contextual.
-"""
+"""Nó AppSec: revisão de segurança estática e contextual com LLM do código gerado."""
 from __future__ import annotations
 import json
 import os
@@ -12,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from ...guardrails.security_scanner import SecurityScanner
 from ...pipeline.state import GraphState
+from ...runner.opencode.llm import call_llm_via_opencode
 
 
 class SecurityVulnerability(BaseModel):
@@ -32,7 +30,7 @@ class SecurityReviewReport(BaseModel):
 
 
 def appsec(state: GraphState) -> dict:
-    """Nó AppSec: Executa scanner de segurança e gera relatório."""
+    """Nó AppSec: Executa scanner estático e revisão contextual via LLM."""
     print("---EXECUTANDO NÓ: AppSec (Security Review)---")
 
     project_dir = state.get("project_dir", os.getcwd())
@@ -44,37 +42,70 @@ def appsec(state: GraphState) -> dict:
         review = _mock_security_review(review_id, now_iso)
         return {**state, "security_review": review, "next_agent": "devops"}
 
-    # Executa escaneamento estático via SecurityScanner
+    # 1. Escaneamento estático via SecurityScanner
     scanner = SecurityScanner()
     scanner_vulns = scanner.scan_directory(project_dir)
 
-    vulns = []
-    has_critical = False
+    vulns: list[SecurityVulnerability] = []
+    has_critical_or_high = False
+
     for v in scanner_vulns:
-        severity = "High" if v.rule_id in ("SEC-001", "SEC-002") else "Medium"
+        if v.rule_id == "SEC-001":
+            severity = "Critical"
+        elif v.rule_id == "SEC-002":
+            severity = "Critical"
+        elif v.rule_id == "SEC-003":
+            severity = "High"
+        else:
+            severity = "Medium"
+
         if severity in ("High", "Critical"):
-            has_critical = True
-        vulns.append({
-            "id": v.rule_id,
-            "type": v.message,
-            "severity": severity,
-            "file_path": v.file_path,
-            "line_number": v.line_number,
-            "description": f"Vulnerabilidade encontrada na linha {v.line_number}: {v.message}",
-        })
+            has_critical_or_high = True
 
-    status = "FAIL" if has_critical else "PASS"
+        vulns.append(
+            SecurityVulnerability(
+                id=v.rule_id,
+                type=v.message,
+                severity=severity,
+                file_path=v.file_path,
+                line_number=v.line_number,
+                description=f"Vulnerabilidade [{severity}] na linha {v.line_number}: {v.message}",
+            )
+        )
 
-    review = {
-        "id": review_id,
-        "status": status,
-        "vulnerabilities_found": vulns,
-        "recommendations": [
-            "Usar env vars em vez de chaves de API hardcoded",
-            "Evitar eval() e exec() dinâmicos em código de produção",
-        ] if vulns else ["Nenhuma vulnerabilidade crítica identificada"],
-        "execution_timestamp": now_iso,
-    }
+    # 2. Revisão contextual via LLM se o scanner estático passar
+    recommendations = [
+        "Usar variáveis de ambiente (.env) para segredos",
+        "Evitar eval() / exec() e sanitizar argumentos de comandos",
+    ]
+    if not vulns:
+        code_snippet = state.get("code", "")[:2000]
+        if code_snippet:
+            try:
+                prompt = (
+                    "Analise o código abaixo buscando falhas de segurança de negócios, OWASP Top 10, "
+                    "vulnerabilidades de injeção ou controle de acesso. Se seguro, diga SEGURO.\n\n"
+                    f"Código:\n```python\n{code_snippet}\n```"
+                )
+                llm_res = call_llm_via_opencode(
+                    system_prompt="Você é um engenheiro de AppSec sênior especializado em segurança de código.",
+                    user_prompt=prompt,
+                    mock=state.get("mock_llm", False),
+                )
+                recommendations.append(f"Análise LLM AppSec: {str(llm_res)[:150]}")
+            except Exception as e:
+                print(f"--- AVISO: Erro na análise LLM AppSec ({e}) ---")
+
+    status = "FAIL" if has_critical_or_high else "PASS"
+
+    report_model = SecurityReviewReport(
+        id=review_id,
+        status=status,
+        vulnerabilities_found=vulns,
+        recommendations=recommendations if vulns else ["Nenhuma vulnerabilidade crítica identificada"],
+        execution_timestamp=now_iso,
+    )
+    review = report_model.model_dump()
 
     output_dir = state.get("output_dir", ".")
     if output_dir:
@@ -85,11 +116,11 @@ def appsec(state: GraphState) -> dict:
         print(f"--- INFO: Relatório AppSec salvo em {path} ---")
 
     if status == "FAIL":
-        print("--- AVISO: Vulnerabilidades críticas encontradas! Notificando Developer. ---")
+        print("--- AVISO: Vulnerabilidades críticas/altas encontradas! Notificando Developer. ---")
         state["feedback_history"] = state.get("feedback_history", []) + [
             {
                 "from": "appsec",
-                "message": f"AppSec encontrou {len(vulns)} vulnerabilidade(s). Favor corrigir.",
+                "message": f"AppSec encontrou {len(vulns)} vulnerabilidade(s) Críticas/Altas. Favor corrigir.",
                 "timestamp": now_iso,
             }
         ]
@@ -99,10 +130,11 @@ def appsec(state: GraphState) -> dict:
 
 
 def _mock_security_review(review_id: str, timestamp: str) -> dict:
-    return {
-        "id": review_id,
-        "status": "PASS",
-        "vulnerabilities_found": [],
-        "recommendations": ["Nenhuma vulnerabilidade encontrada (mock)."],
-        "execution_timestamp": timestamp,
-    }
+    report = SecurityReviewReport(
+        id=review_id,
+        status="PASS",
+        vulnerabilities_found=[],
+        recommendations=["Nenhuma vulnerabilidade encontrada (mock)."],
+        execution_timestamp=timestamp,
+    )
+    return report.model_dump()

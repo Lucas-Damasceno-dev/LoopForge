@@ -1,4 +1,5 @@
 """Configuração oficial da API REST e Web UI do LoopForge."""
+from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 
@@ -24,3 +25,9 @@ class APISettings(BaseSettings):
     db_max_overflow: int = 10
 
     model_config = {"env_prefix": "LF_API_", "env_file": ".env", "extra": "ignore"}
+
+
+@lru_cache
+def get_api_settings() -> APISettings:
+    """Retorna instância singleton reutilizável de APISettings."""
+    return APISettings()

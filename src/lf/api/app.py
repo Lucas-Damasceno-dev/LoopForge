@@ -1,24 +1,19 @@
 """Aplicação FastAPI principal do LoopForge.
 
-Expõe endpoints REST, WebSockets para streaming em tempo real e Web Dashboard UI.
+Expõe endpoints REST, WebSockets autenticados para streaming e Web Dashboard UI.
 """
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import (
-    Depends,
-    FastAPI,
-    HTTPException,
-    Query,
-    WebSocket,
-    WebSocketDisconnect,
-)
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lf.api.auth import verify_authentication
-from lf.api.config import APISettings
+from lf.api.config import get_api_settings
 from lf.api.dashboard_html import DASHBOARD_HTML
 from lf.api.database import close_db, get_session, init_db
 from lf.api.models import PipelineRun
@@ -35,7 +30,7 @@ from lf.api.websocket_manager import ws_manager
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Gerencia ciclo de vida da aplicação: init e close do DB."""
-    settings = APISettings()
+    settings = get_api_settings()
     await init_db(settings)
     yield
     await close_db()
@@ -43,12 +38,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Factory da aplicação FastAPI oficial do LoopForge."""
+    settings = get_api_settings()
     app = FastAPI(
         title="LoopForge API",
         description="API REST, WebSockets e Dashboard Web para gerenciamento de pipelines do LoopForge v6",
         version="6.0.0",
         lifespan=lifespan,
     )
+
+    # ─── Middleware: CORS ───────────────────────────────────────────
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # ─── Middleware: Request Timing & Logging ────────────────────────
+    @app.middleware("http")
+    async def add_process_time_header(request: Request, call_next):
+        start_time = time.time()
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        response.headers["X-Process-Time"] = f"{process_time:.4f}s"
+        return response
 
     # ─── Dashboard Web UI ───────────────────────────────────────────
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -63,11 +77,22 @@ def create_app() -> FastAPI:
         """Verifica se a API e o banco estão operacionais."""
         return HealthResponse()
 
-    # ─── WebSockets para Streaming em Tempo Real ────────────────────
+    # ─── WebSockets para Streaming em Tempo Real com Auth ───────────
     @app.websocket("/ws/streaming")
     @app.websocket("/ws/runs/{run_id}")
-    async def websocket_endpoint(websocket: WebSocket, run_id: str | None = None):
-        """Conexão WebSocket para streaming de nós e eventos de pipeline em tempo real."""
+    async def websocket_endpoint(
+        websocket: WebSocket,
+        run_id: str | None = None,
+        token: str | None = Query(None),
+    ):
+        """Conexão WebSocket com validação de autenticação se ativada."""
+        # Se autenticação for exigida, valida token no query parameter
+        if settings.require_auth or settings.api_key:
+            expected_key = settings.api_key or "secret"
+            if not token or token != expected_key:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+
         await ws_manager.connect(websocket)
         try:
             await ws_manager.send_personal_message(
