@@ -44,7 +44,16 @@ class SQLiteLLMCache:
 
 DEFAULT_OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 DEFAULT_OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash:free")
+DEFAULT_OPENROUTER_BASE_URL = os.environ.get(
+    "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+)
 
+FALLBACK_OPENROUTER_MODELS = [
+    "inclusionai/ling-3.0-flash:free",
+    "google/gemini-2.0-flash-lite:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "deepseek/deepseek-r1:free",
+]
 
 
 def call_openrouter_api(
@@ -54,46 +63,62 @@ def call_openrouter_api(
     api_key: str | None = None,
     timeout: float = 60.0,
 ) -> str:
-    """Realiza uma chamada direta à API do OpenRouter via httpx usando o modelo Ling-3.0 Flash."""
+    """Realiza uma chamada à API do OpenRouter via httpx com cadeia automática de fallback de modelos."""
     import httpx
+
     key = api_key or os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
     if not key:
         raise ValueError("OPENROUTER_API_KEY não foi configurada.")
 
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    base_url = os.environ.get("OPENROUTER_BASE_URL") or DEFAULT_OPENROUTER_BASE_URL
+    url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
         "HTTP-Referer": "https://loopforge.dev",
         "X-Title": "LoopForge AI Engine",
     }
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": temperature,
-    }
 
-    response = httpx.post(url, headers=headers, json=payload, timeout=timeout)
-    if response.status_code != 200:
-        raise RuntimeError(f"OpenRouter API error ({response.status_code}): {response.text}")
+    models_to_try = [model] + [m for m in FALLBACK_OPENROUTER_MODELS if m != model]
+    last_exception = None
 
-    data = response.json()
-    choices = data.get("choices", [])
-    if not choices:
-        raise RuntimeError(f"OpenRouter API retornou resposta vazia: {data}")
+    for m in models_to_try:
+        payload = {
+            "model": m,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+        }
 
-    return choices[0]["message"]["content"]
+        try:
+            response = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices", [])
+                if choices and choices[0].get("message", {}).get("content"):
+                    return choices[0]["message"]["content"]
+            elif response.status_code in (429, 404) or "rate-limited" in response.text or "Model not found" in response.text:
+                print(f"--- AVISO: OpenRouter modelo '{m}' indisponível/rate-limited ({response.status_code}). Tentando modelo fallback... ---")
+                last_exception = RuntimeError(f"OpenRouter API error ({response.status_code}): {response.text}")
+                continue
+            else:
+                last_exception = RuntimeError(f"OpenRouter API error ({response.status_code}): {response.text}")
+        except Exception as e:
+            last_exception = e
+            continue
+
+    if last_exception:
+        raise last_exception
+    raise RuntimeError("OpenRouter API falhou em todos os modelos da cadeia de fallback.")
 
 
 def get_llm(provider: str = "openrouter", model_name: str = DEFAULT_OPENROUTER_MODEL, temperature: float = 0.2) -> Any:
-    """Returns an LLM instance or runner based on provider string."""
+    """Retorna instância de LLM ou função de fallback baseada nas variáveis de ambiente."""
     api_key = os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
     if provider == "openrouter" or api_key:
         return lambda prompt: call_openrouter_api(prompt, model=model_name, temperature=temperature, api_key=api_key)
 
     api_key_gemini = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key_gemini:
-        # Fallback to FakeListLLM for offline/mock environments
         responses = [
             json.dumps({"title": "Mock Epic", "id": "epic-1", "user_stories": ["us-1"]}),
             json.dumps({"id": "us-1", "title": "Mock User Story", "acceptance_criteria": ["Given x when y then z"]}),
@@ -109,6 +134,3 @@ def get_llm(provider: str = "openrouter", model_name: str = DEFAULT_OPENROUTER_M
     except Exception:
         responses = ["Mock LLM response"] * 100
         return FakeListLLM(responses=responses)
-
-
-

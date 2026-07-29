@@ -1,154 +1,185 @@
 """
-Nó Developer: recebe tech spec e gera código REAL via OpenCode.
-Usa subprocesso para invocar OpenCode com contexto completo.
+Nó Developer: recebe tech spec e gera código REAL via chamada direta à API OpenRouter.
 """
 from __future__ import annotations
 
 import os
-import re
-import time
 from pathlib import Path
 
 from ...pipeline.state import GraphState
-from ...runner.opencode import OpenCodeResult, OpenCodeRunner, detect_changed_files
 
 
-def _extract_generated_code(
-    result: OpenCodeResult,
-    project_dir: str,
-    start_time: float,
-) -> str:
-    """Extrai o código fonte real dos arquivos criados/modificados pelo OpenCode.
-    Se nenhum arquivo foi alterado no disco, tenta extrair blocos de código do stdout,
-    ou como fallback retorna o stdout."""
-    changed_files = result.changed_files or detect_changed_files(project_dir, start_time)
+def _ensure_openrouter_key() -> str:
+    key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not key:
+        raise ValueError("OPENROUTER_API_KEY não configurada")
+    return key
 
-    ignored_names = {
-        "generated_code.py", ".loopforge.json", "llm_cache.sqlite",
-        ".users.json", "loop.lock", "package-lock.json", "poetry.lock"
+
+def _call_openrouter(prompt: str, system: str, model: str) -> str:
+    import httpx
+
+    key = _ensure_openrouter_key()
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://loopforge.dev",
+        "X-Title": "LoopForge AI Engine",
     }
-    code_extensions = {
-        ".py", ".js", ".ts", ".jsx", ".tsx", ".html", ".css",
-        ".go", ".rs", ".java", ".c", ".cpp", ".h", ".sh", ".sql"
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
     }
 
-    code_files: list[Path] = []
-    for fpath_str in changed_files:
-        fpath = Path(fpath_str).resolve()
-        if fpath.name in ignored_names or fpath.name.startswith("test_report_"):
-            continue
-        if fpath.suffix.lower() in code_extensions:
-            code_files.append(fpath)
+    response = httpx.post(url, headers=headers, json=payload, timeout=120.0)
+    if response.status_code != 200:
+        raise RuntimeError(f"OpenRouter API error ({response.status_code}): {response.text}")
 
-    if code_files:
-        code_snippets = []
-        proj_path = Path(project_dir).resolve()
-        for fpath in code_files:
-            try:
-                try:
-                    rel_path = fpath.relative_to(proj_path)
-                except ValueError:
-                    rel_path = fpath.name
-                content = fpath.read_text(encoding="utf-8", errors="replace")
-                if len(code_files) == 1:
-                    return content
-                code_snippets.append(f"# --- File: {rel_path} ---\n{content}")
-            except Exception as e:
-                print(f"--- AVISO: Falha ao ler arquivo gerado {fpath}: {e} ---")
+    data = response.json()
+    choices = data.get("choices", [])
+    if not choices:
+        raise RuntimeError("OpenRouter: resposta vazia")
+    return choices[0]["message"]["content"]
 
-        if code_snippets:
-            return "\n\n".join(code_snippets)
 
-    # Fallback 1: Bloco de código markdown no stdout
-    if result.stdout:
-        code_match = re.search(
-            r"```(?:python|py|javascript|js|typescript|ts)?\s*\n(.*?)\n```",
-            result.stdout,
-            re.DOTALL,
-        )
-        if code_match:
-            return code_match.group(1).strip()
-
-    # Fallback 2: Stdout bruto
-    return result.stdout if result.success else ""
+STACK_CONFIGS = {
+    "java": {
+        "lang": "Java",
+        "ext": ".java",
+        "instruction": "You are a Java developer. Generate ONLY Java code.",
+        "rules": [
+            "Write a SINGLE compilable Java class with a main(String[] args) method",
+            "Include import statements",
+            "Do NOT include test code in the same file",
+            "Exactly one class per file — the class name MUST match the filename (Main)",
+            "No markdown fences, no explanations, no backticks",
+        ],
+        "entry": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        \n    }\n}",
+    },
+    "python": {
+        "lang": "Python",
+        "ext": ".py",
+        "instruction": "You are a Python developer. Generate ONLY Python code.",
+        "rules": [
+            "Write a complete, runnable Python program",
+            "Include a main() function and if __name__ guard",
+            "No markdown fences, no explanations, no backticks",
+            "Just the raw code",
+        ],
+        "entry": 'def main():\n    pass\n\nif __name__ == "__main__":\n    main()',
+    },
+    "javascript": {
+        "lang": "JavaScript",
+        "ext": ".js",
+        "instruction": "You are a JavaScript developer. Generate ONLY JavaScript code.",
+        "rules": ["Write a complete Node.js program", "No markdown fences, no explanations", "Just the raw code"],
+        "entry": "function main() {\n    \n}\n\nmain();",
+    },
+    "go": {
+        "lang": "Go",
+        "ext": ".go",
+        "instruction": "You are a Go developer. Generate ONLY Go code.",
+        "rules": ["Write a complete Go program with package main", "Include func main()", "No markdown fences", "Just the raw code"],
+        "entry": 'package main\n\nimport "fmt"\n\nfunc main() {\n    \n}',
+    },
+    "rust": {
+        "lang": "Rust",
+        "ext": ".rs",
+        "instruction": "You are a Rust developer. Generate ONLY Rust code.",
+        "rules": ["Write a complete Rust program with fn main()", "No markdown fences", "Just the raw code"],
+        "entry": "fn main() {\n    \n}",
+    },
+}
 
 
 def developer(state: GraphState) -> dict:
-    """Recebe tech spec e gera código via OpenCode."""
+    """Recebe tech spec e gera código via OpenRouter API"""
     print("---EXECUTANDO NÓ: Developer---")
 
-    tech_spec = state.get("tech_spec") or f"# Fast-Path Task Specification\n\nIdea/Instruction: {state.get('idea', 'Implement requested task')}"
-
-    # Mock mode
     if state.get("mock_llm"):
         print("--- INFO: Developer modo MOCK ---")
-        mock_code = "# Mock generated code\nprint('Hello from mock developer')"
         return {
             **state,
-            "code": mock_code,
+            "code": "# Mock generated code\nprint('mock')",
             "next_agent": "qa",
             "error": None,
         }
 
+    tech_spec = state.get("tech_spec", "")
+    idea = state.get("idea", "")
     user_stories = state.get("user_stories", [])
-    project_dir = state.get("project_dir", os.getcwd())
+    stack_lang = str(state.get("stack", "python")).lower()
+    model_name = os.environ.get("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash:free")
 
-    # Monta prompt focado na primeira user story apenas
-    stack = state.get("stack", "")
-    first_story = user_stories[0] if user_stories else {}
-    story_line = f"{first_story.get('id', '')}: {first_story.get('title', '')}" if first_story else "Implementar"
+    sc = STACK_CONFIGS.get(stack_lang, STACK_CONFIGS["python"])
 
-    feedback = state.get("feedback_history", [])
-    feedback_context = ""
-    if feedback:
-        fb = feedback[-1]
-        feedback_context = f"\nFeedback da iteração anterior ({fb.get('from', '')}): {fb.get('message', '')[:200]}\n"
+    # Build user prompt with context
+    story_lines = []
+    for us in user_stories[:3]:
+        sid = us.get("id", "")
+        title = us.get("title", "")
+        desc = us.get("description", "")[:150]
+        story_lines.append(f"- {sid}: {title} — {desc}")
 
-    first_story_desc = first_story.get('description', '')[:200]
-    prompt = f"""Write a single Python file implementing: {story_line}
+    user_prompt = f"""Implemente em {sc['lang']}:
 
-Context: {first_story_desc}
+Ideia: {idea}
+
+Tech Spec:
+{tech_spec[:2000]}
+
+User Stories:
+{chr(10).join(story_lines) if story_lines else 'N/A'}"""
+
+    system_prompt = f"""{sc['instruction']}
 
 REGRAS:
-1. Output ONLY valid Python code (no markdown, no explanations)
-2. Single file implementation (<200 lines)
-3. Must have a main() function
-4. Use argparse or click for CLI if applicable"""
+{chr(10).join(f'{i+1}. {r}' for i, r in enumerate(sc['rules']))}
 
-    runner = OpenCodeRunner(timeout_seconds=600)
-    start_time = time.time()
+Exemplo de entry point:
+{sc['entry']}
+"""
 
-    print("--- Spawnando OpenCode... ---")
-    model_name = os.environ.get("OPENCODE_MODEL", "openrouter/openrouter/free")
-    result = runner.run(
-        prompt=prompt,
-        project_root=project_dir,
-        model=model_name,
-        circuit_breaker=state.get("circuit_breaker"),
-    )
+    print(f"--- Chamando OpenRouter API (model: {model_name})... ---")
+    try:
+        raw = _call_openrouter(user_prompt, system_prompt, model_name)
+    except Exception as e:
+        err_msg = f"OpenRouter API falhou: {e}"
+        print(f"--- AVISO: {err_msg} ---")
+        state.setdefault("feedback_history", []).append(
+            {"from": "developer", "message": err_msg, "attempt": state.get("attempt_count", 0)}
+        )
+        return {**state, "code": "", "next_agent": "qa", "error": err_msg}
 
+    # Clean up markdown fences if present
+    code = raw.strip()
+    if code.startswith("```"):
+        code = code.split("\n", 1)[-1] if "\n" in code else code[3:]
+    if code.endswith("```"):
+        code = code[:-3].strip()
+    # Remove leading language tag like java, python
+    first_line = code.split("\n", 1)[0].strip()
+    if first_line.lower() in ("java", "python", "javascript", "go", "rust", "typescript"):
+        code = code.split("\n", 1)[-1] if "\n" in code else code
+    code = code.strip()
 
-    # Extrai o código fonte real dos arquivos criados/modificados ou stdout
-    generated_code = _extract_generated_code(result, project_dir, start_time)
-    code_path = os.path.join(state.get("output_dir", "."), "generated_code.py")
-
-    if result.success and generated_code:
-        os.makedirs(state.get("output_dir", "."), exist_ok=True)
-        with open(code_path, "w", encoding="utf-8") as f:
-            f.write(generated_code)
-        print(f"--- INFO: Código salvo em {code_path} ---")
-
-    err_msg = result.error
-    if not result.success:
-        print(f"--- AVISO: OpenCode falhou: {err_msg} ---")
-        state["feedback_history"] = state.get("feedback_history", []) + [
-            {"from": "developer", "message": f"OpenCode falhou: {err_msg}", "attempt": state.get("attempt_count", 0)}
-        ]
+    # Save to file
+    ext = sc["ext"]
+    output_dir = state.get("output_dir", ".")
+    os.makedirs(output_dir, exist_ok=True)
+    code_path = os.path.join(output_dir, f"generated_code{ext}")
+    with open(code_path, "w", encoding="utf-8") as f:
+        f.write(code)
+    print(f"--- INFO: Código salvo em {code_path} ({len(code)} chars) ---")
 
     return {
         **state,
-        "code": generated_code,
+        "code": code,
         "next_agent": "qa",
-        "error": err_msg,
+        "error": None,
     }
-

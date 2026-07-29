@@ -128,22 +128,56 @@ def _extract_json_from_text(text: str) -> dict | list | None:
     import re
     if not text:
         return None
+    # Direct parse attempt
     try:
         return json.loads(text.strip())
     except Exception:
         pass
-    match = re.search(r"```(?:json)?\s*\n(.*?)\n```", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1).strip())
-        except Exception:
-            pass
-    match_obj = re.search(r"({.*}|\[.*\])", text, re.DOTALL)
-    if match_obj:
-        try:
-            return json.loads(match_obj.group(1).strip())
-        except Exception:
-            pass
+
+    # Markdown code block extraction (flexible: tolera conteúdo após o bloco)
+    # Pattern: ```json \n ... \n ```  ou ```json \n ... ```
+    for pattern in [
+        r"```(?:json)?\s*\n(.+?)\n```",
+        r"```(?:json)?\s*\n(.+)```",
+    ]:
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(1).strip())
+            except Exception:
+                pass
+
+    # Brace/bracket depth tracking: extrai o primeiro objeto/array JSON completo
+    for start_char, end_char in [("{", "}"), ("[", "]")]:
+        start = text.find(start_char)
+        if start == -1:
+            continue
+        depth = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if escape:
+                escape = False
+                continue
+            if ch == "\\" and in_string:
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == start_char:
+                depth += 1
+            elif ch == end_char:
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start:i + 1])
+                    except Exception:
+                        # Se o primeiro objeto falhou, continua para achar outro
+                        break
     return None
 
 

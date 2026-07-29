@@ -10,6 +10,26 @@ class TechStack(BaseModel):
     package_manager: str = "pip"
 
 
+def resolve_tech_stack(language: str, framework: str | None = None) -> TechStack:
+    """Resolve coerente de stack, framework, test harness e package manager por linguagem."""
+    lang = language.lower().strip()
+    if lang == "java":
+        fw = framework if framework and framework != "fastapi" else "spring-boot"
+        return TechStack(language="java", framework=fw, testing_harness="junit", package_manager="maven")
+    elif lang in ("javascript", "typescript", "js", "ts"):
+        fw = framework if framework and framework != "fastapi" else "express"
+        return TechStack(language="javascript", framework=fw, testing_harness="vitest", package_manager="npm")
+    elif lang == "go":
+        fw = framework if framework and framework != "fastapi" else "gin"
+        return TechStack(language="go", framework=fw, testing_harness="gotest", package_manager="go")
+    elif lang == "rust":
+        fw = framework if framework and framework != "fastapi" else "actix"
+        return TechStack(language="rust", framework=fw, testing_harness="cargotest", package_manager="cargo")
+    else:
+        fw = framework or "fastapi"
+        return TechStack(language="python", framework=fw, testing_harness="pytest", package_manager="pip")
+
+
 class ArtifactSchema(BaseModel):
     id: str
     schema_id: str
@@ -29,6 +49,9 @@ class TaskSchema(BaseModel):
     attempts: int = 0
     max_retries: int = 3
     depends_on: list[str] = Field(default_factory=list)
+    stack: str = "python"
+    routing_mode: str = "full"
+    task_type: str = "feature"
 
 
 class PlanSchema(BaseModel):

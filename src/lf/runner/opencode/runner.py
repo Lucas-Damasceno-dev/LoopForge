@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .models import OpenCodeResult
 
-DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL", "openrouter/openrouter/free")
+DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL", "openrouter/inclusionai/ling-3.0-flash:free")
 
 
 class OpenCodeRunner:
@@ -53,7 +53,7 @@ class OpenCodeRunner:
         safe_prompt = prompt.replace("'", "'\\''")
         cmd = [
             "script", "-q", "-c",
-            f"opencode run '{safe_prompt}' -m {model_to_use}",
+            f"opencode run '{safe_prompt}' -m {model_to_use} --pure",
             "/dev/null"
         ]
 

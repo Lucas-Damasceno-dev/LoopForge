@@ -79,7 +79,11 @@ Responda com:
         )
 
         if validation.get("needs_feedback"):
-            print(f"--- AVISO: Tech Lead solicita feedback: {validation.get('feedback_message', '')[:100]}... ---")
+            feedback_msg = validation.get('feedback_message', '')
+            print(f"--- AVISO: Tech Lead solicita feedback: ---")
+            print(f"--- {feedback_msg[:500]} ---")
+            if len(feedback_msg) > 500:
+                print("--- (Feedback truncado em 500 caracteres) ---")
             state["feedback_history"] = state.get("feedback_history", []) + [
                 {"from": "tech_lead", "message": validation.get("feedback_message", ""), "timestamp": now_iso}
             ]

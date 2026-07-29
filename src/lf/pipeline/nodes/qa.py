@@ -37,7 +37,20 @@ def qa(state: GraphState) -> dict:
     project_dir = state.get("project_dir", os.getcwd())
 
     if not code and not state.get("mock_llm"):
-        raise ValueError("Código não encontrado no estado para QA")
+        print("--- AVISO: QA pulando testes — nenhum código foi gerado pelo Developer ---")
+        fail_report = _build_report_from_harness(
+            report_id := f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001",
+            datetime.now(UTC).isoformat(),
+            {"passed": 0, "total": 0, "errors": ["Nenhum código para testar"], "duration_ms": 0},
+            user_story_id="US000",
+        )
+        qa_attempt = state.get("qa_attempt_count", 0) + 1
+        state["qa_attempt_count"] = qa_attempt
+        state.setdefault("feedback_history", []).append(
+            {"from": "qa", "message": "Nenhum código gerado — Developer falhou", "timestamp": datetime.now(UTC).isoformat()}
+        )
+        print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
+        return {**state, "test_report": fail_report, "qa_attempt_count": qa_attempt, "next_agent": "developer"}
 
     now_iso = datetime.now(UTC).isoformat()
     report_id = f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
@@ -48,7 +61,7 @@ def qa(state: GraphState) -> dict:
         return {**state, "test_report": report, "next_agent": "appsec"}
 
     # Fase 1: Executar harness real no projeto
-    harness_result = _run_harness(project_dir)
+    harness_result = _run_harness(project_dir, state.get("stack", ""))
 
     # Fase 2: Gerar relatório estruturado via OpenCode (com fallback resiliente para o harness)
     user_stories = state.get("user_stories", [])
@@ -85,11 +98,14 @@ O relatório DEVE ter:
         print(f"--- ERRO QA (Construindo relatório direto do Harness): {e} ---")
         report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
 
+    if not isinstance(report, dict) or "summary" not in report:
+        report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
 
     # Atualiza campos dinâmicos
     report["id"] = report_id
     report["execution_timestamp"] = now_iso
-    report["summary"]["duration_seconds"] = harness_result.get("duration_ms", 0) / 1000
+    report.setdefault("summary", {})["duration_seconds"] = harness_result.get("duration_ms", 0) / 1000
+
 
     output_dir = state.get("output_dir", ".")
     if output_dir:
@@ -117,19 +133,28 @@ O relatório DEVE ter:
 
 
 
-def _run_harness(project_dir: str) -> dict:
+def _run_harness(project_dir: str, stack: str = "") -> dict:
     """Executa testes no projeto via subprocesso."""
     import subprocess
     import time
 
     result = {"passed": 0, "total": 0, "errors": [], "duration_ms": 0}
 
-    commands = [
+    stack_commands = {
+        "python": [("pytest", ["pytest", "-x", "--tb=short", "-q"])],
+        "java": [("mvn test", ["mvn", "test", "-q"]), ("gradle test", ["gradle", "test", "-q"])],
+        "javascript": [("npm test", ["npm", "test"])],
+        "go": [("go test", ["go", "test", "./..."])],
+        "rust": [("cargo test", ["cargo", "test"])],
+    }
+
+    commands = stack_commands.get(stack.lower(), [
         ("npm test", ["npm", "test"]),
         ("pytest", ["pytest", "-x", "--tb=short", "-q"]),
         ("cargo test", ["cargo", "test"]),
         ("go test", ["go", "test", "./..."]),
-    ]
+        ("mvn test", ["mvn", "test", "-q"]),
+    ])
 
     for name, cmd in commands:
         start = time.time()

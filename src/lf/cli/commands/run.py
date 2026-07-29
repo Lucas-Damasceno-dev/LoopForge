@@ -39,7 +39,7 @@ def _run_interactive_wizard() -> dict:
 
 @click.command(name="run")
 @click.option("--idea", default=None, help="Ideia ou objetivo da funcionalidade")
-@click.option("--stack", default="python", help="Stack de tecnologia (python, javascript, go, rust)")
+@click.option("--stack", default=None, help="Stack de tecnologia (python, java, javascript, go, rust)")
 @click.option("--mock", is_flag=True, default=False, help="Usar modo LLM mock")
 @click.option("--interactive", "-i", is_flag=True, default=False, help="Pausar após nós para aprovação humana (HITL)")
 @click.option("--review-mode", is_flag=True, default=False, help="Modo Revisão: executa tudo e pausa antes de salvar no disco")
@@ -49,7 +49,7 @@ def _run_interactive_wizard() -> dict:
 @click.option("--wizard", is_flag=True, default=False, help="Forçar o wizard interativo de inicialização")
 def run_cmd(
     idea: str | None,
-    stack: str,
+    stack: str | None,
     mock: bool,
     interactive: bool,
     review_mode: bool,
@@ -84,6 +84,8 @@ def run_cmd(
             notify = wiz["notify"]
 
         cfg = load_config()
+        if stack is None:
+            stack = cfg.stack.language if (cfg.stack and cfg.stack.language) else "python"
         circuit = CircuitBreaker(max_total_cost=cfg.budget_limit_usd)
         dispatcher = TaskDispatcher(
             mock_llm=mock,

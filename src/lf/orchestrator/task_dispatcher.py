@@ -155,7 +155,9 @@ class TaskDispatcher:
             try:
                 return input()
             except Exception:
-                return ""
+                return "c"
+
+
 
     def _record_decision(
         self,
@@ -195,34 +197,62 @@ class TaskDispatcher:
             pass
 
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
-        """Manipula interrupção humana (HITL) com visual rico, timeout, notificações e feedback categorizado."""
+        """Manipula interrupção humana (HITL) exibindo os artefatos do nó RECÉM-CONCLUÍDO e o gate do PRÓXIMO nó."""
         console = Console()
-        node_name = snapshot.next[0] if snapshot.next else "unknown"
+        next_node = snapshot.next[0] if snapshot.next else "unknown"
+        node_name = next_node
         state = snapshot.values
+
         run_id = config.get("configurable", {}).get("thread_id", "default-run")
 
         if self.notify:
-            title = f"⏸️ Pipeline Pausado — Gate: {node_name.upper()}"
-            msg_text = f"LoopForge está aguardando aprovação humana após o nó {node_name}."
+            title = f"⏸️ Pipeline Pausado — Gate antes de {next_node.upper()}"
+            msg_text = f"LoopForge aguardando aprovação humana antes de executar o nó {next_node}."
             _send_notification(title, msg_text, webhook_url=self.webhook_url)
 
         console.print(f"\n[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]")
-        console.print(f"[bold yellow]⏸️  HUMAN-IN-THE-LOOP GATE — Nó: [bold white]{node_name.upper()}[/bold white][/bold yellow]")
+        console.print(f"[bold yellow]⏸️  HUMAN-IN-THE-LOOP GATE — Próximo Nó: [bold white]{next_node.upper()}[/bold white][/bold yellow]")
         console.print(f"[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]\n")
 
-        if node_name == "developer":
+        # 1. Se estamos pausados antes de QA, o nó que recém-executou foi o DEVELOPER -> mostra o código gerado
+        if next_node == "qa":
             code = state.get("code", "")
-            console.print("[bold cyan]📝 Código Gerado (preview):[/bold cyan]")
+            console.print("[bold cyan]📝 Código Gerado pelo Developer (preview):[/bold cyan]")
+            if any(err_kw in code for err_kw in ["Model not found", "UnknownError", "Error:", "xdotool:"]):
+                console.print()
+                console.print("[bold red]┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓[/bold red]")
+                console.print("[bold red]┃ ⚠️  ERRO: A saída do Developer contém ERRO do LLM/ferramenta[/bold red]")
+                console.print("[bold red]┃    Não é código válido. Revise antes de aprovar.           [/bold red]")
+                console.print("[bold red]┃    Sugestão: digite [yellow]r[/yellow] para retentar ou [yellow]a[/yellow] para ajustar o prompt.[/bold red]")
+                console.print("[bold red]┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛[/bold red]")
+                console.print()
+
             if code:
-                syntax = Syntax(code[:500] + ("..." if len(code) > 500 else ""), "python", theme="monokai", line_numbers=True)
-                console.print(syntax)
+                import re
+                clean_code = re.sub(r'\x1b\[[0-9;]*m', '', str(code)[:600])
+                try:
+                    syntax = Syntax(clean_code + ("..." if len(code) > 600 else ""), "python", theme="monokai", line_numbers=True)
+                    console.print(syntax)
+                except Exception:
+                    console.print(clean_code)
             else:
                 console.print("[dim]Nenhum código gerado.[/dim]")
 
-        elif node_name == "qa":
+
+        # 2. Se estamos pausados antes do DEVELOPER, mostra a especificação do TECH LEAD
+        elif next_node == "developer":
+            tech_spec = state.get("tech_spec", "")
+            console.print("[bold cyan]📋 Especificação Técnica do Tech Lead (preview):[/bold cyan]")
+            if tech_spec:
+                console.print(f"[dim]{tech_spec[:500]}...[/dim]")
+            else:
+                console.print("[dim]Nenhuma especificação disponível.[/dim]")
+
+        # 3. Se estamos pausados antes do APPSEC, mostra o relatório de testes do QA
+        elif next_node == "appsec":
             report = state.get("test_report", {})
             summary = report.get("summary", {})
-            table = Table(title="🧪 Relatório de Testes (QA)")
+            table = Table(title="🧪 Relatório de Testes Executados (QA)")
             table.add_column("Total", justify="right")
             table.add_column("Passaram", justify="right", style="green")
             table.add_column("Falharam", justify="right", style="red")
@@ -235,7 +265,8 @@ class TaskDispatcher:
             )
             console.print(table)
 
-        elif node_name == "appsec":
+        # 4. Se estamos pausados antes do DEVOPS, mostra a revisão do APPSEC
+        elif next_node == "devops":
             sec_review = state.get("security_review", {})
             vulns = sec_review.get("vulnerabilities", [])
             table = Table(title="🛡️ Auditoria de Segurança (AppSec)")
@@ -259,20 +290,19 @@ class TaskDispatcher:
 
         console.print("\n[bold]Ações Disponíveis:[/bold]")
         console.print("  [green]c[/green] — Continuar / Aprovar")
-        console.print("  [yellow]r[/yellow] — Retentar nó")
+        console.print("  [yellow]r[/yellow] — Retentar nó anterior")
         console.print("  [blue]a[/blue] — Solicitar alterações / Ajustar Prompt (Request Changes)")
         console.print("  [red]x[/red] — Abortar pipeline")
 
-        console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão: Aprovar)[/dim]")
-        choice = self._get_input_with_timeout("➜ Escolha [c/r/a/x] (default: c): ", timeout=self.hitl_timeout_seconds)
-        if not choice:
-            choice = "c"
-
-        choice = choice.strip().lower()
+        console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: ABORTAR)[/dim]")
+        raw_choice = self._get_input_with_timeout("➜ Escolha [c/r/a/x] (default: x): ", timeout=self.hitl_timeout_seconds)
+        choice = raw_choice.strip().lower() if raw_choice else "x"
 
         action = "approve"
         cat = None
         msg = None
+
+
 
         if choice == "x":
             action = "abort"
