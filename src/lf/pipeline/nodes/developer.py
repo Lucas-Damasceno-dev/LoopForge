@@ -103,6 +103,17 @@ REGRAS:
         f"\nUser Stories:\n{chr(10).join(story_lines) if story_lines else 'N/A'}",
     ]
 
+    # 🧠 Consulta MemoryManager para obter lições aprendidas passadas relevantes
+    try:
+        from ...memory.manager import MemoryManager
+        mem = MemoryManager()
+        relevant = mem.search_relevant_lessons(query=f"{idea} {stack}", stack=stack, limit=3)
+        formatted_lessons = mem.format_lessons_for_prompt(relevant)
+        if formatted_lessons:
+            prompt_parts.append(f"\n\n{formatted_lessons}")
+    except Exception as exc:
+        print(f"--- AVISO: Não foi possível carregar memória de lições: {exc} ---")
+
     # Feedback de retentativas
     feedback_history = state.get("feedback_history", [])
     test_report = state.get("test_report", {})
