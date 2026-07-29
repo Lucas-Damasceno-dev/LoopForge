@@ -11,7 +11,9 @@ from lf.api.database import close_db, init_db
 from lf.cli.commands.serve import serve_cmd
 
 
-@pytest.fixture(autouse=True)
+import pytest_asyncio
+
+@pytest_asyncio.fixture(autouse=True)
 async def setup_test_db():
     """Configura banco SQLite em memória para cada teste."""
     os.environ["LF_API_TEST"] = "1"
@@ -23,9 +25,7 @@ async def setup_test_db():
     os.environ.pop("LF_API_REQUIRE_AUTH", None)
 
 
-
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     """Cliente HTTP async para testar a FastAPI app."""
     app = create_app()
@@ -103,6 +103,20 @@ async def test_update_and_delete_run(client: AsyncClient):
 
     resp_del = await client.delete(f"/api/runs/{run_id}")
     assert resp_del.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_api_execute_and_resume(client: AsyncClient):
+    """Testa endpoints /execute e /resume da API."""
+    create_resp = await client.post("/api/runs", json={"idea": "Build REST API", "stack": "python"})
+    assert create_resp.status_code == 201
+    run_id = create_resp.json()["id"]
+
+    exec_resp = await client.post(f"/api/runs/{run_id}/execute")
+    assert exec_resp.status_code == 200
+
+    resume_resp = await client.post(f"/api/runs/{run_id}/resume")
+    assert resume_resp.status_code == 200
 
 
 def test_cli_serve_cmd():

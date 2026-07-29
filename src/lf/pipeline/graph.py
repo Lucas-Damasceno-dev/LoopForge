@@ -16,7 +16,6 @@ from .nodes.devops import devops
 from .nodes.pm import product_manager
 from .nodes.qa import qa
 from .nodes.tech_lead import tech_lead
-from .plugins import get_registered_nodes
 from .state import GraphState
 
 
@@ -45,14 +44,11 @@ def router(
     if next_agent in ("FINISH", "__end__", None):
         return END
 
-    custom_nodes = get_registered_nodes()
-    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops") or next_agent in custom_nodes:
+    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops"):
         return next_agent
 
     # Fallback seguro: se next_agent for desconhecido ou FINISH, encerra o fluxo
     return END
-
-
 
 
 def should_retry(state: GraphState) -> Literal["appsec", "developer", "__end__"]:
@@ -67,7 +63,6 @@ def should_retry(state: GraphState) -> Literal["appsec", "developer", "__end__"]
 
     if qa_attempt < max_retries:
         return "developer"
-
 
     return END
 
@@ -88,17 +83,6 @@ def build_graph(
     workflow.add_node("qa", qa)
     workflow.add_node("appsec", appsec)
     workflow.add_node("devops", devops)
-
-    # Adiciona nós customizados de plugins registrados
-    custom_nodes = get_registered_nodes()
-    for custom_name, custom_func in custom_nodes.items():
-        workflow.add_node(custom_name, custom_func)
-        workflow.add_conditional_edges(
-            custom_name,
-            router,
-            {"__end__": END},
-        )
-
 
     # Entry point condicional — Roteamento adaptativo (Fast-Path vs Full-Path)
     workflow.set_conditional_entry_point(
@@ -185,5 +169,3 @@ def build_graph(
                 gates.append(n)
 
     return workflow.compile(checkpointer=checkpointer, interrupt_after=gates or None)
-
-

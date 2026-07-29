@@ -1,12 +1,15 @@
 """
-Nó QA: executa testes reais via harness e gera relatório estruturado.
-Integra com runner, parser, formatter do módulo harness.
+Nó QA: executa testes reais via harness e gera relatório estruturado,
+sem mutação direta de estado e sem reportar PASS falso para 0 testes.
 """
 from __future__ import annotations
 
 import json
 import os
+import subprocess
+import time
 from datetime import UTC, datetime
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -33,27 +36,32 @@ def qa(state: GraphState) -> dict:
     print("---EXECUTANDO NÓ: QA---")
 
     code = state.get("code", "")
-    tech_spec = state.get("tech_spec", "")
     project_dir = state.get("project_dir", os.getcwd())
+    now_iso = datetime.now(UTC).isoformat()
+    report_id = f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
+
+    feedback_history = list(state.get("feedback_history", []))
 
     if not code and not state.get("mock_llm"):
         print("--- AVISO: QA pulando testes — nenhum código foi gerado pelo Developer ---")
         fail_report = _build_report_from_harness(
-            report_id := f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001",
-            datetime.now(UTC).isoformat(),
+            report_id,
+            now_iso,
             {"passed": 0, "total": 0, "errors": ["Nenhum código para testar"], "duration_ms": 0},
             user_story_id="US000",
         )
         qa_attempt = state.get("qa_attempt_count", 0) + 1
-        state["qa_attempt_count"] = qa_attempt
-        state.setdefault("feedback_history", []).append(
-            {"from": "qa", "message": "Nenhum código gerado — Developer falhou", "timestamp": datetime.now(UTC).isoformat()}
-        )
+        new_feedback = feedback_history + [
+            {"from": "qa", "message": "Nenhum código gerado — Developer falhou", "timestamp": now_iso}
+        ]
         print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
-        return {**state, "test_report": fail_report, "qa_attempt_count": qa_attempt, "next_agent": "developer"}
-
-    now_iso = datetime.now(UTC).isoformat()
-    report_id = f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
+        return {
+            **state,
+            "test_report": fail_report,
+            "qa_attempt_count": qa_attempt,
+            "feedback_history": new_feedback,
+            "next_agent": "developer",
+        }
 
     if state.get("mock_llm"):
         print("--- INFO: QA modo MOCK ---")
@@ -61,7 +69,7 @@ def qa(state: GraphState) -> dict:
         return {**state, "test_report": report, "next_agent": "appsec"}
 
     # Fase 1: Executar harness real no projeto
-    harness_result = _run_harness(project_dir, state.get("stack", ""))
+    harness_result = _run_harness(project_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
 
     # Fase 2: Gerar relatório estruturado via OpenCode (com fallback resiliente para o harness)
     user_stories = state.get("user_stories", [])
@@ -74,7 +82,7 @@ def qa(state: GraphState) -> dict:
 - Tempo: {harness_result.get('duration_ms', 0)}ms
 
 Código implementado:
-```python
+```
 {code[:2000]}
 ```"""
         report = call_llm_via_opencode(
@@ -101,85 +109,168 @@ O relatório DEVE ter:
     if not isinstance(report, dict) or "summary" not in report:
         report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
 
-    # Atualiza campos dinâmicos
+    # Se harness falhou, garante que summary reflete a falha real
+    if harness_result.get("passed", 0) == 0 or harness_result.get("errors"):
+        report["summary"]["status"] = "FAIL"
+        report["summary"]["tests_passed"] = harness_result.get("passed", 0)
+        report["summary"]["tests_failed"] = max(1, len(harness_result.get("errors", [])))
+
     report["id"] = report_id
     report["execution_timestamp"] = now_iso
-    report.setdefault("summary", {})["duration_seconds"] = harness_result.get("duration_ms", 0) / 1000
-
+    report.setdefault("summary", {})["duration_seconds"] = harness_result.get("duration_ms", 0) / 1000.0
 
     output_dir = state.get("output_dir", ".")
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
         path = os.path.join(output_dir, f"test_report_{report_id}.json")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
         print(f"--- INFO: Test report salvo em {path} ---")
 
-    # Decide próximo passo baseado no resultado
-    is_pass = report.get("summary", {}).get("tests_failed", 1) == 0
+    is_pass = report.get("summary", {}).get("status") == "PASS" and report.get("summary", {}).get("tests_failed", 1) == 0
     next_agent = "appsec" if is_pass else "developer"
 
     qa_attempt = state.get("qa_attempt_count", 0)
+    new_feedback = feedback_history
     if not is_pass:
         qa_attempt += 1
-        state["qa_attempt_count"] = qa_attempt
         print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
-        state["feedback_history"] = state.get("feedback_history", []) + [
-            {"from": "qa", "message": f"{report.get('summary', {}).get('tests_failed', 0)} teste(s) falharam", "timestamp": now_iso}
-        ]
+        failed_cnt = report.get("summary", {}).get("tests_failed", 1)
+        err_details = harness_result.get("errors", ["Testes falharam"])
+        msg = f"{failed_cnt} teste(s) falharam: {'; '.join(err_details[:2])}"
+        new_feedback = feedback_history + [{"from": "qa", "message": msg, "timestamp": now_iso}]
 
-    return {**state, "test_report": report, "qa_attempt_count": qa_attempt, "next_agent": next_agent}
-
-
-
-
-def _run_harness(project_dir: str, stack: str = "") -> dict:
-    """Executa testes no projeto via subprocesso."""
-    import subprocess
-    import time
-
-    result = {"passed": 0, "total": 0, "errors": [], "duration_ms": 0}
-
-    stack_commands = {
-        "python": [("pytest", ["pytest", "-x", "--tb=short", "-q"])],
-        "java": [("mvn test", ["mvn", "test", "-q"]), ("gradle test", ["gradle", "test", "-q"])],
-        "javascript": [("npm test", ["npm", "test"])],
-        "go": [("go test", ["go", "test", "./..."])],
-        "rust": [("cargo test", ["cargo", "test"])],
+    return {
+        **state,
+        "test_report": report,
+        "qa_attempt_count": qa_attempt,
+        "feedback_history": new_feedback,
+        "next_agent": next_agent,
     }
 
-    commands = stack_commands.get(stack.lower(), [
-        ("npm test", ["npm", "test"]),
-        ("pytest", ["pytest", "-x", "--tb=short", "-q"]),
-        ("cargo test", ["cargo", "test"]),
-        ("go test", ["go", "test", "./..."]),
-        ("mvn test", ["mvn", "test", "-q"]),
-    ])
 
-    for name, cmd in commands:
-        start = time.time()
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=project_dir,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            duration = int((time.time() - start) * 1000)
-            result["duration_ms"] += duration
+def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> dict:
+    """Executa testes ou compilação do projeto/arquivos standalone via subprocesso."""
+    result = {"passed": 0, "total": 0, "errors": [], "duration_ms": 0}
+    dirs_to_check = [d for d in [project_dir, output_dir] if d and os.path.exists(d)]
 
-            if proc.returncode == 0:
-                result["passed"] += 1
+    stack_lower = stack.lower()
+
+    # Java harness
+    if "java" in stack_lower:
+        has_pom = any(os.path.exists(os.path.join(d, "pom.xml")) for d in dirs_to_check)
+        has_gradle = any(os.path.exists(os.path.join(d, "build.gradle")) for d in dirs_to_check)
+
+        if has_pom:
+            _exec_cmd(["mvn", "test", "-q"], project_dir, "mvn test", result)
+        elif has_gradle:
+            _exec_cmd(["gradle", "test", "-q"], project_dir, "gradle test", result)
+        else:
+            # Fallback para standalone Java files
+            java_files = []
+            for d in dirs_to_check:
+                java_files.extend(list(Path(d).glob("*.java")))
+
+            if java_files:
+                target_file = next((f for f in java_files if f.name == "Main.java"), java_files[0])
+                _exec_cmd(["javac", str(target_file)], str(target_file.parent), "javac compile", result)
+                if result["passed"] > 0:
+                    class_name = target_file.stem
+                    _exec_cmd(["java", class_name], str(target_file.parent), "java execution", result)
             else:
-                stderr = proc.stderr[-500:] if proc.stderr else ""
-                result["errors"].append(f"{name}: {stderr[:200]}")
-            result["total"] += 1
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            # Comando não encontrado ou timeout não é erro — stack não tem esse runner
-            pass
+                result["errors"].append("Nenhum arquivo .java nem pom.xml/build.gradle encontrado para testar.")
 
+        return result
+
+    # Python harness
+    if "python" in stack_lower:
+        has_pytest_files = any(list(Path(d).glob("test_*.py")) or list(Path(d).glob("*_test.py")) for d in dirs_to_check)
+        if has_pytest_files:
+            _exec_cmd(["pytest", "-x", "--tb=short", "-q"], project_dir, "pytest", result)
+        else:
+            py_files = []
+            for d in dirs_to_check:
+                py_files.extend([f for f in Path(d).glob("*.py") if not f.name.startswith("test_")])
+            if py_files:
+                for py_file in py_files[:2]:
+                    _exec_cmd(["python3", "-m", "py_compile", str(py_file)], str(py_file.parent), f"py_compile ({py_file.name})", result)
+            else:
+                _exec_cmd(["pytest", "-x", "--tb=short", "-q"], project_dir, "pytest", result)
+        return result
+
+    # JavaScript harness
+    if "javascript" in stack_lower or "js" in stack_lower:
+        has_pkg = any(os.path.exists(os.path.join(d, "package.json")) for d in dirs_to_check)
+        if has_pkg:
+            _exec_cmd(["npm", "test"], project_dir, "npm test", result)
+        else:
+            js_files = []
+            for d in dirs_to_check:
+                js_files.extend(list(Path(d).glob("*.js")))
+            if js_files:
+                for js_file in js_files[:2]:
+                    _exec_cmd(["node", "--check", str(js_file)], str(js_file.parent), f"node check ({js_file.name})", result)
+            else:
+                result["errors"].append("Nenhum arquivo .js nem package.json encontrado para testar.")
+        return result
+
+    # Go harness
+    if "go" in stack_lower:
+        has_go_mod = any(os.path.exists(os.path.join(d, "go.mod")) for d in dirs_to_check)
+        if has_go_mod:
+            _exec_cmd(["go", "test", "./..."], project_dir, "go test", result)
+        else:
+            go_files = []
+            for d in dirs_to_check:
+                go_files.extend(list(Path(d).glob("*.go")))
+            if go_files:
+                _exec_cmd(["go", "vet", str(go_files[0])], str(go_files[0].parent), "go vet", result)
+            else:
+                result["errors"].append("Nenhum arquivo .go encontrado para testar.")
+        return result
+
+    # Rust harness
+    if "rust" in stack_lower:
+        has_cargo = any(os.path.exists(os.path.join(d, "Cargo.toml")) for d in dirs_to_check)
+        if has_cargo:
+            _exec_cmd(["cargo", "test"], project_dir, "cargo test", result)
+        else:
+            rs_files = []
+            for d in dirs_to_check:
+                rs_files.extend(list(Path(d).glob("*.rs")))
+            if rs_files:
+                _exec_cmd(["rustc", "--crate-type", "bin", "--emit=metadata", str(rs_files[0])], str(rs_files[0].parent), "rustc check", result)
+            else:
+                result["errors"].append("Nenhum arquivo .rs encontrado para testar.")
+        return result
+
+    # Fallback genérico
+    _exec_cmd(["pytest", "-x", "--tb=short", "-q"], project_dir, "pytest", result)
     return result
+
+
+def _exec_cmd(cmd: list[str], cwd: str, name: str, result: dict) -> None:
+    start = time.time()
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        duration = int((time.time() - start) * 1000)
+        result["duration_ms"] += duration
+        result["total"] += 1
+
+        if proc.returncode == 0:
+            result["passed"] += 1
+        else:
+            stderr = proc.stderr[-500:] if proc.stderr else proc.stdout[-500:]
+            result["errors"].append(f"{name}: exit {proc.returncode} — {stderr[:200]}")
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        result["total"] += 1
+        result["errors"].append(f"{name}: runner indisponível ({e})")
 
 
 def _build_report_from_harness(
@@ -189,13 +280,18 @@ def _build_report_from_harness(
     user_story_id: str = "US001",
 ) -> dict:
     """Constrói relatório de teste estruturado e preciso a partir da execução direta do harness."""
-    errors = harness_result.get("errors", [])
+    errors = list(harness_result.get("errors", []))
     total = harness_result.get("total", 0)
     passed = harness_result.get("passed", 0)
-    failed = len(errors)
     duration_s = harness_result.get("duration_ms", 0) / 1000.0
 
-    status = "PASS" if failed == 0 and (passed > 0 or total == 0) else "FAIL"
+    if total == 0:
+        errors.append("Nenhum teste foi executado ou nenhum harness/compilador foi encontrado.")
+        failed = len(errors)
+        status = "FAIL"
+    else:
+        failed = len(errors)
+        status = "PASS" if failed == 0 and passed > 0 else "FAIL"
 
     return {
         "id": report_id,
@@ -206,7 +302,7 @@ def _build_report_from_harness(
         "environment": {"name": "local", "config_hash": None},
         "summary": {
             "status": status,
-            "total_tests": total if total > 0 else (passed + failed),
+            "total_tests": max(total, passed + failed),
             "tests_passed": passed,
             "tests_failed": failed,
             "tests_skipped": 0,
@@ -219,7 +315,7 @@ def _build_report_from_harness(
                 "suite_type": "unit/integration",
                 "status": status,
                 "duration_seconds": duration_s,
-                "total_tests": total,
+                "total_tests": max(total, passed + failed),
                 "failed_tests_details": [{"error": err} for err in errors],
             }
         ],
@@ -229,7 +325,6 @@ def _build_report_from_harness(
 
 
 def _mock_report(report_id: str, timestamp: str) -> dict:
-
     return {
         "id": report_id,
         "user_story_id": "US001",

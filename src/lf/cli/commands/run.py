@@ -8,9 +8,7 @@ from rich.prompt import Confirm, Prompt
 from lf.config.loader import load_config
 from lf.config.schema import TaskSchema
 from lf.guardrails.circuit_breaker import CircuitBreaker
-from lf.guardrails.loop_lock import LoopLock
 from lf.orchestrator.task_dispatcher import TaskDispatcher
-from lf.telemetry.recorder import TelemetryRecorder
 
 console = Console()
 
@@ -59,91 +57,76 @@ def run_cmd(
     wizard: bool,
 ):
     """Executa a pipeline de tarefas dos agentes autônomos do LoopForge."""
-    lock = LoopLock()
     session_id = str(uuid.uuid4())[:8]
 
-    if not lock.acquire(session_id):
-        console.print("[bold red]Outra execução do LoopForge está ativa (loop.lock encontrado).[/bold red]")
+    # 1. Se resume_id for fornecido, executa retomada via checkpoint
+    if resume_id:
+        dispatcher = TaskDispatcher(mock_llm=mock, interactive=interactive, notify=notify, webhook_url=webhook_url)
+        console.print(f"[bold cyan]⚡ Retomando pipeline do checkpoint '{resume_id}'...[/bold cyan]")
+        dispatcher.resume(project_id="project", task_id=resume_id)
         return
 
-    try:
-        # 1. Se resume_id for fornecido, executa retomada via checkpoint
-        if resume_id:
-            dispatcher = TaskDispatcher(mock_llm=mock, interactive=interactive, notify=notify, webhook_url=webhook_url)
-            console.print(f"[bold cyan]⚡ Retomando pipeline do checkpoint '{resume_id}'...[/bold cyan]")
-            dispatcher.resume(project_id="project", task_id=resume_id)
-            return
+    # 2. Wizard se não houver ideia/plan ou se --wizard for passado
+    if wizard or (not idea and sys.stdin.isatty() and not load_config().plan.tasks):
+        wiz = _run_interactive_wizard()
+        idea = wiz["idea"]
+        stack = wiz["stack"]
+        interactive = wiz["interactive"]
+        review_mode = wiz["review_mode"]
+        notify = wiz["notify"]
 
-        # 2. Wizard se não houver ideia/plan ou se --wizard for passado
-        if wizard or (not idea and sys.stdin.isatty() and not load_config().plan.tasks):
-            wiz = _run_interactive_wizard()
-            idea = wiz["idea"]
-            stack = wiz["stack"]
-            interactive = wiz["interactive"]
-            review_mode = wiz["review_mode"]
-            notify = wiz["notify"]
+    cfg = load_config()
+    if stack is None:
+        stack = cfg.stack.language if (cfg.stack and cfg.stack.language) else "python"
+    circuit = CircuitBreaker(max_total_cost=cfg.budget_limit_usd)
+    dispatcher = TaskDispatcher(
+        mock_llm=mock,
+        interactive=interactive,
+        circuit_breaker=circuit,
+        review_mode=review_mode,
+        notify=notify,
+        webhook_url=webhook_url,
+    )
 
-        cfg = load_config()
-        if stack is None:
-            stack = cfg.stack.language if (cfg.stack and cfg.stack.language) else "python"
-        circuit = CircuitBreaker(max_total_cost=cfg.budget_limit_usd)
-        dispatcher = TaskDispatcher(
-            mock_llm=mock,
-            interactive=interactive,
-            circuit_breaker=circuit,
-            review_mode=review_mode,
-            notify=notify,
-            webhook_url=webhook_url,
-        )
-        recorder = TelemetryRecorder()
+    tasks_to_run = []
+    if idea:
+        tasks_to_run = [TaskSchema(id="task-1", title=idea, agent_id="cpo", stack=stack)]
+    elif cfg.plan.tasks:
+        tasks_to_run = cfg.plan.tasks
+    else:
+        tasks_to_run = [TaskSchema(id="task-1", title="Build application features", agent_id="cpo", stack=stack)]
 
-        tasks_to_run = []
-        if idea:
-            tasks_to_run = [TaskSchema(id="task-1", title=idea, agent_id="cpo", stack=stack)]
-        elif cfg.plan.tasks:
-            tasks_to_run = cfg.plan.tasks
-        else:
-            tasks_to_run = [TaskSchema(id="task-1", title="Build application features", agent_id="cpo", stack=stack)]
+    console.print(f"[bold green]⚡ Iniciando LoopForge Run (Sessão ID: {session_id})...[/bold green]")
+    if interactive:
+        console.print("[bold yellow]👤 Modo Interativo (HITL) ativado.[/bold yellow]")
+    if review_mode:
+        console.print("[bold magenta]🔍 Modo Revisão ativado (pausa no final antes de aplicar).[/bold magenta]")
 
-        console.print(f"[bold green]⚡ Iniciando LoopForge Run (Sessão ID: {session_id})...[/bold green]")
-        if interactive:
-            console.print("[bold yellow]👤 Modo Interativo (HITL) ativado.[/bold yellow]")
-        if review_mode:
-            console.print("[bold magenta]🔍 Modo Revisão ativado (pausa no final antes de aplicar).[/bold magenta]")
+    shared_state: dict = {}
+    for task in tasks_to_run:
+        if not circuit.can_proceed():
+            console.print("[bold red]Circuit breaker ativado! Interrompendo pipeline.[/bold red]")
+            break
 
-        shared_state: dict = {}
-        for task in tasks_to_run:
-            if not circuit.can_proceed():
-                console.print("[bold red]Circuit breaker ativado! Interrompendo pipeline.[/bold red]")
-                break
+        console.print(f"\n[bold cyan]Executando Tarefa {task.id}: {task.title}[/bold cyan]")
+        try:
+            state = dispatcher.dispatch(task, project_id=cfg.project_id, shared_state=shared_state)
+            shared_state.update({k: v for k, v in state.items() if v})
 
-            console.print(f"\n[bold cyan]Executando Tarefa {task.id}: {task.title}[/bold cyan]")
-            try:
-                state = dispatcher.dispatch(task, project_id=cfg.project_id, shared_state=shared_state)
-                shared_state.update({k: v for k, v in state.items() if v})
+            error = state.get("error")
+            test_report = state.get("test_report", {})
+            has_summary = bool(test_report and "summary" in test_report)
+            tests_failed = test_report.get("summary", {}).get("tests_failed", 0) if has_summary else 0
 
-                error = state.get("error")
-                test_report = state.get("test_report", {})
-                has_summary = bool(test_report and "summary" in test_report)
-                tests_failed = test_report.get("summary", {}).get("tests_failed", 0) if has_summary else 0
-
-                if error:
-                    circuit.record_failure()
-                    console.print(f"[red]Tarefa {task.id} falhou: {error}[/red]")
-                elif tests_failed == 0:
-                    circuit.record_success()
-                    console.print(f"[green]Tarefa {task.id} concluída com sucesso.[/green]")
-                else:
-                    circuit.record_failure()
-                    console.print(f"[red]Tarefa {task.id}: {tests_failed} teste(s) falharam[/red]")
-
-                recorder.record_node_execution(
-                    session_id, task.id, state.get("next_agent", "unknown"),
-                    "done" if (not error and tests_failed == 0) else "failed"
-                )
-            except Exception as e:
+            if error:
                 circuit.record_failure()
-                console.print(f"[red]Tarefa {task.id} falhou com erro: {e}[/red]")
-
-    finally:
-        lock.release()
+                console.print(f"[red]Tarefa {task.id} falhou: {error}[/red]")
+            elif tests_failed == 0:
+                circuit.record_success()
+                console.print(f"[green]Tarefa {task.id} concluída com sucesso.[/green]")
+            else:
+                circuit.record_failure()
+                console.print(f"[red]Tarefa {task.id}: {tests_failed} teste(s) falharam[/red]")
+        except Exception as e:
+            circuit.record_failure()
+            console.print(f"[red]Tarefa {task.id} falhou com erro: {e}[/red]")

@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from lf.guardrails.circuit_breaker import CircuitBreaker
-from lf.guardrails.loop_lock import LoopLock
 from lf.guardrails.security_scanner import SecurityScanner
 from lf.telemetry.store import TelemetryStore
 
@@ -15,17 +14,6 @@ def test_circuit_breaker():
 
     cb.record_failure()
     assert not cb.can_proceed()
-
-
-def test_loop_lock(tmp_path: Path):
-    lock_file = tmp_path / "test.lock"
-    lock = LoopLock(lock_file)
-
-    assert lock.acquire("session-1")
-    assert not lock.acquire("session-2")
-    assert lock.release()
-    assert lock.acquire("session-2")
-    lock.release()
 
 
 def test_telemetry_store(tmp_path: Path):

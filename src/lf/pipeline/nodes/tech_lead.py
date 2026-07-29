@@ -78,16 +78,18 @@ Responda com:
             circuit_breaker=state.get("circuit_breaker"),
         )
 
+        new_feedback = list(state.get("feedback_history", []))
         if validation.get("needs_feedback"):
             feedback_msg = validation.get('feedback_message', '')
             print(f"--- AVISO: Tech Lead solicita feedback: ---")
             print(f"--- {feedback_msg[:500]} ---")
             if len(feedback_msg) > 500:
                 print("--- (Feedback truncado em 500 caracteres) ---")
-            state["feedback_history"] = state.get("feedback_history", []) + [
+            new_feedback.append(
                 {"from": "tech_lead", "message": validation.get("feedback_message", ""), "timestamp": now_iso}
-            ]
+            )
     except Exception as e:
+        new_feedback = list(state.get("feedback_history", []))
         print(f"--- ERRO TL validação: {e} ---")
 
     # Fase 2: Gerar tech spec
@@ -123,7 +125,7 @@ Template (use como guia):
             f.write(tech_spec)
         print(f"--- INFO: Tech spec salva em {path} ---")
 
-    return {**state, "tech_spec": tech_spec, "next_agent": "developer"}
+    return {**state, "tech_spec": tech_spec, "feedback_history": new_feedback, "next_agent": "developer"}
 
 
 def _mock_tech_spec(user_stories: list[dict], template: str, date: str) -> str:

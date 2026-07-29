@@ -51,9 +51,10 @@ DEFAULT_OPENROUTER_BASE_URL = os.environ.get(
 
 FALLBACK_OPENROUTER_MODELS = [
     "inclusionai/ling-3.0-flash:free",
+    "qwen/qwen-2.5-coder-32b-instruct:free",
     "google/gemini-2.0-flash-lite:free",
+    "deepseek/deepseek-r1",
     "meta-llama/llama-3.3-70b-instruct:free",
-    "deepseek/deepseek-r1:free",
 ]
 
 
@@ -68,10 +69,14 @@ def call_openrouter_api(
     model: str = DEFAULT_OPENROUTER_MODEL,
     temperature: float = 0.2,
     api_key: str | None = None,
-    timeout: float = 60.0,
+    timeout: float | None = None,
 ) -> str:
     """Realiza uma chamada à API do OpenRouter via httpx com cadeia automática de fallback de modelos."""
     import httpx
+
+    if timeout is None:
+        env_timeout = os.environ.get("LLM_TIMEOUT") or os.environ.get("OPENROUTER_TIMEOUT")
+        timeout = float(env_timeout) if env_timeout else 60.0
 
     key = api_key or os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
     if not key:

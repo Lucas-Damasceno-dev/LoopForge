@@ -117,7 +117,7 @@ def create_app() -> FastAPI:
         except Exception:
             ws_manager.disconnect(websocket)
 
-    # ─── CRUD Runs ──────────────────────────────────────────────────
+    # ─── CRUD & Execução de Runs ──────────────────────────────────
     @app.post(
         "/api/runs",
         response_model=RunResponse,
@@ -125,8 +125,11 @@ def create_app() -> FastAPI:
         tags=["Runs"],
         dependencies=[Depends(verify_authentication)],
     )
-    async def create_run(payload: RunCreate, session: AsyncSession = Depends(get_session)):
-        """Cria uma nova execução de pipeline."""
+    async def create_run(
+        payload: RunCreate,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Cria e dispara uma nova execução de pipeline em segundo plano."""
         run = PipelineRun(
             idea=payload.idea,
             stack=payload.stack,
@@ -145,6 +148,80 @@ def create_app() -> FastAPI:
             }
         )
 
+        import asyncio
+        asyncio.create_task(
+            _execute_pipeline_in_background(
+                run_id=run.id,
+                idea=payload.idea,
+                stack=payload.stack,
+                mock_llm=payload.mock_llm,
+                routing_mode=payload.routing_mode,
+                interactive=payload.interactive,
+            )
+        )
+
+        return run
+
+    @app.post(
+        "/api/runs/{run_id}/execute",
+        response_model=RunResponse,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def execute_run(
+        run_id: str,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Dispara a execução de uma pipeline pendente ou falhada em segundo plano."""
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+
+        import asyncio
+        asyncio.create_task(
+            _execute_pipeline_in_background(
+                run_id=run.id,
+                idea=run.idea,
+                stack=run.stack,
+            )
+        )
+
+        return run
+
+    @app.post(
+        "/api/runs/{run_id}/resume",
+        response_model=RunResponse,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def resume_run(
+        run_id: str,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Retoma uma execução de pipeline interrompida a partir do último checkpoint."""
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+
+        import asyncio
+        def _sync_resume():
+            from lf.orchestrator.task_dispatcher import TaskDispatcher
+            dispatcher = TaskDispatcher()
+            return dispatcher.resume(project_id="project", task_id=f"run-{run_id}")
+
+        async def _resume_in_bg():
+            run.status = "running"
+            await session.commit()
+            try:
+                final_state = await asyncio.to_thread(_sync_resume)
+                run.status = "completed" if not final_state.get("error") else "failed"
+                run.logs = final_state.get("error") or "Pipeline retomada com sucesso"
+            except Exception as e:
+                run.status = "failed"
+                run.logs = str(e)
+            await session.commit()
+
+        asyncio.create_task(_resume_in_bg())
         return run
 
     @app.get(
@@ -292,4 +369,106 @@ def create_app() -> FastAPI:
         return decisions
 
     return app
+
+
+async def _execute_pipeline_in_background(
+    run_id: str,
+    idea: str,
+    stack: str,
+    mock_llm: bool = False,
+    routing_mode: str = "full",
+    interactive: bool = False,
+):
+    """Executa a pipeline assincronamente em segundo plano e atualiza o estado da Run no DB."""
+    import asyncio
+    import os
+    import time
+    from lf.api.database import session_factory
+    from lf.api.models import PipelineRun
+    from lf.config.schema import TaskSchema
+    from lf.orchestrator.task_dispatcher import TaskDispatcher
+
+    start_time = time.time()
+
+    if session_factory:
+        async with session_factory() as session:
+            run = await session.get(PipelineRun, run_id)
+            if run:
+                run.status = "running"
+                await session.commit()
+
+    task = TaskSchema(
+        id=f"task-{run_id[:8]}",
+        title=idea,
+        agent_id="cpo",
+        stack=stack,
+        routing_mode=routing_mode,
+    )
+
+    project_dir = f"/tmp/loopforge/run_{run_id}"
+    os.makedirs(project_dir, exist_ok=True)
+
+    if os.getenv("LF_API_TEST"):
+        mock_llm = True
+
+    dispatcher = TaskDispatcher(
+        mock_llm=mock_llm,
+        interactive=interactive,
+        notify=False,
+    )
+
+    def _sync_dispatch():
+        return dispatcher.dispatch(
+            task,
+            project_id=f"run-{run_id}",
+            shared_state={"project_dir": project_dir, "output_dir": project_dir},
+        )
+
+    try:
+        final_state = await asyncio.to_thread(_sync_dispatch)
+        duration = round(time.time() - start_time, 2)
+
+        err = final_state.get("error")
+        test_report = final_state.get("test_report", {})
+        tests_failed = (
+            test_report.get("summary", {}).get("tests_failed", 0)
+            if isinstance(test_report, dict)
+            else 0
+        )
+
+        final_status = "completed" if (not err and tests_failed == 0) else "failed"
+        log_msg = err if err else f"Pipeline concluída em {duration}s. Testes com falha: {tests_failed}"
+
+        if session_factory:
+            async with session_factory() as session:
+                run = await session.get(PipelineRun, run_id)
+                if run:
+                    run.status = final_status
+                    run.current_node = final_state.get("next_agent", "FINISH")
+                    run.duration_seconds = duration
+                    run.logs = log_msg
+                    await session.commit()
+
+        await ws_manager.broadcast({
+            "event": "pipeline_finished",
+            "run_id": run_id,
+            "status": final_status,
+            "duration_seconds": duration,
+        })
+    except Exception as e:
+        duration = round(time.time() - start_time, 2)
+        if session_factory:
+            async with session_factory() as session:
+                run = await session.get(PipelineRun, run_id)
+                if run:
+                    run.status = "failed"
+                    run.duration_seconds = duration
+                    run.logs = f"Erro na execução da pipeline: {e}"
+                    await session.commit()
+
+        await ws_manager.broadcast({
+            "event": "pipeline_error",
+            "run_id": run_id,
+            "error": str(e),
+        })
 

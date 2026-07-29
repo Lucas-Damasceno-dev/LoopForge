@@ -15,7 +15,9 @@ from lf.config.schema import TaskSchema
 from lf.orchestrator.task_dispatcher import TaskDispatcher, _send_notification
 
 
-@pytest.fixture(autouse=True)
+import pytest_asyncio
+
+@pytest_asyncio.fixture(autouse=True)
 async def setup_test_env(tmp_path):
     os.chdir(tmp_path)
     os.environ["LF_API_TEST"] = "1"

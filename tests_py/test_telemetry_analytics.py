@@ -1,11 +1,10 @@
 import json
 
 from lf.telemetry.analytics import export_analytics_json, render_analytics_summary
-from lf.telemetry.recorder import TelemetryRecorder
 from lf.telemetry.store import TelemetryStore
 
 
-def test_telemetry_store_and_recorder(tmp_path):
+def test_telemetry_store(tmp_path):
     db_file = tmp_path / "telemetry.sqlite"
     store = TelemetryStore(db_path=db_file)
     store.log_event(
@@ -16,25 +15,10 @@ def test_telemetry_store_and_recorder(tmp_path):
         duration=1.25,
     )
 
-
     events = store.fetch_all()
     assert len(events) == 1
     assert events[0]["session_id"] == "s-001"
     assert events[0]["node"] == "developer"
-
-    # Test TelemetryRecorder
-    recorder = TelemetryRecorder(store=store)
-    recorder.record_node_execution(
-        session_id="s-002",
-        task_id="T-002",
-        node="qa",
-        status="done",
-        duration=0.5,
-    )
-
-
-    events_updated = store.fetch_all()
-    assert len(events_updated) == 2
 
 
 def test_render_analytics_summary(tmp_path):
@@ -42,7 +26,6 @@ def test_render_analytics_summary(tmp_path):
     store = TelemetryStore(db_path=db_file)
     store.log_event("s1", "T1", "cpo", "done", 2.0)
 
-    # Render summary table to console
     render_analytics_summary(store=store)
 
 

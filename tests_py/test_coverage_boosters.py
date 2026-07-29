@@ -26,7 +26,9 @@ class DummySchema(BaseModel):
     count: int = Field(0)
 
 
-@pytest.fixture(autouse=True)
+import pytest_asyncio
+
+@pytest_asyncio.fixture(autouse=True)
 async def setup_test_env():
     os.environ["LF_API_TEST"] = "1"
     await init_db()
