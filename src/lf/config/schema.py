@@ -56,6 +56,9 @@ class TaskSchema(BaseModel):
     routing_mode: str = "full"
     task_type: str = "feature"
 
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item, None)
+
 
 class PlanSchema(BaseModel):
     model_config = ConfigDict(extra="ignore", from_attributes=True, validate_default=True)
