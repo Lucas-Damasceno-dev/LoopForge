@@ -15,7 +15,7 @@ console = Console()
 @click.command(name="benchmark")
 @click.option("--limit", default=10, type=int, help="Número de problemas curados a executar (padrão: 10)")
 @click.option("--runs", default=None, type=int, help="Alias para --limit (compatibilidade retroativa)")
-@click.option("--mock", is_flag=True, default=True, help="Executar em modo LLM mock para testes ultrarrápidos")
+@click.option("--mock/--no-mock", default=True, help="Executar em modo LLM mock para testes ultrarrápidos")
 @click.option("--storage-dir", default=".loopforge/benchmarks", help="Diretório de armazenamento do histórico ELO")
 def benchmark_cmd(limit: int, runs: int | None, mock: bool, storage_dir: str):
     """Executa a suíte curada de benchmarks e mede a pontuação ELO do pipeline."""
