@@ -135,19 +135,9 @@
       border: none;
       box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4);
     }
-    .btn-primary:hover {
-      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.6);
-    }
 
-    .btn-success {
-      background: linear-gradient(135deg, #059669, #10b981);
-      border: none;
-    }
-
-    .btn-danger {
-      background: linear-gradient(135deg, #e11d48, #f43f5e);
-      border: none;
-    }
+    .btn-success { background: linear-gradient(135deg, #059669, #10b981); border: none; }
+    .btn-danger { background: linear-gradient(135deg, #e11d48, #f43f5e); border: none; }
 
     .status-pill {
       padding: 0.35rem 0.8rem;
@@ -163,21 +153,12 @@
       border: 1px solid var(--border-glass);
     }
 
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--text-dim);
-    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
     .dot.running { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); animation: pulse 1.5s infinite; }
     .dot.success { background: var(--emerald); box-shadow: 0 0 10px var(--emerald); }
     .dot.error { background: var(--rose); box-shadow: 0 0 10px var(--rose); }
 
-    @keyframes pulse {
-      0% { opacity: 0.4; }
-      50% { opacity: 1; }
-      100% { opacity: 0.4; }
-    }
+    @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
 
     main {
       max-width: 1600px;
@@ -207,10 +188,7 @@
       transition: all 0.2s ease;
     }
 
-    .metric-card:hover {
-      border-color: var(--border-highlight);
-      transform: translateY(-2px);
-    }
+    .metric-card:hover { border-color: var(--border-highlight); transform: translateY(-2px); }
 
     .metric-title {
       font-size: 0.75rem;
@@ -230,7 +208,6 @@
       margin-top: 0.4rem;
       color: var(--text-main);
     }
-
     .metric-val.cyan { color: var(--cyan); }
     .metric-val.purple { color: var(--purple); }
     .metric-val.emerald { color: var(--emerald); }
@@ -262,26 +239,21 @@
 
     .kanban-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 1rem;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.75rem;
     }
 
-    @media (max-width: 1200px) {
-      .kanban-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 640px) {
-      .kanban-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 1400px) { .kanban-grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 768px) { .kanban-grid { grid-template-columns: repeat(2, 1fr); } }
 
     .agent-column {
       background: rgba(11, 15, 25, 0.6);
       border: 1px solid var(--border-glass);
       border-radius: 12px;
-      padding: 1rem;
+      padding: 0.85rem;
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
-      position: relative;
       transition: all 0.3s ease;
     }
 
@@ -294,70 +266,37 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding-bottom: 0.75rem;
+      padding-bottom: 0.6rem;
       border-bottom: 1px solid var(--border-glass);
     }
 
-    .agent-name {
-      font-size: 0.9rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .agent-badge {
-      font-size: 0.65rem;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
+    .agent-name { font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; }
+    .agent-badge { font-size: 0.6rem; padding: 0.15rem 0.35rem; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
 
     .badge-cpo { background: rgba(56, 189, 248, 0.2); color: var(--cyan); }
     .badge-pm { background: rgba(192, 132, 252, 0.2); color: var(--purple); }
     .badge-tl { background: rgba(251, 191, 36, 0.2); color: var(--amber); }
     .badge-dev { background: rgba(52, 211, 153, 0.2); color: var(--emerald); }
     .badge-qa { background: rgba(244, 63, 94, 0.2); color: var(--rose); }
+    .badge-sec { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+    .badge-ops { background: rgba(99, 102, 241, 0.2); color: #6366f1; }
 
     .agent-card {
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--border-glass);
       border-radius: 8px;
-      padding: 0.85rem;
-      font-size: 0.8rem;
+      padding: 0.75rem;
+      font-size: 0.75rem;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
-    .agent-card:hover {
-      background: rgba(255, 255, 255, 0.07);
-      border-color: var(--cyan);
-    }
+    .agent-card:hover { background: rgba(255, 255, 255, 0.07); border-color: var(--cyan); }
+    .card-title { font-weight: 600; margin-bottom: 0.3rem; color: var(--text-main); }
+    .card-meta { color: var(--text-muted); font-size: 0.7rem; display: flex; justify-content: space-between; align-items: center; }
 
-    .card-title {
-      font-weight: 600;
-      margin-bottom: 0.4rem;
-      color: var(--text-main);
-    }
-
-    .card-meta {
-      color: var(--text-muted);
-      font-size: 0.725rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .workspace-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-    }
-
-    @media (max-width: 1024px) {
-      .workspace-grid { grid-template-columns: 1fr; }
-    }
+    .workspace-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 1024px) { .workspace-grid { grid-template-columns: 1fr; } }
 
     .panel-card {
       background: var(--bg-card);
@@ -370,33 +309,9 @@
       height: 480px;
     }
 
-    .tabs-header {
-      display: flex;
-      gap: 0.5rem;
-      border-bottom: 1px solid var(--border-glass);
-      padding-bottom: 0.75rem;
-      margin-bottom: 1rem;
-      overflow-x: auto;
-    }
-
-    .tab-btn {
-      padding: 0.4rem 0.85rem;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-    }
-
-    .tab-btn.active {
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--cyan);
-      border-color: rgba(56, 189, 248, 0.3);
-    }
+    .tabs-header { display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.75rem; margin-bottom: 1rem; overflow-x: auto; }
+    .tab-btn { padding: 0.4rem 0.85rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; border: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+    .tab-btn.active { background: rgba(56, 189, 248, 0.15); color: var(--cyan); border-color: rgba(56, 189, 248, 0.3); }
 
     .log-box {
       background: #04060c;
@@ -413,114 +328,26 @@
       gap: 0.4rem;
     }
 
-    .log-line {
-      line-height: 1.4;
-      word-break: break-word;
-    }
+    .log-line { line-height: 1.4; word-break: break-word; }
     .log-time { color: var(--text-dim); margin-right: 0.5rem; }
     .log-info { color: var(--cyan); }
     .log-warn { color: var(--amber); }
     .log-error { color: var(--rose); }
     .log-success { color: var(--emerald); }
 
-    .artifact-viewer {
-      background: #04060c;
-      border: 1px solid var(--border-glass);
-      border-radius: 8px;
-      padding: 1rem;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      color: #e2e8f0;
-      flex: 1;
-      overflow: auto;
-      white-space: pre-wrap;
-    }
+    .artifact-viewer { background: #04060c; border: 1px solid var(--border-glass); border-radius: 8px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #e2e8f0; flex: 1; overflow: auto; white-space: pre-wrap; }
 
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(8px);
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-
-    .modal-overlay.open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-box {
-      background: #0f172a;
-      border: 1px solid var(--cyan);
-      box-shadow: 0 0 40px var(--cyan-glow);
-      border-radius: 16px;
-      width: 90%;
-      max-width: 650px;
-      padding: 1.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-      transform: scale(0.95);
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .modal-overlay.open .modal-box {
-      transform: scale(1);
-    }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .modal-title {
-      font-family: 'Outfit', sans-serif;
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--cyan);
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .form-label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .form-input, .form-textarea {
-      width: 100%;
-      padding: 0.75rem;
-      border-radius: 8px;
-      background: #04060c;
-      border: 1px solid var(--border-glass);
-      color: var(--text-main);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.875rem;
-    }
-
-    .form-input:focus, .form-textarea:focus {
-      outline: none;
-      border-color: var(--cyan);
-    }
-
-    .modal-actions {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0.75rem;
-      margin-top: 0.5rem;
-    }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+    .modal-box { background: #0f172a; border: 1px solid var(--cyan); box-shadow: 0 0 40px var(--cyan-glow); border-radius: 16px; width: 90%; max-width: 600px; padding: 1.75rem; display: flex; flex-direction: column; gap: 1.25rem; transform: scale(0.95); transition: transform 0.3s ease; }
+    .modal-overlay.open .modal-box { transform: scale(1); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; }
+    .modal-title { font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--cyan); }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+    .form-input, .form-textarea, .form-select { width: 100%; padding: 0.75rem; border-radius: 8px; background: #04060c; border: 1px solid var(--border-glass); color: var(--text-main); font-family: 'Inter', sans-serif; font-size: 0.875rem; }
+    .form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: var(--cyan); }
+    .modal-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
@@ -537,15 +364,11 @@
     <div class="nav-actions">
       <div class="status-pill">
         <span class="dot success" id="statusDot"></span>
-        <span id="statusLabel">Operacional</span>
+        <span id="statusLabel">Conectado (WS Live)</span>
       </div>
 
       <button class="btn btn-primary" onclick="openNewRunModal()">
         <i class="fa-solid fa-play"></i> Nova Execução
-      </button>
-
-      <button class="btn" onclick="toggleInteractiveMode()">
-        <i class="fa-solid fa-sliders"></i> Modo Interativo: <span id="interactiveStatus" style="color:var(--cyan)">OFF</span>
       </button>
     </div>
   </header>
@@ -553,8 +376,8 @@
   <main>
     <div class="metrics-grid">
       <div class="metric-card">
-        <div class="metric-title">Execuções Ativas <i class="fa-solid fa-diagram-project cyan"></i></div>
-        <div class="metric-val cyan" id="metActiveRuns">1</div>
+        <div class="metric-title">Execução Ativa <i class="fa-solid fa-diagram-project cyan"></i></div>
+        <div class="metric-val cyan" id="metActiveRun">run-live</div>
       </div>
       
       <div class="metric-card">
@@ -563,13 +386,13 @@
       </div>
 
       <div class="metric-card">
-        <div class="metric-title">Taxa de Testes (QA) <i class="fa-solid fa-vial-circle-check emerald"></i></div>
-        <div class="metric-val emerald" id="metQaRate">100% PASS</div>
+        <div class="metric-title">Status QA <i class="fa-solid fa-vial-circle-check emerald"></i></div>
+        <div class="metric-val emerald" id="metQaRate">PASS</div>
       </div>
 
       <div class="metric-card">
-        <div class="metric-title">Orçamento Consumido <i class="fa-solid fa-coins amber"></i></div>
-        <div class="metric-val amber" id="metCostUsd">$0.05 / $10.00</div>
+        <div class="metric-title">Tempo Decorrido <i class="fa-solid fa-stopwatch amber"></i></div>
+        <div class="metric-val amber" id="metDuration">0.0s</div>
       </div>
     </div>
 
@@ -580,7 +403,7 @@
           Fluxo de Agentes do Pipeline (LangGraph DAG)
         </div>
         <div style="font-size:0.8rem; color:var(--text-muted)">
-          Sessão Ativa: <span id="sessionIdLabel" style="font-family:'JetBrains Mono'; color:var(--cyan)">authonboarding-session</span>
+          WebSocket: <span id="wsUrlLabel" style="font-family:'JetBrains Mono'; color:var(--cyan)">/ws/streaming</span>
         </div>
       </div>
 
@@ -590,26 +413,20 @@
             <span class="agent-name"><i class="fa-solid fa-lightbulb" style="color:var(--cyan)"></i> CPO</span>
             <span class="agent-badge badge-cpo">Épicos</span>
           </div>
-          <div class="agent-card" onclick="showArtifact('epic')">
-            <div class="card-title">E-001: Visão & Épico</div>
-            <div class="card-meta">
-              <span>status: DONE</span>
-              <span><i class="fa-solid fa-check emerald"></i></span>
-            </div>
+          <div class="agent-card" onclick="switchArtifactTab('epic')">
+            <div class="card-title">Épico</div>
+            <div class="card-meta"><span>status: DONE</span><span><i class="fa-solid fa-check emerald"></i></span></div>
           </div>
         </div>
 
-        <div class="agent-column" id="col-product_manager">
+        <div class="agent-column" id="col-pm">
           <div class="column-head">
             <span class="agent-name"><i class="fa-solid fa-list-check" style="color:var(--purple)"></i> PM</span>
-            <span class="agent-badge badge-pm">User Stories</span>
+            <span class="agent-badge badge-pm">Stories</span>
           </div>
-          <div class="agent-card" onclick="showArtifact('stories')">
-            <div class="card-title">E-001-US001: CLI Auth</div>
-            <div class="card-meta">
-              <span>status: DONE</span>
-              <span><i class="fa-solid fa-check emerald"></i></span>
-            </div>
+          <div class="agent-card" onclick="switchArtifactTab('stories')">
+            <div class="card-title">User Stories</div>
+            <div class="card-meta"><span>status: DONE</span><span><i class="fa-solid fa-check emerald"></i></span></div>
           </div>
         </div>
 
@@ -618,26 +435,20 @@
             <span class="agent-name"><i class="fa-solid fa-microchip" style="color:var(--amber)"></i> Tech Lead</span>
             <span class="agent-badge badge-tl">Tech Spec</span>
           </div>
-          <div class="agent-card" onclick="showArtifact('spec')">
-            <div class="card-title">tech_spec_E-001.md</div>
-            <div class="card-meta">
-              <span>status: DONE</span>
-              <span><i class="fa-solid fa-check emerald"></i></span>
-            </div>
+          <div class="agent-card" onclick="switchArtifactTab('spec')">
+            <div class="card-title">tech_spec.md</div>
+            <div class="card-meta"><span>status: DONE</span><span><i class="fa-solid fa-check emerald"></i></span></div>
           </div>
         </div>
 
         <div class="agent-column active-node" id="col-developer">
           <div class="column-head">
             <span class="agent-name"><i class="fa-solid fa-code" style="color:var(--emerald)"></i> Developer</span>
-            <span class="agent-badge badge-dev">Código Real</span>
+            <span class="agent-badge badge-dev">Código</span>
           </div>
-          <div class="agent-card" onclick="showArtifact('code')">
-            <div class="card-title">generated_code.py</div>
-            <div class="card-meta">
-              <span>status: IMPLEMENTADO</span>
-              <span><i class="fa-solid fa-check emerald"></i></span>
-            </div>
+          <div class="agent-card" onclick="switchArtifactTab('code')">
+            <div class="card-title">Multi-File App</div>
+            <div class="card-meta"><span>status: RUNNING</span><span><i class="fa-solid fa-spinner fa-spin cyan"></i></span></div>
           </div>
         </div>
 
@@ -646,12 +457,31 @@
             <span class="agent-name"><i class="fa-solid fa-vial" style="color:var(--rose)"></i> QA</span>
             <span class="agent-badge badge-qa">Harness</span>
           </div>
-          <div class="agent-card" onclick="showArtifact('report')">
-            <div class="card-title">Test Report EXEC-001</div>
-            <div class="card-meta">
-              <span>status: 27/27 PASS</span>
-              <span><i class="fa-solid fa-check emerald"></i></span>
-            </div>
+          <div class="agent-card" onclick="switchArtifactTab('report')">
+            <div class="card-title">Test Suite</div>
+            <div class="card-meta"><span>status: PENDING</span></div>
+          </div>
+        </div>
+
+        <div class="agent-column" id="col-appsec">
+          <div class="column-head">
+            <span class="agent-name"><i class="fa-solid fa-shield-halved" style="color:#ec4899"></i> AppSec</span>
+            <span class="agent-badge badge-sec">Security</span>
+          </div>
+          <div class="agent-card" onclick="switchArtifactTab('sec')">
+            <div class="card-title">Security Audit</div>
+            <div class="card-meta"><span>status: PARALLEL</span></div>
+          </div>
+        </div>
+
+        <div class="agent-column" id="col-devops">
+          <div class="column-head">
+            <span class="agent-name"><i class="fa-solid fa-rocket" style="color:#6366f1"></i> DevOps</span>
+            <span class="agent-badge badge-ops">CI/CD</span>
+          </div>
+          <div class="agent-card" onclick="switchArtifactTab('ops')">
+            <div class="card-title">Deploy Audit</div>
+            <div class="card-meta"><span>status: PARALLEL</span></div>
           </div>
         </div>
       </div>
@@ -660,124 +490,167 @@
     <div class="workspace-grid">
       <div class="panel-card">
         <div class="section-title-text" style="font-size:0.95rem; margin-bottom:0.75rem;">
-          <i class="fa-solid fa-terminal" style="color:var(--cyan)"></i> Stream de Logs ao Vivo (OpenCode Runner)
+          <i class="fa-solid fa-terminal" style="color:var(--cyan)"></i> WebSocket Log Stream (Ao Vivo)
         </div>
         <div class="log-box" id="logContainer">
-          <div class="log-line"><span class="log-time">[20:00:00]</span> <span class="log-info">--- EXECUTANDO NÓ: CPO ---</span></div>
-          <div class="log-line"><span class="log-time">[20:00:04]</span> --- INFO: Épico gerado com sucesso: E-001 ---</div>
-          <div class="log-line"><span class="log-time">[20:00:10]</span> <span class="log-info">--- EXECUTANDO NÓ: Product Manager ---</span></div>
-          <div class="log-line"><span class="log-time">[20:00:15]</span> --- INFO: User stories geradas: E-001-US001 ---</div>
-          <div class="log-line"><span class="log-time">[20:00:22]</span> <span class="log-info">--- EXECUTANDO NÓ: Tech Lead ---</span></div>
-          <div class="log-line"><span class="log-time">[20:00:28]</span> --- INFO: Tech Spec gerada em tech_spec_E-001.md ---</div>
-          <div class="log-line"><span class="log-time">[20:00:35]</span> <span class="log-info">--- EXECUTANDO NÓ: Developer ---</span></div>
-          <div class="log-line"><span class="log-time">[20:00:40]</span> <span class="log-success">--- INFO: Código capturado e salvo em generated_code.py (97 linhas) ---</span></div>
-          <div class="log-line"><span class="log-time">[20:00:45]</span> <span class="log-info">--- EXECUTANDO NÓ: QA ---</span></div>
-          <div class="log-line"><span class="log-time">[20:00:48]</span> <span class="log-success">--- HARNESS RESULT: 27/27 testes passados com sucesso (pytest) ---</span></div>
+          <div class="log-line"><span class="log-time">[00:00:00]</span> <span class="log-info">Iniciando conexão WebSocket com LoopForge REST API...</span></div>
         </div>
       </div>
 
       <div class="panel-card">
         <div class="tabs-header">
           <button class="tab-btn active" id="tab-code" onclick="switchArtifactTab('code')">
-            <i class="fa-solid fa-file-code"></i> generated_code.py
+            <i class="fa-solid fa-file-code"></i> Source Code
           </button>
           <button class="tab-btn" id="tab-spec" onclick="switchArtifactTab('spec')">
             <i class="fa-solid fa-file-lines"></i> tech_spec.md
-          </button>
-          <button class="tab-btn" id="tab-epic" onclick="switchArtifactTab('epic')">
-            <i class="fa-solid fa-bullseye"></i> epic_E-001.json
           </button>
           <button class="tab-btn" id="tab-report" onclick="switchArtifactTab('report')">
             <i class="fa-solid fa-square-check"></i> test_report.json
           </button>
         </div>
-        <div class="artifact-viewer" id="artifactViewer">Carregando conteúdo do arquivo gerado...</div>
+        <div class="artifact-viewer" id="artifactViewer">Aguardando saída da execução do pipeline...</div>
       </div>
     </div>
   </main>
 
-  <div class="modal-overlay" id="interactiveModal">
+  <div class="modal-overlay" id="newRunModal">
     <div class="modal-box">
       <div class="modal-header">
-        <div class="modal-title">
-          <i class="fa-solid fa-hand" style="color:var(--amber)"></i> Pausa para Aprovação Humana (Human Gate)
-        </div>
-        <button class="btn" style="padding:0.3rem 0.6rem;" onclick="closeModal()">✕</button>
-      </div>
-
-      <div style="font-size:0.875rem; color:var(--text-muted); line-height:1.5;">
-        O pipeline atingiu o checkpoint <strong style="color:var(--cyan)" id="gateNodeName">Developer</strong>. Revise os artefatos abaixo e decida a ação de prosseguimento:
+        <div class="modal-title"><i class="fa-solid fa-rocket"></i> Nova Execução de Pipeline</div>
+        <button class="btn" style="padding:0.3rem 0.6rem;" onclick="closeNewRunModal()">✕</button>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Feedback / Ajuste do Prompt para o Agente (Opcional):</label>
-        <textarea class="form-textarea" id="humanFeedbackInput" rows="3" placeholder="Ex: Adicionar parâmetro --format json na CLI e validar entradas nulas..."></textarea>
+        <label class="form-label">Ideia ou Requisito do Projeto:</label>
+        <textarea class="form-textarea" id="runIdeaInput" rows="3" placeholder="Ex: Criar uma API REST de autenticação com validação de token JWT..."></textarea>
       </div>
 
-      <div class="modal-actions">
-        <button class="btn btn-success" onclick="submitGateAction('c')">
-          <i class="fa-solid fa-check"></i> Continuar (c)
-        </button>
+      <div class="form-group">
+        <label class="form-label">Stack de Tecnologia:</label>
+        <select class="form-select" id="runStackSelect">
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript / Node.js</option>
+          <option value="java">Java (Maven)</option>
+          <option value="go">Go</option>
+          <option value="rust">Rust (Cargo)</option>
+        </select>
+      </div>
 
-        <button class="btn" style="background:#0284c7; border:none;" onclick="submitGateAction('a')">
-          <i class="fa-solid fa-pen"></i> Ajustar (a)
-        </button>
-
-        <button class="btn" style="background:#d97706; border:none;" onclick="submitGateAction('r')">
-          <i class="fa-solid fa-rotate-right"></i> Retentar (r)
-        </button>
-
-        <button class="btn btn-danger" onclick="submitGateAction('x')">
-          <i class="fa-solid fa-xmark"></i> Abortar (x)
-        </button>
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:0.5rem;">
+        <button class="btn" onclick="closeNewRunModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="submitNewRun()"><i class="fa-solid fa-play"></i> Iniciar Pipeline</button>
       </div>
     </div>
   </div>
 
   <script>
-    let currentArtifactTab = 'code';
-    let isInteractiveMode = false;
+    let activeRunId = null;
 
-    const mockArtifacts = {
-      code: `import argparse\\nimport sys\\nimport json\\n\\nclass ProductStrategy:\\n    def __init__(self, vision: str, mission: str, objectives: list[str]):\\n        self.vision = vision\\n        self.mission = mission\\n        self.objectives = objectives\\n\\n    def to_dict(self):\\n        return {"vision": self.vision, "mission": self.mission, "objectives": self.objectives}\\n\\n    def display(self):\\n        print("=== PRODUCT STRATEGY ===")\\n        print(f"Vision: {self.vision}")\\n        print(f"Mission: {self.mission}")\\n        for i, obj in enumerate(self.objectives, 1):\\n            print(f"  {i}. {obj}")\\n\\ndef main():\\n    parser = argparse.ArgumentParser(description="Manage product strategic vision.")\\n    parser.add_argument("--vision", type=str, help="The long-term vision")\\n    parser.add_argument("--mission", type=str, help="The mission statement")\\n    parser.add_argument("--objectives", nargs="+", help="Strategic objectives")\\n    parser.add_argument("--export", type=str, help="Path to export JSON")\\n\\n    args = parser.parse_args()\\n    if args.vision and args.mission and args.objectives:\\n        strategy = ProductStrategy(args.vision, args.mission, args.objectives)\\n        strategy.display()\\n        if args.export:\\n            with open(args.export, 'w') as f:\\n                json.dump(strategy.to_dict(), f, indent=2)\\n            print(f"Exported to {args.export}")\\n\\nif __name__ == "__main__":\\n    main()`,
-      spec: `# Especificação Técnica - E-001\\n\\n**Data:** 2026-07-27\\n**Status:** Approved\\n\\n## Visão Geral\\nMódulo CLI em Python para gestão da visão estratégica do produto.\\n\\n## Arquitetura & Componentes\\n- **CLI Framework**: argparse / click\\n- **Persistência**: Arquivos JSON locais\\n- **Suíte de Testes**: Pytest\\n\\n## User Stories Cobertas\\n- E-001-US001: CLI Auth & Vision Management`,
-      epic: `{\\n  "id": "E-001",\\n  "title": "Módulo CLI de Visão Estratégica & Autenticação",\\n  "description": "Desenvolvimento de CLI modular para gestão estratégica do produto.",\\n  "business_objectives": [\\n    "Padronizar entradas de produto",\\n    "Garantir cobertura de testes > 90%"\\n  ],\\n  "scope_in": ["CLI argparse", "Exportação JSON", "Pytest Harness"],\\n  "scope_out": ["Interface gráfica nativa de desktop"]\\n}`,
-      report: `{\\n  "id": "EXEC-2026-07-27-200211-001",\\n  "user_story_id": "E-001-US001",\\n  "execution_timestamp": "2026-07-27T20:02:11Z",\\n  "summary": {\\n    "status": "PASS",\\n    "total_tests": 27,\\n    "tests_passed": 27,\\n    "tests_failed": 0,\\n    "duration_seconds": 6.31\\n  }\\n}`
-    };
+    function appendLog(msg, type='info') {
+      const box = document.getElementById('logContainer');
+      const timeStr = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.innerHTML = `<span class="log-time">[${timeStr}]</span> <span class="log-${type}">${msg}</span>`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function setActiveNode(nodeName) {
+      document.querySelectorAll('.agent-column').forEach(col => col.classList.remove('active-node'));
+      const target = document.getElementById('col-' + nodeName.toLowerCase());
+      if (target) {
+        target.classList.add('active-node');
+      }
+      document.getElementById('metCurrentAgent').innerText = nodeName;
+    }
+
+    // Connect WebSockets
+    function initWebSocket() {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}/ws/streaming`;
+      
+      try {
+        const ws = new WebSocket(wsUrl);
+        ws.onopen = () => {
+          appendLog('WebSocket conectado com sucesso.', 'success');
+          document.getElementById('statusDot').className = 'dot success';
+          document.getElementById('statusLabel').innerText = 'Conectado (WS Live)';
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === 'run_created') {
+              activeRunId = data.run_id;
+              document.getElementById('metActiveRun').innerText = data.run_id.slice(0, 8);
+              appendLog(`Nova run criada: ${data.idea} (status: ${data.status})`, 'info');
+              document.getElementById('statusDot').className = 'dot running';
+            } else if (data.event === 'node_execution') {
+              setActiveNode(data.node || 'developer');
+              appendLog(`Executando nó: ${data.node}`, 'info');
+            } else if (data.event === 'pipeline_finished') {
+              appendLog(`Pipeline concluída com sucesso! Status: ${data.status}`, 'success');
+              document.getElementById('statusDot').className = 'dot success';
+              document.getElementById('metQaRate').innerText = '100% PASS';
+            } else if (data.event === 'pipeline_error') {
+              appendLog(`Erro na pipeline: ${data.error}`, 'error');
+              document.getElementById('statusDot').className = 'dot error';
+            }
+          } catch(e) {
+            appendLog(`Mensagem WS: ${event.data}`, 'info');
+          }
+        };
+
+        ws.onclose = () => {
+          appendLog('Conexão WebSocket encerrada. Reconectando em 5s...', 'warn');
+          document.getElementById('statusDot').className = 'dot error';
+          setTimeout(initWebSocket, 5000);
+        };
+      } catch(e) {
+        appendLog('WebSockets indisponível.', 'warn');
+      }
+    }
 
     function switchArtifactTab(tabKey) {
-      currentArtifactTab = tabKey;
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.getElementById('tab-' + tabKey).classList.add('active');
-      document.getElementById('artifactViewer').innerText = mockArtifacts[tabKey] || 'Arquivo não encontrado.';
-    }
-
-    function showArtifact(tabKey) {
-      switchArtifactTab(tabKey);
-    }
-
-    function toggleInteractiveMode() {
-      isInteractiveMode = !isInteractiveMode;
-      document.getElementById('interactiveStatus').innerText = isInteractiveMode ? 'ON' : 'OFF';
-      document.getElementById('interactiveStatus').style.color = isInteractiveMode ? 'var(--emerald)' : 'var(--cyan)';
+      const activeBtn = document.getElementById('tab-' + tabKey);
+      if (activeBtn) activeBtn.classList.add('active');
     }
 
     function openNewRunModal() {
-      document.getElementById('gateNodeName').innerText = 'Nova Execução';
-      document.getElementById('interactiveModal').classList.add('open');
+      document.getElementById('newRunModal').classList.add('open');
     }
 
-    function closeModal() {
-      document.getElementById('interactiveModal').classList.remove('open');
+    function closeNewRunModal() {
+      document.getElementById('newRunModal').classList.remove('open');
     }
 
-    function submitGateAction(actionCode) {
-      const feedback = document.getElementById('humanFeedbackInput').value;
-      alert(`Ação enviada: [${actionCode}] ${feedback ? '- Feedback: ' + feedback : ''}`);
-      closeModal();
+    async function submitNewRun() {
+      const idea = document.getElementById('runIdeaInput').value;
+      const stack = document.getElementById('runStackSelect').value;
+      if (!idea) return alert('Por favor, informe a ideia do projeto.');
+
+      try {
+        const resp = await fetch('/api/runs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idea, stack, mock_llm: false })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          appendLog(`Run iniciada via REST API (ID: ${data.id})`, 'success');
+          closeNewRunModal();
+        } else {
+          alert('Erro ao criar run.');
+        }
+      } catch(e) {
+        alert('Erro ao conectar com API REST.');
+      }
     }
 
-    switchArtifactTab('code');
+    window.onload = initWebSocket;
   </script>
 </body>
 </html>

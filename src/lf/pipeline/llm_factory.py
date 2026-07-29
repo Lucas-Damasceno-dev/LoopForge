@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -8,7 +9,31 @@ from typing import Any
 from langchain_core.language_models.fake import FakeListLLM
 
 
+def compress_prompt(text: str, max_chars: int = 6000) -> str:
+    """Compacta prompts removendo linhas em branco duplicadas, comentários prolixos e espaços desnecessários."""
+    if not text:
+        return ""
+    # Remove múltiplas quebras de linha sequenciais
+    compressed = re.sub(r"\n{3,}", "\n\n", text)
+    # Compacta espaços múltiplos em cada linha mantendo a indentação essencial
+    compressed = "\n".join(re.sub(r"[ \t]{2,}", " ", line) for line in compressed.splitlines())
+    if len(compressed) > max_chars:
+        half = max_chars // 2
+        compressed = compressed[:half] + "\n\n[... PROMPT COMPRESSÃO SEMÂNTICA LOOPFORGE ...]\n\n" + compressed[-half:]
+    return compressed.strip()
+
+
+def _semantic_normalize_prompt(prompt: str) -> str:
+    """Normaliza o prompt para hash de cache semântico (ignora timestamps e variações de espaçamento)."""
+    norm = prompt.lower()
+    norm = re.sub(r"\b20\d{2}-\d{2}-\d{2}[tT ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:z|Z)?\b", "", norm)
+    norm = re.sub(r"\s+", " ", norm)
+    return norm.strip()
+
+
 class SQLiteLLMCache:
+    """Cache semântico de chamadas LLM com SQLite."""
+
     def __init__(self, db_path: str | Path = ".loopforge/llm_cache.sqlite"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -27,14 +52,16 @@ class SQLiteLLMCache:
             )
 
     def get(self, prompt: str) -> str | None:
-        h = hashlib.sha256(prompt.encode()).hexdigest()
+        sem_prompt = _semantic_normalize_prompt(prompt)
+        h = hashlib.sha256(sem_prompt.encode()).hexdigest()
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.execute("SELECT response FROM cache WHERE prompt_hash = ?", (h,))
             row = cur.fetchone()
             return row[0] if row else None
 
     def set(self, prompt: str, response: str):
-        h = hashlib.sha256(prompt.encode()).hexdigest()
+        sem_prompt = _semantic_normalize_prompt(prompt)
+        h = hashlib.sha256(sem_prompt.encode()).hexdigest()
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO cache (prompt_hash, response) VALUES (?, ?)",
@@ -70,9 +97,13 @@ def call_openrouter_api(
     temperature: float = 0.2,
     api_key: str | None = None,
     timeout: float | None = None,
+    compress: bool = True,
 ) -> str:
-    """Realiza uma chamada à API do OpenRouter via httpx com cadeia automática de fallback de modelos."""
+    """Realiza uma chamada à API do OpenRouter via httpx com compressão de prompt e fallback de modelos."""
     import httpx
+
+    if compress:
+        prompt = compress_prompt(prompt)
 
     if timeout is None:
         env_timeout = os.environ.get("LLM_TIMEOUT") or os.environ.get("OPENROUTER_TIMEOUT")

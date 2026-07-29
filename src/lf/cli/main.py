@@ -1,18 +1,12 @@
+"""LoopForge CLI Interface — Centraliza os comandos essenciais do ecossistema."""
 import click
 
-from lf.cli.commands.audit import audit_cmd
 from lf.cli.commands.benchmark import benchmark_cmd
-from lf.cli.commands.completion import completion_cmd
 from lf.cli.commands.diff import diff_cmd
 from lf.cli.commands.explore import explore_cmd
-from lf.cli.commands.generate_tests import generate_tests_cmd
-from lf.cli.commands.init import init_cmd
-from lf.cli.commands.plan import plan_cmd
-from lf.cli.commands.release import release_cmd
 from lf.cli.commands.resume import resume_cmd
 from lf.cli.commands.run import run_cmd
 from lf.cli.commands.serve import serve_cmd
-from lf.cli.commands.status import status_cmd
 
 
 @click.group()
@@ -21,24 +15,13 @@ def main():
     """LoopForge v6 - Autonomous Agent Governance and Pipeline Orchestrator"""
 
 
-main.add_command(init_cmd)
-main.add_command(plan_cmd)
+# Comandos Core Essenciais
 main.add_command(run_cmd)
-main.add_command(status_cmd)
-main.add_command(audit_cmd)
-main.add_command(release_cmd)
-main.add_command(generate_tests_cmd)
 main.add_command(serve_cmd)
-main.add_command(completion_cmd)
 main.add_command(benchmark_cmd)
 main.add_command(resume_cmd)
 main.add_command(diff_cmd)
 main.add_command(explore_cmd)
-
-
-
-
-
 
 
 if __name__ == "__main__":

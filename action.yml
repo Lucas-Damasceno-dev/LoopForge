@@ -1,0 +1,59 @@
+name: 'LoopForge AI Pipeline Governance'
+description: 'Autonomous multi-agent AI engineering pipeline for feature implementation, QA, security audit, and DevOps'
+author: 'LoopForge Team'
+branding:
+  icon: 'code'
+  color: 'blue'
+
+inputs:
+  idea:
+    description: 'Feature idea or task description for LoopForge to implement'
+    required: true
+  stack:
+    description: 'Technology stack (python, java, javascript, go, rust)'
+    required: false
+    default: 'python'
+  routing_mode:
+    description: 'Routing mode: full (CPO->PM->TL->Dev->QA->AppSec->DevOps) or fast (Dev->QA->AppSec->DevOps)'
+    required: false
+    default: 'fast'
+  openrouter_api_key:
+    description: 'OpenRouter API Key for LLM execution'
+    required: false
+  mock_llm:
+    description: 'Set to true to run in mock mode for dry-run testing'
+    required: false
+    default: 'false'
+
+outputs:
+  run_id:
+    description: 'Unique execution ID of the LoopForge pipeline run'
+  code:
+    description: 'Primary generated code file path'
+  qa_status:
+    description: 'QA Test Status (PASS or FAIL)'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install LoopForge
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Run LoopForge Pipeline
+      shell: bash
+      env:
+        OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
+      run: |
+        MOCK_FLAG=""
+        if [ "${{ inputs.mock_llm }}" = "true" ]; then
+          MOCK_FLAG="--mock"
+        fi
+        python -m lf run --idea "${{ inputs.idea }}" --stack "${{ inputs.stack }}" $MOCK_FLAG
