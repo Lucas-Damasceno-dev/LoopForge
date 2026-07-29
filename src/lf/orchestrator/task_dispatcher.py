@@ -193,8 +193,8 @@ class TaskDispatcher:
             )
             conn.commit()
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"--- AVISO: Falha ao gravar decisão humana: {e} ---")
 
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
         """Manipula interrupção humana (HITL) exibindo os artefatos do nó RECÉM-CONCLUÍDO e o gate do PRÓXIMO nó."""
@@ -389,8 +389,8 @@ class TaskDispatcher:
         try:
             GitCheckpointManager().create_checkpoint(f"loopforge/task-{project_id}")
             create_github_pr(title=title, body=body, labels=labels)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"--- AVISO: Falha ao criar checkpoint/PR: {e} ---")
 
     def list_checkpoints(self) -> list[str]:
         """Lista todos os thread_ids com checkpoints gravados em .loopforge/checkpoints.sqlite."""
@@ -404,7 +404,8 @@ class TaskDispatcher:
             cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
             rows = cursor.fetchall()
             return [row[0] for row in rows]
-        except Exception:
+        except Exception as e:
+            print(f"--- AVISO: Falha ao listar checkpoints: {e} ---")
             return []
         finally:
             conn.close()

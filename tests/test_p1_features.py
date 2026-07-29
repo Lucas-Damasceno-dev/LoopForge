@@ -13,7 +13,7 @@ from lf.telemetry.benchmark_dataset import CURATED_BENCHMARK_PROBLEMS
 
 
 def test_curated_benchmark_dataset():
-    assert len(CURATED_BENCHMARK_PROBLEMS) >= 10
+    assert len(CURATED_BENCHMARK_PROBLEMS) == 15
     assert CURATED_BENCHMARK_PROBLEMS[0].stack == "python"
     assert CURATED_BENCHMARK_PROBLEMS[4].stack == "rust"
 

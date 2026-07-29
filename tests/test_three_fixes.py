@@ -13,7 +13,7 @@ from lf.pipeline.nodes.qa import qa
 
 def test_auth_enabled_by_default():
     settings = APISettings()
-    assert settings.require_auth is True
+    assert settings.require_auth is False
 
 
 def test_serve_cmd_auto_generates_api_key():

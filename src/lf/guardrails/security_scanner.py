@@ -39,7 +39,8 @@ class SecurityScanner:
                                     message=msg,
                                 )
                             )
-            except Exception:
+            except Exception as e:
+                print(f"--- AVISO: Erro ao escanear arquivo {p}: {e} ---")
                 continue
 
         return vulnerabilities
@@ -70,7 +71,8 @@ class SecurityScanner:
 
                 if modified:
                     p.write_text("\n".join(new_lines), encoding="utf-8")
-            except Exception:
+            except Exception as e:
+                print(f"--- AVISO: Erro ao corrigir arquivo {p}: {e} ---")
                 continue
 
         return fixed_count

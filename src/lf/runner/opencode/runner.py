@@ -132,8 +132,8 @@ def detect_changed_files(project_root: str | Path, start_time: float) -> list[st
                             continue
                         if file_path.is_file():
                             changed.append(str(file_path))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"--- AVISO: Erro ao detectar mudanças (git diff): {e} ---")
 
     # 2. Fallback: verificação de mtime
     if not changed and root.exists():
@@ -149,7 +149,7 @@ def detect_changed_files(project_root: str | Path, start_time: float) -> list[st
                             changed.append(str(p))
                     except OSError:
                         pass
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"--- AVISO: Erro ao detectar mudanças (mtime fallback): {e} ---")
 
     return changed

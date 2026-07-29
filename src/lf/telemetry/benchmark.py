@@ -54,8 +54,8 @@ class BenchmarkSuite:
                 with open(elo_file, encoding="utf-8") as f:
                     data = json.load(f)
                     return float(data.get("current_elo", 1200.0))
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"--- AVISO: Erro ao ler ELO rating ({e}), usando default ---")
         return 1200.0
 
     def update_elo_rating(self, elo_delta: float) -> tuple[float, float]:
@@ -70,8 +70,8 @@ class BenchmarkSuite:
                 with open(elo_file, encoding="utf-8") as f:
                     data = json.load(f)
                     history = data.get("history", [])
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"--- AVISO: Erro ao ler histórico ELO ({e}), iniciando novo ---")
 
         history.append({
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -130,8 +130,8 @@ class BenchmarkSuite:
                     by_stack[stack]["successful"] += 1
                 by_stack[stack]["total_duration"] += dur
                 by_stack[stack]["total_cost"] += cost
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"--- AVISO: Erro ao processar benchmark {fpath}: {e} ---")
 
         for s, metrics in by_stack.items():
             runs = metrics["runs"]
