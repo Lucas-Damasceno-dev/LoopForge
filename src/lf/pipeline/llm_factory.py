@@ -44,8 +44,9 @@ class SQLiteLLMCache:
 
 DEFAULT_OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 DEFAULT_OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash:free")
+_DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_OPENROUTER_BASE_URL = os.environ.get(
-    "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+    "OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL
 )
 
 FALLBACK_OPENROUTER_MODELS = [
@@ -54,6 +55,12 @@ FALLBACK_OPENROUTER_MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
     "deepseek/deepseek-r1:free",
 ]
+
+
+def _is_default_openrouter() -> bool:
+    """Retorna True se estiver usando a URL padrão do OpenRouter."""
+    url = os.environ.get("OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL)
+    return url.rstrip("/") == _DEFAULT_OPENROUTER_BASE_URL
 
 
 def call_openrouter_api(
@@ -79,7 +86,11 @@ def call_openrouter_api(
         "X-Title": "LoopForge AI Engine",
     }
 
-    models_to_try = [model] + [m for m in FALLBACK_OPENROUTER_MODELS if m != model]
+    models_to_try = (
+        [model] + [m for m in FALLBACK_OPENROUTER_MODELS if m != model]
+        if _is_default_openrouter()
+        else [model]
+    )
     last_exception = None
 
     for m in models_to_try:
@@ -87,6 +98,7 @@ def call_openrouter_api(
             "model": m,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temperature,
+            "stream": False,
         }
 
         try:
@@ -97,18 +109,19 @@ def call_openrouter_api(
                 if choices and choices[0].get("message", {}).get("content"):
                     return choices[0]["message"]["content"]
             elif response.status_code in (429, 404) or "rate-limited" in response.text or "Model not found" in response.text:
-                print(f"--- AVISO: OpenRouter modelo '{m}' indisponível/rate-limited ({response.status_code}). Tentando modelo fallback... ---")
-                last_exception = RuntimeError(f"OpenRouter API error ({response.status_code}): {response.text}")
+                tag = "OpenRouter" if _is_default_openrouter() else "LLM API"
+                print(f"--- AVISO: {tag} modelo '{m}' indisponível ({response.status_code}). Tentando fallback... ---")
+                last_exception = RuntimeError(f"{tag} error ({response.status_code}): {response.text}")
                 continue
             else:
-                last_exception = RuntimeError(f"OpenRouter API error ({response.status_code}): {response.text}")
+                last_exception = RuntimeError(f"LLM API error ({response.status_code}): {response.text}")
         except Exception as e:
             last_exception = e
             continue
 
     if last_exception:
         raise last_exception
-    raise RuntimeError("OpenRouter API falhou em todos os modelos da cadeia de fallback.")
+    raise RuntimeError("LLM API falhou em todos os modelos da cadeia de fallback.")
 
 
 def get_llm(provider: str = "openrouter", model_name: str = DEFAULT_OPENROUTER_MODEL, temperature: float = 0.2) -> Any:

@@ -20,7 +20,8 @@ def _call_openrouter(prompt: str, system: str, model: str) -> str:
     import httpx
 
     key = _ensure_openrouter_key()
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    base_url = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
@@ -34,16 +35,17 @@ def _call_openrouter(prompt: str, system: str, model: str) -> str:
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.2,
+        "stream": False,
     }
 
     response = httpx.post(url, headers=headers, json=payload, timeout=120.0)
     if response.status_code != 200:
-        raise RuntimeError(f"OpenRouter API error ({response.status_code}): {response.text}")
+        raise RuntimeError(f"LLM API error ({response.status_code}): {response.text}")
 
     data = response.json()
     choices = data.get("choices", [])
     if not choices:
-        raise RuntimeError("OpenRouter: resposta vazia")
+        raise RuntimeError("LLM API: resposta vazia")
     return choices[0]["message"]["content"]
 
 

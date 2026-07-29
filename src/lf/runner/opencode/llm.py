@@ -76,9 +76,12 @@ Responda SOMENTE o objeto JSON puro."""
     from ...pipeline.llm_factory import (
         DEFAULT_OPENROUTER_KEY,
         DEFAULT_OPENROUTER_MODEL,
+        _DEFAULT_OPENROUTER_BASE_URL,
         call_openrouter_api,
     )
     openrouter_key = os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
+    base_url = os.environ.get("OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL)
+    is_default_or = base_url.rstrip("/") == _DEFAULT_OPENROUTER_BASE_URL
 
     raw_response_text = ""
     if openrouter_key:
@@ -86,12 +89,15 @@ Responda SOMENTE o objeto JSON puro."""
         try:
             raw_response_text = call_openrouter_api(final_prompt, model=model_name, api_key=openrouter_key)
         except Exception as e:
-            print(f"--- AVISO: OpenRouter API falhou ({e}), tentando OpenCodeRunner fallback ---")
-            runner = OpenCodeRunner(timeout_seconds=300)
-            result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
-            if not result.success:
-                raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
-            raw_response_text = result.clean_stdout
+            if is_default_or:
+                print(f"--- AVISO: OpenRouter API falhou ({e}), tentando OpenCodeRunner fallback ---")
+                runner = OpenCodeRunner(timeout_seconds=300)
+                result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
+                if not result.success:
+                    raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
+                raw_response_text = result.clean_stdout
+            else:
+                raise
     else:
         runner = OpenCodeRunner(timeout_seconds=300)
         result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
