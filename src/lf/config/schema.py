@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TechStack(BaseModel):
@@ -43,6 +43,7 @@ class TaskSchema(BaseModel):
     title: str
     status: Literal["pending", "running", "validating", "failed", "done"] = "pending"
     agent_id: str = "developer"
+    persona: str = ""
     input_artifact_id: str = ""
     expected_schema: str = ""
     prompt: str = ""
@@ -55,6 +56,8 @@ class TaskSchema(BaseModel):
 
 
 class PlanSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True, validate_default=True)
+
     tasks: list[TaskSchema] = Field(default_factory=list)
     graph: dict[str, list[str]] = Field(default_factory=dict)
 
