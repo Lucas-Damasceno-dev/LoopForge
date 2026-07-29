@@ -7,6 +7,7 @@ from .parser import parse_test_output
 
 @dataclass
 class TestHarnessResult:
+    __test__ = False
     total: int
     passed: int
     failed: int
