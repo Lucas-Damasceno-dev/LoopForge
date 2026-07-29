@@ -59,7 +59,10 @@ async def close_db() -> None:
     """Fecha o engine e libera conexões."""
     global engine, session_factory
     if engine:
-        await engine.dispose()
+        try:
+            await engine.dispose()
+        except Exception:
+            pass
     engine = None
     session_factory = None
 
