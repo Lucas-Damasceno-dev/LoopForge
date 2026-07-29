@@ -18,6 +18,10 @@ examples/.loopforge/
 # Deepwork tracking
 .slim/deepwork/
 
+# Worktrees
+.slim/worktrees/
+.slim/worktrees.json
+
 # OS files
 .DS_Store
 *.log
