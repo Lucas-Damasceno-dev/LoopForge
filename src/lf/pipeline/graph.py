@@ -59,14 +59,15 @@ def should_retry(state: GraphState) -> Literal["appsec", "developer", "__end__"]
     """Decide após QA se deve prosseguir para AppSec ou retentar."""
     test_report = state.get("test_report", {})
     tests_failed = test_report.get("summary", {}).get("tests_failed", 1)
-    attempt = state.get("attempt_count", 0)
+    qa_attempt = state.get("qa_attempt_count", 0)
     max_retries = state.get("max_retries", 3)
 
     if tests_failed == 0:
         return "appsec"
 
-    if attempt < max_retries:
+    if qa_attempt < max_retries:
         return "developer"
+
 
     return END
 

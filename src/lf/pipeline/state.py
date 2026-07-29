@@ -31,9 +31,12 @@ class GraphState(TypedDict):
     # Controle de fluxo
     next_agent: str
     attempt_count: int
+    qa_attempt_count: int
+    appsec_attempt_count: int
     max_retries: int
     error: str | None
     feedback_history: list[dict]
+
 
     # Config de LLM
     mock_llm: bool

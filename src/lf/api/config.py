@@ -16,9 +16,9 @@ class APISettings(BaseSettings):
     # Banco de dados único (SQLite compartilhado com telemetry por padrão)
     database_url: str = "sqlite+aiosqlite:///.loopforge/telemetry.sqlite"
 
-    # Autenticação básica / API Key (opcional)
+    # Autenticação básica / API Key (Segurança ativada por padrão)
     api_key: str | None = None
-    require_auth: bool = False
+    require_auth: bool = True
 
     # Pool de conexões (usado quando PostgreSQL for fornecido)
     db_pool_size: int = 5

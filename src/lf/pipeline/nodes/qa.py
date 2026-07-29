@@ -103,13 +103,17 @@ O relatório DEVE ter:
     is_pass = report.get("summary", {}).get("tests_failed", 1) == 0
     next_agent = "appsec" if is_pass else "developer"
 
+    qa_attempt = state.get("qa_attempt_count", 0)
     if not is_pass:
-        print("--- AVISO: Testes falharam. Reportando ao Developer. ---")
+        qa_attempt += 1
+        state["qa_attempt_count"] = qa_attempt
+        print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
         state["feedback_history"] = state.get("feedback_history", []) + [
             {"from": "qa", "message": f"{report.get('summary', {}).get('tests_failed', 0)} teste(s) falharam", "timestamp": now_iso}
         ]
 
-    return {**state, "test_report": report, "next_agent": next_agent}
+    return {**state, "test_report": report, "qa_attempt_count": qa_attempt, "next_agent": next_agent}
+
 
 
 
