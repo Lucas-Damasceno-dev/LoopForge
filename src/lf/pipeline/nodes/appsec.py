@@ -116,7 +116,21 @@ def appsec(state: GraphState) -> dict:
         print(f"--- INFO: Relatório AppSec salvo em {path} ---")
 
     if status == "FAIL":
-        print("--- AVISO: Vulnerabilidades críticas/altas encontradas! Notificando Developer. ---")
+        attempt = state.get("attempt_count", 0) + 1
+        max_retries = state.get("max_retries", 3)
+        state["attempt_count"] = attempt
+
+        if attempt >= max_retries:
+            err_msg = f"AppSec encontrou vulnerabilidades e excedeu o limite máximo de {max_retries} tentativas."
+            print(f"--- ERRO: {err_msg} ---")
+            return {
+                **state,
+                "security_review": review,
+                "error": err_msg,
+                "next_agent": "FINISH",
+            }
+
+        print(f"--- AVISO: Vulnerabilidades encontradas (tentativa {attempt}/{max_retries}). Notificando Developer. ---")
         state["feedback_history"] = state.get("feedback_history", []) + [
             {
                 "from": "appsec",
@@ -124,9 +138,10 @@ def appsec(state: GraphState) -> dict:
                 "timestamp": now_iso,
             }
         ]
-        return {**state, "security_review": review, "next_agent": "developer"}
+        return {**state, "security_review": review, "attempt_count": attempt, "next_agent": "developer"}
 
     return {**state, "security_review": review, "next_agent": "devops"}
+
 
 
 def _mock_security_review(review_id: str, timestamp: str) -> dict:

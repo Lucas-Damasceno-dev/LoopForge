@@ -41,6 +41,11 @@ def devops(state: GraphState) -> dict:
         for f in ("pyproject.toml", "setup.py", "requirements.txt", "package.json")
     )
 
+    entrypoint_exists = any(
+        os.path.exists(os.path.join(project_dir, f))
+        for f in ("main.py", "app.py", "src/lf/__main__.py", "src/lf/cli/main.py", "index.js", "server.js")
+    )
+
     # Cálculo dinâmico da pontuação de deployabilidade (base 100)
     score = 100.0
     recommendations = []
@@ -56,6 +61,11 @@ def devops(state: GraphState) -> dict:
     if not pkg_manifest_exists:
         score -= 20.0
         recommendations.append("Adicionar manifesto de dependências (pyproject.toml ou requirements.txt).")
+
+    if not entrypoint_exists:
+        score -= 15.0
+        recommendations.append("Definir um ponto de entrada principal para a aplicação (ex: main.py ou app.py).")
+
 
     qa_report = state.get("test_report", {})
     if qa_report.get("summary", {}).get("tests_failed", 0) > 0:

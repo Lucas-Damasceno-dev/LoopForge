@@ -1,5 +1,12 @@
+import asyncio
+import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
+from langgraph.checkpoint.sqlite import SqliteSaver
+from rich.console import Console
+
+from lf.api.websocket_manager import ws_manager
 from lf.config.schema import TaskSchema
 from lf.ontology.state_machine.definition import TaskState
 from lf.ontology.state_machine.labels import get_git_label
@@ -61,8 +68,6 @@ class TaskDispatcher:
             "persona_id": getattr(task, "agent_id", None),
         }
 
-
-
         if shared_state:
             for k, v in shared_state.items():
                 if v and k not in ("error", "next_agent"):
@@ -70,12 +75,26 @@ class TaskDispatcher:
 
         return state
 
+    def _broadcast_ws(self, event_type: str, task_id: str, payload: dict):
+        """Emite evento via WebSocket manager para conectividade em tempo real."""
+        try:
+            message = {
+                "event": event_type,
+                "task_id": task_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                **payload,
+            }
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(ws_manager.broadcast(message))
+            except RuntimeError:
+                asyncio.run(ws_manager.broadcast(message))
+        except Exception:
+            pass
 
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
         """Manipula interrupção. Retorna False se o usuário abortou."""
-        from rich.console import Console
         console = Console()
-
         node_name = snapshot.next[0] if snapshot.next else "unknown"
         state = snapshot.values
 
@@ -106,11 +125,9 @@ class TaskDispatcher:
             console.print("[red]Execução abortada pelo usuário.[/red]")
             return False
         elif choice == "r":
-            # Retentar: reseta erro e re-enfileira o nó atual
             app.update_state(config, {"error": None})
             return True
         elif choice == "a":
-            # Ajustar: pede feedback pro usuário e adiciona ao estado
             feedback = input("✏️  Feedback para o agente:\n➜ ")
             app.update_state(config, {
                 "error": None,
@@ -120,7 +137,6 @@ class TaskDispatcher:
             })
             return True
         else:
-            # Continuar (default)
             console.print("[green]Continuando...[/green]")
             return True
 
@@ -148,13 +164,7 @@ class TaskDispatcher:
             pass
 
     def dispatch(self, task: TaskSchema, project_id: str = "project", shared_state: dict | None = None) -> dict:
-        import sqlite3
-        from pathlib import Path
-
-        from langgraph.checkpoint.sqlite import SqliteSaver
-
         initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
-
 
         checkpoint_path = str(Path(".loopforge/checkpoints.sqlite").resolve())
         conn = sqlite3.connect(checkpoint_path, check_same_thread=False)
@@ -164,36 +174,46 @@ class TaskDispatcher:
         graph = self._get_graph(checkpointer=checkpointer)
         config = {"configurable": {"thread_id": thread_id}}
 
-        try:
-            if self.interactive:
-                # --- MODO INTERATIVO: stream + interrupt handling ---
-                for event in graph.stream(initial_state, config):
-                    for node_name, output in event.items():
-                        if isinstance(output, dict) and output.get("status") == "interrupted":
-                            pass  # será tratado abaixo
+        self._broadcast_ws("pipeline_started", task.id, {"idea": task.title, "node": initial_state.get("next_agent")})
 
-                # Verifica se houve interrupção
+        try:
+            # Stream execution nodes so events are broadcasted in real time
+            for event in graph.stream(initial_state, config):
+                for node_name, output in event.items():
+                    if isinstance(output, dict):
+                        next_agent = output.get("next_agent")
+                        self._broadcast_ws("node_execution", task.id, {
+                            "node": node_name,
+                            "next_agent": next_agent,
+                            "attempt_count": output.get("attempt_count", 0),
+                        })
+
+            if self.interactive:
                 snapshot = graph.get_state(config)
                 while snapshot.next:
                     proceed = self._human_interrupt_handler(snapshot, config, graph)
                     if not proceed:
                         break
-                    # Resume streaming
                     for event in graph.stream(None, config):
-                        pass
+                        for node_name, output in event.items():
+                            if isinstance(output, dict):
+                                self._broadcast_ws("node_execution", task.id, {
+                                    "node": node_name,
+                                    "next_agent": output.get("next_agent"),
+                                })
                     snapshot = graph.get_state(config)
 
-                state_snapshot = graph.get_state(config)
-                result = dict(state_snapshot.values) if state_snapshot.values else {}
-            else:
-                # --- MODO AUTOMÁTICO: invoke direto ---
-                final_state = graph.invoke(initial_state, config)
-                result = dict(final_state) if isinstance(final_state, dict) else dict(final_state)
+            state_snapshot = graph.get_state(config)
+            result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
-            # Cria PR com labels do Foundry
+            self._broadcast_ws("pipeline_finished", task.id, {
+                "status": "completed" if not result.get("error") else "failed",
+                "error": result.get("error"),
+            })
+
             self._create_pr_with_labels(task, result, project_id)
-
             return result
 
         except Exception as e:
+            self._broadcast_ws("pipeline_error", task.id, {"error": str(e)})
             return {**initial_state, "error": str(e), "status": "failed"}
