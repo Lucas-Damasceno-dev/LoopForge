@@ -2,7 +2,7 @@
 
 **Autonomous Agent Governance and Pipeline Orchestrator**
 
-LoopForge é um motor autônomo de *Loop Engineering* e orquestrador de governança para agentes de IA. Construído em Python 3.12+ com **LangGraph**, **Pydantic v2** e ontologia do **The Foundry**, ele gerencia o ciclo de desenvolvimento autônomo com resiliência industrial, guardrails orçamentários, roteamento adaptativo e telemetria SQLite.
+LoopForge é um motor autônomo de *Loop Engineering* e orquestrador de governança para agentes de IA. Construído em Python 3.12+ com **LangGraph**, **Pydantic v2**, **FastAPI**, **WebSockets** e a ontologia do **The Foundry**, ele gerencia o ciclo de desenvolvimento autônomo de software com resiliência industrial, auditoria paralela (AppSec + DevOps), governança de orçamento e pontuação ELO de benchmarks.
 
 > **Versão Atual:** 6.0.0  
 > **Arquitetura Base:** Python + LangGraph (`StateGraph`)  
@@ -11,17 +11,29 @@ LoopForge é um motor autônomo de *Loop Engineering* e orquestrador de governan
 
 ---
 
-## 🌟 Principais Funcionalidades da v6
+## 🌟 Exemplos Reais Gerados pelo LoopForge
+
+Abaixo está a galeria de projetos reais **100% gerados autonomamente** pela pipeline de agentes do LoopForge, incluindo código principal, manifestos de dependência, suítes de testes unitários e o relatório `lessons.md`:
+
+| Projeto | Stack Tecnológica | Arquivos Gerados | Compila & Testa? | Status QA | Link da Galeria |
+|---|---|---|---|---|---|
+| **Java Spring Boot Task API** | Java 17 + Maven | `pom.xml`, `TaskApiApplication.java`, `TaskApiApplicationTest.java`, `lessons.md` | ✅ `mvn test` | **PASS (100%)** | [Ver Exemplo](examples/gallery/java_spring_boot_task_api) |
+| **Rust CLI Dollar Quote** | Rust + Cargo | `Cargo.toml`, `src/main.rs`, `tests/test_main.rs`, `lessons.md` | ✅ `cargo test` | **PASS (100%)** | [Ver Exemplo](examples/gallery/rust_dollar_quote_cli) |
+| **Python FastAPI HTMX Dashboard** | Python + FastAPI + HTMX | `pyproject.toml`, `main.py`, `tests/test_main.py`, `lessons.md` | ✅ `pytest` | **PASS (100%)** | [Ver Exemplo](examples/gallery/python_fastapi_htmx_dashboard) |
+
+---
+
+## ⚡ Funcionalidades do Ecossistema v6
 
 | Módulo | Descrição | Status |
 |---|---|---|
-| **LangGraph Pipeline** | Stateful Graph com papéis de **CPO**, **PM**, **Tech Lead**, **Developer** e **QA** | ✅ |
-| **Roteamento Adaptativo** | Suporte a **Full-Path** (hierarquia completa) e **Fast-Path** (Dev → QA direto) | ✅ |
-| **Spec Review Gate** | Gate interativo em CLI (`lf plan`) para aprovação e edição de especificações | ✅ |
-| **Integração OpenRouter** | Chamada direta ao modelo **Ling 3.0 Flash Free** com parsing de JSON resiliente | ✅ |
-| **Guardrails & Circuit Breaker** | Limite orçamentário (USD), controle de falhas e travamento via `loop.lock` | ✅ |
-| **Security Scanner** | Auditoria de código em busca de secrets e funções perigosas com opção `--fix` | ✅ |
-| **Telemetria SQLite & Checkpointing** | Persistência de sessões, histórico de requisições LLM e suporte a `run --replay` | ✅ |
+| **LangGraph Multi-Agent DAG** | Papéis autônomos de **CPO**, **PM**, **Tech Lead**, **Developer**, **QA**, **AppSec** e **DevOps** | ✅ |
+| **Stack Decidida pelo Tech Lead** | O Tech Lead avalia a ideia e define a melhor stack (`rust`, `java`, `python`, `go`, `js`) sem engessar a CLI | ✅ |
+| **Auditoria Simultânea Paralela** | Execução concorrente de **AppSec** (Security Review) e **DevOps** (CI/CD) via ThreadPoolExecutor | ✅ |
+| **Benchmark ELO System** | Suíte de 10 problemas curados para medição quantitativa da qualidade e rating ELO (`lf benchmark`) | ✅ |
+| **FastAPI REST & WebSockets UI** | Painel Web interativo ao vivo em tempo real com recepção de logs e HITL | ✅ |
+| **GitHub Action & `lf pr`** | Integração contínua para CI/CD (`action.yml`) e criação autônoma de Pull Requests (`lf pr`) | ✅ |
+| **Otimização de Custos LLM** | Cache semântico SQLite e compressão inteligente de prompts no `llm_factory` | ✅ |
 
 ---
 
@@ -29,17 +41,14 @@ LoopForge é um motor autônomo de *Loop Engineering* e orquestrador de governan
 
 ### Pré-requisitos
 - **Python** >= 3.12
-- **uv** ou **pip**
+- **pip** ou **uv**
 
 ```bash
 # Clone o repositório
 git clone https://github.com/Lucas-Damasceno-dev/LoopForge.git
 cd LoopForge
 
-# Instalar dependências e CLI em modo editável com uv
-uv pip install -e .
-
-# Ou via pip padrão
+# Instalar dependências e a CLI LoopForge em modo editável
 pip install -e .
 ```
 
@@ -48,24 +57,23 @@ pip install -e .
 ## ⚡ Quick Start
 
 ```bash
-# 1. Inicializar configuração no repositório atual
-lf init
+# 1. Executar a pipeline autônoma para criar um projeto (Tech Lead decide a stack)
+lf run --idea "CLI em Rust que lê CSV e calcula estatísticas"
 
-# 2. Criar e revisar uma especificação de projeto (Spec Review Gate)
-lf plan --vision "Criar um módulo Python de utilitários matemáticos" --mode full
+# 2. Forçar uma stack específica via override de usuário
+lf run --idea "API REST de Tarefas" --stack java
 
-# 3. Executar o ciclo do pipeline agentico
-lf run
+# 3. Executar em segundo plano e abrir Pull Request no GitHub ao concluir
+lf run --idea "Dashboard financeiro em Python" --pr
 
-# 4. Executar uma tarefa rápida em Fast-Path (direto Dev -> QA)
-lf plan --vision "Corrigir cálculo de desconto" --mode fast
-lf run
+# 4. Iniciar o Servidor REST API & Web Dashboard UI ao vivo
+lf serve --port 8000
 
-# 5. Auditar segurança do código gerado
-lf audit . --fix
+# 5. Medir o ELO Rating do pipeline contra a suíte de benchmarks curados
+lf benchmark
 
-# 6. Exibir o status das tarefas e telemetria
-lf status
+# 6. Criar commit e Pull Request em qualquer diretório de projeto gerado
+lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 ```
 
 ---
@@ -74,51 +82,22 @@ lf status
 
 | Comando | Descrição |
 |---|---|
-| `lf init [dir]` | Inicializa a configuração `.loopforge.json` e ambiente do projeto |
-| `lf plan` | Gera plano de tarefas com Spec Review Gate interativo (`--mode full\|fast`) |
-| `lf run` | Executa o pipeline de agentes (`--mock`, `-i/--interactive`, `--replay <session>`) |
-| `lf status` | Exibe o painel de status do plano, tarefas e telemetria das sessões |
-| `lf audit [dir]` | Executa o scanner de segurança em busca de vulnerabilidades e secrets (`--fix`) |
-| `lf generate-tests` | Gera suítes de teste unitário baseline para módulos do projeto |
-| `lf release [version]` | Gera notas de lançamento semânticas e atualiza o `CHANGELOG.md` |
+| `lf run` | Executa o pipeline autônomo dos agentes (`--idea`, `--stack`, `--pr`, `--mock`, `-i`) |
+| `lf serve` | Inicia o servidor REST API e a Web Dashboard UI ao vivo com WebSockets |
+| `lf benchmark` | Executa a suíte de benchmarks curados e reporta a pontuação ELO do pipeline |
+| `lf resume` | Retoma execuções de pipeline pausadas a partir de checkpoints no LangGraph |
+| `lf diff` | Exibe diferenças de código entre retentativas e gerações |
+| `lf explore` | Explorador interativo de artefatos, especificações e relatórios de teste |
+| `lf pr` | Inicializa repositório Git, commita alterações e abre Pull Request no GitHub |
 
 ---
 
-## ⚙️ Configuração (`.loopforge.json`)
-
-Exemplo de arquivo de configuração `.loopforge.json`:
-
-```json
-{
-  "project_id": "meu-projeto",
-  "vision": "Aplicação autônoma gerenciada por agentes de IA",
-  "stack": "python",
-  "budget_limit_usd": 10.0,
-  "max_retries_per_task": 3,
-  "llm_provider": "openrouter",
-  "llm_model": "inclusionai/ling-3.0-flash:free",
-  "plan": {
-    "tasks": [
-      {
-        "id": "T-001",
-        "title": "Executar developer: Módulo principal",
-        "persona": "developer",
-        "routing_mode": "fast",
-        "status": "pending"
-      }
-    ]
-  }
-}
-```
-
----
-
-## 🧪 Testes
+## 🧪 Testes Automatizados
 
 ```bash
-# Executar a suíte de testes completa do Python v6
-uv run pytest
+# Executar a suíte de testes unitários e de integração
+.venv/bin/pytest tests_py
 ```
 
-- **36/36 testes aprovados** em `tests_py/`
-- Cobertura completa de Roteamento Adaptativo, LangGraph, OpenRouter Ling 3.0 Flash Free, Security Scanner e Telemetria SQLite.
+- **122 testes aprovados** em `tests_py/`
+- Cobertura completa de Decisão Autônoma de Stack pelo Tech Lead, Auditoria Paralela AppSec+DevOps, WebSockets Live, ELO Rating e Gerador `lessons.md`.
