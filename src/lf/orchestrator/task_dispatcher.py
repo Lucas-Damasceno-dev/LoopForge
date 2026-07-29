@@ -54,6 +54,8 @@ class TaskDispatcher:
             "next_agent": target_agent,
 
             "attempt_count": getattr(task, "attempts", 0),
+            "qa_attempt_count": 0,
+            "appsec_attempt_count": 0,
             "max_retries": getattr(task, "max_retries", 3),
             "error": None,
             "feedback_history": [],
@@ -163,11 +165,29 @@ class TaskDispatcher:
         except Exception:
             pass
 
+    def list_checkpoints(self) -> list[str]:
+        """Lista todos os thread_ids com checkpoints gravados em .loopforge/checkpoints.sqlite."""
+        checkpoint_path = str(Path(".loopforge/checkpoints.sqlite").resolve())
+        if not Path(checkpoint_path).exists():
+            return []
+
+        conn = sqlite3.connect(checkpoint_path, check_same_thread=False)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
+            rows = cursor.fetchall()
+            return [row[0] for row in rows]
+        except Exception:
+            return []
+        finally:
+            conn.close()
+
     def dispatch(self, task: TaskSchema, project_id: str = "project", shared_state: dict | None = None) -> dict:
         initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
 
-        checkpoint_path = str(Path(".loopforge/checkpoints.sqlite").resolve())
-        conn = sqlite3.connect(checkpoint_path, check_same_thread=False)
+        checkpoint_path = Path(".loopforge/checkpoints.sqlite").resolve()
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(checkpoint_path), check_same_thread=False)
         checkpointer = SqliteSaver(conn)
         thread_id = f"{project_id}-{task.id}"
 
@@ -177,7 +197,6 @@ class TaskDispatcher:
         self._broadcast_ws("pipeline_started", task.id, {"idea": task.title, "node": initial_state.get("next_agent")})
 
         try:
-            # Stream execution nodes so events are broadcasted in real time
             for event in graph.stream(initial_state, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
@@ -217,3 +236,57 @@ class TaskDispatcher:
         except Exception as e:
             self._broadcast_ws("pipeline_error", task.id, {"error": str(e)})
             return {**initial_state, "error": str(e), "status": "failed"}
+
+    def resume(self, project_id: str = "project", task_id: str = "task-1") -> dict:
+        """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via SqliteSaver checkpoint."""
+        checkpoint_path = str(Path(".loopforge/checkpoints.sqlite").resolve())
+        if not Path(checkpoint_path).exists():
+            raise RuntimeError(f"Nenhum banco de checkpoints encontrado em {checkpoint_path}")
+
+        conn = sqlite3.connect(checkpoint_path, check_same_thread=False)
+        checkpointer = SqliteSaver(conn)
+        thread_id = f"{project_id}-{task_id}"
+        config = {"configurable": {"thread_id": thread_id}}
+
+        graph = self._get_graph(checkpointer=checkpointer)
+        snapshot = graph.get_state(config)
+
+        if not snapshot or not snapshot.values:
+            raise RuntimeError(f"Nenhum checkpoint encontrado para o thread '{thread_id}'.")
+
+        last_values = snapshot.values
+        resuming_node = snapshot.next[0] if snapshot.next else last_values.get("next_agent", "cpo")
+
+        print(f"--- CHECKPOINT RECOVERY: Retomando pipeline (thread: {thread_id}) a partir do nó '{resuming_node}' ---")
+
+        # Limpa o erro gravado no estado para liberar a execução retomada
+        graph.update_state(config, {"error": None})
+
+        self._broadcast_ws("pipeline_resumed", task_id, {
+            "thread_id": thread_id,
+            "resuming_from_node": resuming_node,
+        })
+
+        try:
+            # Passa None para retomar a execução a partir do último nó gravado
+            for event in graph.stream(None, config):
+                for node_name, output in event.items():
+                    if isinstance(output, dict):
+                        self._broadcast_ws("node_execution", task_id, {
+                            "node": node_name,
+                            "next_agent": output.get("next_agent"),
+                        })
+
+            state_snapshot = graph.get_state(config)
+            result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
+
+            self._broadcast_ws("pipeline_finished", task_id, {
+                "status": "completed" if not result.get("error") else "failed",
+                "error": result.get("error"),
+            })
+
+            return result
+
+        except Exception as e:
+            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)})
+            return {**last_values, "error": str(e), "status": "failed"}
