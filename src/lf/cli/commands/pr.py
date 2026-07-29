@@ -43,8 +43,8 @@ def create_git_pr(project_dir: str, idea: str = "LoopForge Feature", session_id:
                 )
                 if pr_res.returncode == 0:
                     pr_url = pr_res.stdout.strip()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"--- AVISO: Falha ao criar PR: {e} ---")
 
         return {
             "status": "success",
