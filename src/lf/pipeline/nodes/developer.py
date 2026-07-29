@@ -189,10 +189,10 @@ def _get_default_filename_by_stack(stack: str) -> str:
     s = stack.lower()
     if "rust" in s:
         return "src/main.rs"
+    if "javascript" in s or "node" in s or "js" in s:
+        return "generated_code.js"
     if "java" in s:
         return "src/main/java/Main.java"
-    if "javascript" in s or "node" in s:
-        return "generated_code.js"
     if "go" in s:
         return "main.go"
     return "generated_code.py"
@@ -206,17 +206,17 @@ def _generate_mock_project(stack: str) -> dict[str, str]:
             "src/main.rs": 'fn main() {\n    println!("Hello from Rust");\n}',
             "tests/test_main.rs": '#[test]\nfn test_baseline() {\n    assert_eq!(2 + 2, 4);\n}',
         }
+    elif "javascript" in s or "node" in s or "js" in s:
+        return {
+            "package.json": '{"name":"generated-app","version":"1.0.0","type":"module","scripts":{"test":"node --test"}}',
+            "generated_code.js": 'console.log("Hello JS");',
+            "test/app.test.js": "import test from 'node:test'; import assert from 'node:assert'; test('ok', () => assert.strictEqual(1, 1));",
+        }
     elif "java" in s:
         return {
             "pom.xml": '<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><groupId>com.lf</groupId><artifactId>app</artifactId><version>1.0</version></project>',
             "src/main/java/Main.java": 'public class Main { public static void main(String[] args) { System.out.println("Java app"); } }',
             "src/test/java/MainTest.java": 'import org.junit.jupiter.api.Test;\npublic class MainTest { @Test public void testPass() {} }',
-        }
-    elif "javascript" in s or "node" in s:
-        return {
-            "package.json": '{"name":"generated-app","version":"1.0.0","type":"module","scripts":{"test":"node --test"}}',
-            "generated_code.js": 'console.log("Hello JS");',
-            "test/app.test.js": "import test from 'node:test'; import assert from 'node:assert'; test('ok', () => assert.strictEqual(1, 1));",
         }
     elif "go" in s:
         return {

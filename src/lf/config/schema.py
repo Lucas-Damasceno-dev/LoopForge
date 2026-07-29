@@ -49,7 +49,7 @@ class TaskSchema(BaseModel):
     attempts: int = 0
     max_retries: int = 3
     depends_on: list[str] = Field(default_factory=list)
-    stack: str = "python"
+    stack: str | None = Field(None, description="Stack tecnológica opcional")
     routing_mode: str = "full"
     task_type: str = "feature"
 
