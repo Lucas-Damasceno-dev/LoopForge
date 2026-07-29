@@ -1,7 +1,5 @@
 [package]
-name = "dollar-quote-cli"
+name = "generated-app"
 version = "0.1.0"
 edition = "2021"
-description = "CLI em Rust que baixa cotação do dólar e salva em CSV (Gerado pelo LoopForge)"
-
 [dependencies]
