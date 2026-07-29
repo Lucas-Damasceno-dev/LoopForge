@@ -204,22 +204,38 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Run not found")
 
         import asyncio
+        target_id = run.id
+
         def _sync_resume():
             from lf.orchestrator.task_dispatcher import TaskDispatcher
             dispatcher = TaskDispatcher()
-            return dispatcher.resume(project_id="project", task_id=f"run-{run_id}")
+            return dispatcher.resume(project_id="project", task_id=f"run-{target_id}")
 
         async def _resume_in_bg():
-            run.status = "running"
-            await session.commit()
+            from lf.api.database import session_factory
+            if session_factory:
+                async with session_factory() as bg_session:
+                    r = await bg_session.get(PipelineRun, target_id)
+                    if r:
+                        r.status = "running"
+                        await bg_session.commit()
             try:
                 final_state = await asyncio.to_thread(_sync_resume)
-                run.status = "completed" if not final_state.get("error") else "failed"
-                run.logs = final_state.get("error") or "Pipeline retomada com sucesso"
+                if session_factory:
+                    async with session_factory() as bg_session:
+                        r = await bg_session.get(PipelineRun, target_id)
+                        if r:
+                            r.status = "completed" if not final_state.get("error") else "failed"
+                            r.logs = final_state.get("error") or "Pipeline retomada com sucesso"
+                            await bg_session.commit()
             except Exception as e:
-                run.status = "failed"
-                run.logs = str(e)
-            await session.commit()
+                if session_factory:
+                    async with session_factory() as bg_session:
+                        r = await bg_session.get(PipelineRun, target_id)
+                        if r:
+                            r.status = "failed"
+                            r.logs = str(e)
+                            await bg_session.commit()
 
         asyncio.create_task(_resume_in_bg())
         return run
