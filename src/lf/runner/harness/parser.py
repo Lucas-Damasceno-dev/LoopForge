@@ -28,6 +28,14 @@ def parse_test_output(output: str) -> dict[str, int]:
         passed = int(cargo_match.group(1))
         failed = int(cargo_match.group(2))
 
+    # 4. Maven / JUnit: Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+    mvn_match = re.search(r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+)", output)
+    if mvn_match:
+        total = int(mvn_match.group(1))
+        fails = int(mvn_match.group(2)) + int(mvn_match.group(3))
+        passed = max(passed, total - fails)
+        failed = max(failed, fails)
+
     if passed == 0 and failed == 0 and "ok" in output.lower():
         passed = 1
 

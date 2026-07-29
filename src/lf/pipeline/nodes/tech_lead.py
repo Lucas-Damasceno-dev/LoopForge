@@ -21,6 +21,7 @@ class ValidationResult(BaseModel):
     feedback_message: str = Field(..., description="Feedback detalhado para o PM")
     approved_stories: list[str] = Field(default_factory=list, description="IDs das histórias aprovadas")
     recommended_stack: str = Field("python", description="Stack recomendada (ex: python, rust, java, javascript, go)")
+    stack_rationale: str = Field("Stack selecionada com base no escopo e maturidade do ecossistema.", description="Justificativa técnica da escolha da stack")
 
 
 def _extract_stack_from_text(text: str) -> str:
@@ -141,9 +142,12 @@ Template (use como guia):
             f.write(tech_spec)
         print(f"--- INFO: Tech spec salva em {path} ---")
 
+    rationale = validation.get("stack_rationale", f"Stack '{decided_stack}' escolhida por adequação técnica aos requisitos.") if 'validation' in locals() else f"Stack '{decided_stack}' selecionada por requisitos de arquitetura."
+
     return {
         **state,
         "stack": decided_stack,
+        "stack_rationale": rationale,
         "tech_spec": tech_spec,
         "feedback_history": new_feedback,
         "next_agent": "developer",

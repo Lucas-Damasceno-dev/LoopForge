@@ -7,6 +7,7 @@ from .parser import parse_test_output
 
 @dataclass
 class TestHarnessResult:
+    __test__ = False
     total: int
     passed: int
     failed: int
@@ -15,7 +16,9 @@ class TestHarnessResult:
 
 
 class TestHarnessRunner:
-    """Multi-stack Test Harness (pytest, vitest, jest, go test, cargo test)."""
+    """Multi-stack Test Harness (pytest, vitest, jest, go test, cargo test, maven, gradle)."""
+
+    __test__ = False
 
     def __init__(self, command: str | None = None, stack: str | None = None):
         self.command = command
@@ -33,6 +36,13 @@ class TestHarnessRunner:
 
         if self.stack == "rust" or (cwd_path / "Cargo.toml").exists():
             return "cargo test"
+
+        if self.stack == "java" or (cwd_path / "pom.xml").exists() or (cwd_path / "build.gradle").exists() or (cwd_path / "build.gradle.kts").exists():
+            if (cwd_path / "pom.xml").exists():
+                return "mvn test"
+            if (cwd_path / "gradlew").exists():
+                return "./gradlew test"
+            return "gradle test"
 
         if self.stack in ("javascript", "typescript") or (cwd_path / "package.json").exists():
             if (cwd_path / "vitest.config.ts").exists() or (cwd_path / "vitest.config.js").exists():

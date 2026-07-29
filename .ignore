@@ -2,3 +2,6 @@
 !.slim/**
 !.slim/deepwork/
 !.slim/deepwork/**
+!.slim/worktrees/
+!.slim/worktrees/**
+!.slim/worktrees.json

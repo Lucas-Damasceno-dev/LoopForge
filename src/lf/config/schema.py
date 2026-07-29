@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TechStack(BaseModel):
@@ -39,6 +39,8 @@ class ArtifactSchema(BaseModel):
 
 
 class TaskSchema(BaseModel):
+    model_config = {"extra": "ignore"}
+
     id: str
     title: str
     status: Literal["pending", "running", "validating", "failed", "done"] = "pending"
@@ -55,8 +57,23 @@ class TaskSchema(BaseModel):
 
 
 class PlanSchema(BaseModel):
+    model_config = {"extra": "ignore"}
+
     tasks: list[TaskSchema] = Field(default_factory=list)
     graph: dict[str, list[str]] = Field(default_factory=dict)
+
+    @field_validator("tasks", mode="before")
+    @classmethod
+    def validate_tasks(cls, v: Any) -> Any:
+        if isinstance(v, list):
+            res = []
+            for item in v:
+                if isinstance(item, dict):
+                    res.append(TaskSchema(**item))
+                else:
+                    res.append(item)
+            return res
+        return v
 
 
 class LoopForgeConfig(BaseModel):

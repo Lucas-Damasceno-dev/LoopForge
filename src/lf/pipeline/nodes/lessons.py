@@ -79,6 +79,15 @@ def generate_lessons_md(state: GraphState) -> str:
                 f.write(content)
             print(f"--- INFO: Artefato final lessons.md gerado em {lessons_path} ---")
 
+    # Salva a lição aprendida no MemoryManager SQLite
+    try:
+        from ...memory.manager import MemoryManager
+        mem = MemoryManager()
+        run_id = state.get("run_id", "run_latest")
+        mem.save_lesson(run_id=run_id, stack=stack, idea=idea, lesson_text=content[:500])
+    except Exception as exc:
+        print(f"--- AVISO: Falha ao persistir no MemoryManager: {exc} ---")
+
     return content
 
 
