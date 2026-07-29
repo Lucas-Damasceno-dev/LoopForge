@@ -48,6 +48,8 @@ def create_plan_from_vision(vision_path_or_text: str, output_dir: str, routing_m
         tasks.append(TaskSchema(
             id=f"T-{i+1:03d}",
             title=f"Executar {persona}: {vision[:40]}",
+            agent_id=persona,
+            persona=persona,
             status="pending",
             depends_on=[f"T-{j+1:03d}" for j in range(i)],
             max_retries=3,
@@ -75,6 +77,8 @@ def create_plan_from_epic(epic: dict, output_dir: str) -> Plan:
         tasks.append(TaskSchema(
             id=f"T-{i+1:03d}",
             title=f"{persona}: {epic.get('title', 'Executar persona')[:60]}",
+            agent_id=persona,
+            persona=persona,
             status="pending",
             depends_on=[f"T-{j+1:03d}" for j in range(i)],
             max_retries=3,

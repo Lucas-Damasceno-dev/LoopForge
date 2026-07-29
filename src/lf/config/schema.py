@@ -57,6 +57,8 @@ class TaskSchema(BaseModel):
     task_type: str = "feature"
 
     def __getitem__(self, item: str) -> Any:
+        if item == "persona":
+            return getattr(self, "persona", "") or getattr(self, "agent_id", "")
         return getattr(self, item, None)
 
 
