@@ -38,6 +38,9 @@ async def test_api_human_decision_endpoints():
         assert run_resp.status_code == 201
         run_id = run_resp.json()["id"]
 
+        import asyncio
+        await asyncio.sleep(0.2)
+
         # 2. Registra decisão humana
         dec_resp = await client.post(
             f"/api/runs/{run_id}/decide",

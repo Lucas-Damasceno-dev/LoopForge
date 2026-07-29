@@ -24,7 +24,8 @@ def parallel_audit(state: GraphState) -> dict:
 
     sec_review = res_appsec.get("security_review") or res_appsec.get("security_report", {})
     sec_report = res_appsec.get("security_report") or sec_review
-    ops_report = res_devops.get("devops_report", {})
+    ops_report = res_devops.get("devops_report") or res_devops.get("devops_manifest", {})
+    ops_manifest = res_devops.get("devops_manifest") or ops_report
     err = res_appsec.get("error") or res_devops.get("error")
 
     next_agent = res_appsec.get("next_agent", "FINISH")
@@ -34,6 +35,7 @@ def parallel_audit(state: GraphState) -> dict:
         "security_report": sec_report,
         "security_review": sec_review,
         "devops_report": ops_report,
+        "devops_manifest": ops_manifest,
         "next_agent": next_agent if next_agent == "developer" else "FINISH",
         "error": err,
     }
