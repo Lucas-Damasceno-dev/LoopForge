@@ -9,6 +9,7 @@ from lf.cli.commands.pr import pr_cmd
 from lf.cli.commands.resume import resume_cmd
 from lf.cli.commands.run import run_cmd
 from lf.cli.commands.serve import serve_cmd
+from lf.cli.commands.studio import studio_cmd
 
 
 @click.group()
@@ -26,6 +27,7 @@ main.add_command(diff_cmd)
 main.add_command(explore_cmd)
 main.add_command(pr_cmd)
 main.add_command(export_cmd)
+main.add_command(studio_cmd)
 
 
 if __name__ == "__main__":
