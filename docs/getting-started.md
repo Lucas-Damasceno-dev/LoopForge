@@ -1,31 +1,50 @@
-# Getting Started with LoopForge
+# Getting Started with LoopForge v6
 
-## Installation
+## Instalação
 
 ```bash
+# Clone o repositório
+git clone https://github.com/Lucas-Damasceno-dev/LoopForge.git
+cd LoopForge
+
+# Instalar dependências e CLI em modo editável
 pip install -e .
 ```
+
+---
 
 ## Quick Start (CLI)
 
 ```bash
-# Initialize a new project context
-lf init --name "My Project"
+# 1. Executar o pipeline autônomo (Tech Lead decide a stack autonomamente)
+lf run --idea "CLI em Rust que baixa cotação do dólar e salva em CSV"
 
-# Create a project specification plan
-lf plan --idea "Build a REST API service"
+# 2. Executar especificando uma stack via override manual
+lf run --idea "API REST de tarefas" --stack java
 
-# Run the 7-agent pipeline
-lf run --idea "Build a REST API service" --stack python
+# 3. Executar com revisão humana (HITL) entre as fases
+lf run --idea "Dashboard financeiro em Python" --interactive
 
-# Start the REST API & Web Dashboard
+# 4. Executar e abrir Pull Request no GitHub ao concluir
+lf run --idea "API REST de Tarefas" --pr
+
+# 5. Iniciar o Servidor REST API & Web Dashboard UI com WebSockets
 lf serve --host 127.0.0.1 --port 8000
+
+# 6. Avaliar a qualidade do pipeline com a suíte de Benchmark ELO
+lf benchmark
+
+# 7. Retomar pipeline interrompido a partir de checkpoint
+lf resume --resume <session_id>
 ```
 
-## Docker Deployment
+---
+
+## Implantação via Docker
 
 ```bash
 cp .env.example .env
 docker compose up -d
 ```
-Access the Dashboard at `http://localhost:8000/dashboard`.
+
+Acesse o Dashboard interativo no navegador: `http://localhost:8000/dashboard`.

@@ -1,79 +1,75 @@
-# LoopForge v6 — Architecture
+# LoopForge v6 — Architecture & Technical Specifications
 
 ## Overview
 
-LoopForge is an automated loop engineering engine for AI agents. v6 is built in Python with LangGraph for stateful workflow orchestration.
+LoopForge é um orquestrador autônomo de governança de agentes de IA construído em Python 3.12+ utilizando **LangGraph** para orquestração de workflow com estado (`GraphState`), **Pydantic v2** para validação estrita de dados, **FastAPI** para API REST e WebSockets, e o harness **OpenCode** para execução e LLM routing.
+
+---
 
 ## Module Map
 
-```
-lf/
-├── cli/              # Click CLI (init, plan, run, status)
-├── config/           # Pydantic settings, JSON/YAML loader
+```text
+src/lf/
+├── api/              # Servidor FastAPI REST, WebSockets e templates HTML
+│   ├── app.py        # Endpoints /api/runs, /ws/streaming, background workers
+│   └── templates/    # Dashboard HTML/WebSockets interativo
+├── cli/              # Interface CLI Click (main, run, serve, benchmark, resume, diff, explore, pr)
+│   ├── commands/     # Módulos dos comandos individuais
+│   └── main.py       # Registro centralizado de comandos core
+├── config/           # Pydantic v2 schemas (LoopForgeConfig, TaskSchema, TechStack)
 ├── pipeline/         # LangGraph StateGraph, nodes, state
-│   ├── graph.py      # build_graph() — centralized router + edges
-│   ├── state.py      # GraphState TypedDict (22 fields)
-│   ├── llm_factory.py# SQLiteLLMCache + legacy get_llm
-│   └── nodes/        # Individual agent nodes
-│       ├── cpo.py    # → Product Manager
-│       ├── pm.py     # → Tech Lead
-│       ├── tech_lead.py # → Developer
-│       ├── developer.py # → QA
-│       └── qa.py     # → FINISH
-├── orchestrator/     # Task dispatch, plan creation
-│   ├── task_dispatcher.py # Builds state, invokes graph, handles interrupts
-│   └── plan_creator.py    # vision → TaskSchema[]
-├── guardrails/       # CircuitBreaker, LoopLock, SecurityScanner
-├── telemetry/        # SQLite store + analytics
-├── runner/           # OpenCode subprocess, test harness, git
-│   ├── opencode/     # OpenCodeRunner, call_llm_via_opencode
-│   └── harness/      # TestHarnessRunner, parser
-├── ontology/         # The Foundry schema loader + persona registry
-├── memory/           # Simple JSON memory
-└── contrib/          # Experimental: FastAPI dashboard
+│   ├── graph.py      # build_graph() — Roteamento centralizado + arcos do grafo
+│   ├── state.py      # GraphState TypedDict
+│   ├── llm_factory.py# SQLiteLLMCache, compressão de prompt e normalização semântica
+│   └── nodes/        # Nó individual dos agentes
+│       ├── cpo.py            # → PM
+│       ├── pm.py             # → Tech Lead
+│       ├── tech_lead.py      # → Developer (decisão dinâmica de stack)
+│       ├── developer.py      # → QA (geração multi-arquivo)
+│       ├── qa.py             # → Parallel Audit (detecção automática de manifestos)
+│       ├── parallel_audit.py # → AppSec + DevOps em paralelo via ThreadPoolExecutor
+│       ├── appsec.py         # Scanner de segurança estático e auditoria LLM
+│       ├── devops.py         # Análise de deployabilidade e CI/CD
+│       └── lessons.py        # Gerador do artefato final lessons.md
+├── orchestrator/     # Despacho de tarefas e criação de planos
+│   ├── task_dispatcher.py # Constrói estado inicial, invoca o grafo e gerencia checkpoints
+│   └── plan_creator.py    # Converte visão em TaskSchema[]
+├── guardrails/       # CircuitBreaker e SecurityScanner
+├── telemetry/        # Telemetria SQLite e benchmark ELO rating system
+│   ├── benchmark.py         # Avaliação de benchmarks e cálculo ELO
+│   └── benchmark_dataset.py # 10 problemas curados multi-stack
+└── runner/           # Subprocesso OpenCode, git runner e test harness
+    ├── opencode/     # OpenCodeRunner, call_llm_via_opencode
+    └── harness/      # TestHarnessRunner
 ```
 
-## Data Flow
+---
 
+## Fluxo de Dados e Pipeline
+
+```text
+lf run --idea "..."
+       ↓
+TaskDispatcher → initial_state (stack=None)
+       ↓
+build_graph() → StateGraph.invoke()
+       ↓
+CPO → PM → Tech Lead (decide stack) → Developer (gera multi-arquivos) → QA (detecta & testa)
+                                                                           ↓
+                                                   Parallel Audit (AppSec + DevOps)
+                                                                           ↓
+                                                          Lessons Generator (lessons.md)
+                                                                           ↓
+                                                          FINISH / PR (gh pr create)
 ```
-lf init  →  .loopforge.json (config)
-lf plan  →  PlanSchema (tasks)
-lf run   →  TaskDispatcher → build_graph() → StateGraph.invoke()
-               ↓
-         cpo → pm → tech_lead → developer → qa → end
-               ↓
-         TelemetryRecorder → SQLite store
-               ↓
-         CircuitBreaker (per-task)
-```
 
-## Pipeline Flow
+---
 
-Each pipeline cycle processes one task through 5 LangGraph nodes:
+## Decisões de Design Principais
 
-| Node | Input | Output |
-|---|---|---|
-| CPO | idea | epic (Pydantic EpicSchema) |
-| Product Manager | epic | user_stories (UserStoryList) |
-| Tech Lead | user_stories | tech_spec (markdown) |
-| Developer | tech_spec | code (generated via OpenCode subprocess) |
-| QA | code | test_report (TestExecutionReport) |
-
-Routing is centralized in `graph.py:router()`. QA decides retry vs finish via `should_retry()`.
-
-## Key Design Decisions
-
-- **Router único**: routing in graph.py only, not in dispatcher/nodes
-- **Mock mode**: `mock_llm=True` returns mock data, no subprocess
-- **Circuit Breaker**: wired into `call_llm_via_opencode` and per-task loop
-- **SQLite cache**: `SQLiteLLMCache` in llm_factory.py (not opencode.py)
-- **Checkpointing**: LangGraph SqliteSaver for persistent state recovery
-
-## CLI Commands
-
-| Command | Description |
-|---|---|
-| `lf init` | Generate .loopforge.json config |
-| `lf plan` | Create task plan from vision |
-| `lf run` | Execute task pipeline (mock, interactive) |
-| `lf status` | Show task status from plan |
+- **Decisão Dinâmica de Stack**: O Tech Lead analisa os requisitos e grava a melhor stack em `state["stack"]`. Se o usuário fornecer `--stack`, esta é usada como override.
+- **Roteamento Centralizado no Grafo**: Arcos e transições definidos estritamente em `graph.py`.
+- **Detecção Automática do QA**: Reconhecimento agnóstico de manifestos e executores (`pom.xml`, `Cargo.toml`, `go.mod`, `package.json`, `build.gradle`, `pyproject.toml`, `*.csproj`).
+- **Auditoria Simultânea Paralela**: Nó `parallel_audit` executa `AppSec` e `DevOps` simultaneamente via `ThreadPoolExecutor` para otimização de tempo.
+- **Isolamento de Sessão de Banco de Dados**: Trabalhadores assíncronos no FastAPI utilizam `session_factory()` próprio em corrotina background para evitar conflitos de concorrencia.
+- **Cache Semântico e Compressão LLM**: Redução de custo via deduplicação de prompts e armazenamento local SQLite.

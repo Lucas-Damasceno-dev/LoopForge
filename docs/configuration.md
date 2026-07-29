@@ -1,60 +1,66 @@
-# Configuration
+# Configuração do LoopForge v6
 
-O LoopForge é configurado via arquivo `.loopforge.json`, `.loopforge.yml` ou `.loopforge.yaml` na raiz do projeto. O schema é validado com **Zod** em runtime.
+O LoopForge é configurado via arquivo `.loopforge.json` ou `.loopforge.yml` na raiz do projeto. O schema é validado em runtime através dos modelos **Pydantic v2**.
 
 ---
 
-## Schema Completo
+## Schema Completo (Python / Pydantic v2)
 
-```typescript
-interface LoopForgeConfig {
-  projectName: string;                  // Nome do projeto
-  version?: string;                     // Versão do projeto
-  harness: HarnessConfig;
-  memory?: MemoryConfig;
-  guardrails?: GuardrailsConfig;
-  notifications?: NotificationConfig;
-  llm?: LLMConfig;
-}
+```python
+class LoopForgeConfig(BaseModel):
+    project_id: str = "loopforge_project"
+    project_name: str = "LoopForge Project"
+    version: str = "6.0.0"
+    ontology_path: str = "examples/the-foundry"
+    stack: TechStack = Field(default_factory=TechStack)
+    llm_provider: str = "google"
+    llm_model: str = "gemini-2.0-flash"
+    budget_limit_usd: float = 10.0
+    max_parallel_tasks: int = 2
+    plan: PlanSchema = Field(default_factory=PlanSchema)
+
+
+class TaskSchema(BaseModel):
+    id: str
+    title: str
+    status: Literal["pending", "running", "validating", "failed", "done"] = "pending"
+    agent_id: str = "developer"
+    input_artifact_id: str = ""
+    expected_schema: str = ""
+    prompt: str = ""
+    attempts: int = 0
+    max_retries: int = 3
+    depends_on: list[str] = Field(default_factory=list)
+    stack: str | None = Field(None, description="Stack tecnológica opcional (Tech Lead decide se omitido)")
+    routing_mode: str = "full"
+    task_type: str = "feature"
 ```
 
 ---
 
-## Campos e Sub-objetos
+## Exemplo de `.loopforge.json`
 
-### `guardrails`
-
-| Campo | Tipo | Padrão | Descrição |
-|---|---|---|---|
-| `maxConsecutiveFailures` | `number` | `3` | Falhas consecutivas antes do circuit breaker abrir |
-| `maxTotalIterations` | `number` | `10` | Número máximo de iterações totais do loop |
-| `maxBudgetUsd` | `number` | `5.0` | Orçamento total máximo em dólar |
-| `maxCostPerIteration` | `number` | `2.0` | Teto financeiro máximo permitido para uma única iteração |
-| `requireCleanGit` | `boolean` | `true` | Exige repositório limpo para iniciar |
-
----
-
-### `notifications`
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `webhookUrl` | `string` | URL do Webhook (Slack, Discord, Teams) |
-| `desktop.enabled` | `boolean` | Ativa/desativa notificações de desktop no sistema |
-| `email.enabled` | `boolean` | Ativa/desativa envio de e-mails de alerta |
-| `email.smtpHost` | `string` | Host do servidor SMTP |
-| `email.smtpPort` | `number` | Porta SMTP (ex: 587 ou 465) |
-| `email.to` | `string` | Endereço do destinatário do relatório |
-
-**Exemplo:**
 ```json
-"notifications": {
-  "webhookUrl": "https://discord.com/api/webhooks/...",
-  "desktop": { "enabled": true },
-  "email": {
-    "enabled": true,
-    "smtpHost": "smtp.gmail.com",
-    "smtpPort": 587,
-    "to": "alerta@meudominio.com"
+{
+  "project_id": "meu-projeto",
+  "project_name": "Meu Projeto Autônomo",
+  "version": "6.0.0",
+  "ontology_path": "examples/the-foundry",
+  "budget_limit_usd": 10.0,
+  "max_parallel_tasks": 2,
+  "llm_provider": "openrouter",
+  "llm_model": "inclusionai/ling-3.0-flash:free",
+  "plan": {
+    "tasks": [
+      {
+        "id": "T-001",
+        "title": "API REST de tarefas com autenticação JWT em Java Spring Boot",
+        "agent_id": "cpo",
+        "routing_mode": "full",
+        "status": "pending",
+        "stack": null
+      }
+    ]
   }
 }
 ```
