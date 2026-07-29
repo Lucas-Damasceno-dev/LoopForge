@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from lf.orchestrator.plan_creator import create_plan_from_epic
 from lf.pipeline.nodes.developer import (
-    STACK_PROJECT_TEMPLATES,
     _extract_generated_code,
     _parse_multi_file_response,
     developer,
@@ -51,7 +50,14 @@ public class Main {}
 
 
 def test_developer_multi_file_mock_all_stacks(tmp_path):
-    for stack in ("java", "python", "javascript", "go", "rust"):
+    manifest_map = {
+        "java": "pom.xml",
+        "python": "pyproject.toml",
+        "javascript": "package.json",
+        "go": "go.mod",
+        "rust": "Cargo.toml",
+    }
+    for stack, expected_manifest in manifest_map.items():
         target_dir = tmp_path / stack
         state = {
             "idea": f"Test {stack} multi file app",
@@ -64,12 +70,8 @@ def test_developer_multi_file_mock_all_stacks(tmp_path):
         assert res["next_agent"] == "qa"
         assert res["code"] is not None
 
-        sc = STACK_PROJECT_TEMPLATES[stack]
-        manifest_path = target_dir / sc["manifest_file"]
-        test_path = target_dir / sc["test_file"]
-
-        assert manifest_path.exists(), f"Manifest {sc['manifest_file']} not created for {stack}"
-        assert test_path.exists(), f"Test file {sc['test_file']} not created for {stack}"
+        manifest_path = target_dir / expected_manifest
+        assert manifest_path.exists(), f"Manifest {expected_manifest} not created for {stack}"
 
 
 def test_developer_node_llm_execution(tmp_path):

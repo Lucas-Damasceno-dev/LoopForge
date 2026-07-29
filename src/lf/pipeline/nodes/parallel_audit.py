@@ -1,6 +1,6 @@
 """
 Nó Parallel Audit: executa AppSec (Security Audit) e DevOps (CI/CD Deployability Analysis)
-de forma paralela e simultânea via ThreadPoolExecutor.
+de forma paralela e simultânea via ThreadPoolExecutor e gera o artefato final lessons.md.
 """
 from __future__ import annotations
 
@@ -9,10 +9,11 @@ import concurrent.futures
 from ...pipeline.state import GraphState
 from .appsec import appsec
 from .devops import devops
+from .lessons import generate_lessons_md
 
 
 def parallel_audit(state: GraphState) -> dict:
-    """Executa AppSec e DevOps simultaneamente em paralelo."""
+    """Executa AppSec e DevOps simultaneamente em paralelo e gera o lessons.md."""
     print("--- EXECUTANDO EM PARALELO: AppSec + DevOps Audit ---")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
@@ -30,7 +31,7 @@ def parallel_audit(state: GraphState) -> dict:
 
     next_agent = res_appsec.get("next_agent", "FINISH")
 
-    return {
+    updated_state = {
         **state,
         "security_report": sec_report,
         "security_review": sec_review,
@@ -39,3 +40,8 @@ def parallel_audit(state: GraphState) -> dict:
         "next_agent": next_agent if next_agent == "developer" else "FINISH",
         "error": err,
     }
+
+    # Gera o artefato final lessons.md
+    generate_lessons_md(updated_state)
+
+    return updated_state

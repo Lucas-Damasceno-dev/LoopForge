@@ -1,6 +1,6 @@
 """
-Nó Developer: recebe tech spec e gera estrutura de projeto MULTI-ARQUIVO real (pom.xml, package.json,
-pyproject.toml, go.mod, Cargo.toml e testes unitários) via llm_factory / OpenCode runner.
+Nó Developer: recebe a stack decidida pelo Tech Lead e gera um projeto MULTI-ARQUIVO completo
+(código principal, manifesto de dependências e testes unitários).
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def _extract_generated_code(res: any, output_dir: str, duration: float = 0.0) ->
     return _clean_code(stdout)
 
 
-def _parse_multi_file_response(raw_text: str, default_filename: str) -> dict[str, str]:
+def _parse_multi_file_response(raw_text: str, default_filename: str = "main.py") -> dict[str, str]:
     """Extrai múltiplos arquivos do texto retornado pela LLM com base em marcadores de cabeçalho."""
     files: dict[str, str] = {}
     pattern = r"(?:###|\/\/\/|---)\s*(?:FILE|File|file):\s*([^\n\r]+)[\r\n]+```(?:[a-zA-Z0-9_-]+)?\s*[\r\n]+(.*?)```"
@@ -46,7 +46,6 @@ def _parse_multi_file_response(raw_text: str, default_filename: str) -> dict[str
             clean_path = rel_path.strip().strip("`'\"")
             files[clean_path] = content.strip()
     else:
-        # Tenta fallback para marcadores sem cercas markdown
         alt_pattern = r"(?:###|\/\/\/|---)\s*(?:FILE|File|file):\s*([^\n\r]+)[\r\n]+(.*?)(?=(?:###|\/\/\/|---)\s*(?:FILE|File|file):|\Z)"
         alt_matches = re.findall(alt_pattern, raw_text, re.DOTALL)
         if alt_matches:
@@ -60,200 +59,24 @@ def _parse_multi_file_response(raw_text: str, default_filename: str) -> dict[str
     return files
 
 
-STACK_PROJECT_TEMPLATES = {
-    "java": {
-        "lang": "Java",
-        "ext": ".java",
-        "main_file": "Main.java",
-        "manifest_file": "pom.xml",
-        "instruction": "You are a Java developer. Generate a complete multi-file Maven project.",
-        "rules": [
-            "Generate a compilable Java class named Main with a main method",
-            "Define multi-file outputs with '### FILE: <path>' headers",
-            "Include imports and clean modular structure",
-        ],
-        "manifest_template": """<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>com.loopforge</groupId>
-    <artifactId>generated-app</artifactId>
-    <version>1.0.0</version>
-    <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-    <dependencies>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.10.0</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.1.2</version>
-            </plugin>
-        </plugins>
-    </build>
-</project>""",
-        "test_file": "src/test/java/com/loopforge/app/MainTest.java",
-        "test_template": """package com.loopforge.app;
-
-import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
-
-public class MainTest {
-    @Test
-    public void testBaselineExecution() {
-        assertTrue(true, "Suite de testes Maven baseline do LoopForge");
-    }
-}""",
-    },
-    "python": {
-        "lang": "Python",
-        "ext": ".py",
-        "main_file": "generated_code.py",
-        "manifest_file": "pyproject.toml",
-        "instruction": "You are a Python developer. Generate a complete multi-file Python package.",
-        "rules": [
-            "Generate runnable Python code with main function and __name__ guard",
-            "Define multi-file outputs with '### FILE: <path>' headers",
-            "Include imports and type hints",
-        ],
-        "manifest_template": """[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "generated-app"
-version = "0.1.0"
-description = "LoopForge Generated Python Application"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = []
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-q"
-testpaths = ["tests"]
-""",
-        "test_file": "tests/test_main.py",
-        "test_template": """def test_baseline_execution():
-    assert True
-""",
-    },
-    "javascript": {
-        "lang": "JavaScript",
-        "ext": ".js",
-        "main_file": "generated_code.js",
-        "manifest_file": "package.json",
-        "instruction": "You are a JavaScript developer. Generate a complete multi-file Node.js project.",
-        "rules": [
-            "Write a complete Node.js ESM module or script",
-            "Define multi-file outputs with '### FILE: <path>' headers",
-        ],
-        "manifest_template": """{
-  "name": "generated-app",
-  "version": "1.0.0",
-  "description": "LoopForge Generated Node.js Application",
-  "main": "generated_code.js",
-  "type": "module",
-  "scripts": {
-    "start": "node generated_code.js",
-    "test": "node --test"
-  }
-}""",
-        "test_file": "test/app.test.js",
-        "test_template": """import test from 'node:test';
-import assert from 'node:assert';
-
-test('baseline test suite', () => {
-  assert.strictEqual(true, true);
-});""",
-    },
-    "go": {
-        "lang": "Go",
-        "ext": ".go",
-        "main_file": "main.go",
-        "manifest_file": "go.mod",
-        "instruction": "You are a Go developer. Generate a complete multi-file Go project.",
-        "rules": [
-            "Write complete Go code with package main and func main()",
-            "Define multi-file outputs with '### FILE: <path>' headers",
-        ],
-        "manifest_template": """module generated-app
-
-go 1.21
-""",
-        "test_file": "main_test.go",
-        "test_template": """package main
-
-import "testing"
-
-func TestBaseline(t *testing.T) {
-	// Baseline test
-}""",
-    },
-    "rust": {
-        "lang": "Rust",
-        "ext": ".rs",
-        "main_file": "main.rs",
-        "manifest_file": "Cargo.toml",
-        "instruction": "You are a Rust developer. Generate a complete multi-file Cargo project.",
-        "rules": [
-            "Write complete Rust code with fn main()",
-            "Define multi-file outputs with '### FILE: <path>' headers",
-        ],
-        "manifest_template": """[package]
-name = "generated-app"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-""",
-        "test_file": "tests/integration_test.rs",
-        "test_template": """#[test]
-fn test_baseline() {
-    assert_eq!(2 + 2, 4);
-}""",
-    },
-}
-
-
 def developer(state: GraphState) -> dict:
-    """Recebe tech spec e gera estrutura de projeto MULTI-ARQUIVO real."""
+    """Gera projeto completo multi-arquivo na stack decidida pelo Tech Lead."""
     print("---EXECUTANDO NÓ: Developer---")
 
     attempt_count = state.get("attempt_count", 0) + 1
-    stack_lang = str(state.get("stack", "python")).lower()
-    sc = STACK_PROJECT_TEMPLATES.get(stack_lang, STACK_PROJECT_TEMPLATES["python"])
+    stack = str(state.get("stack", "python")).lower()
     output_dir = state.get("output_dir", ".")
     project_dir = state.get("project_dir", output_dir)
 
+    default_main = _get_default_filename_by_stack(stack)
+
     if state.get("mock_llm"):
-        print("--- INFO: Developer modo MOCK (gerando estrutura multi-arquivo mock) ---")
-        mock_files = {
-            sc["main_file"]: f"// Mock {sc['lang']} code\npublic class Main {{ public static void main(String[] args) {{ System.out.println(\"mock\"); }} }}" if sc["lang"] == "Java" else f"# Mock {sc['lang']} code\nprint('mock')",
-            sc["manifest_file"]: sc["manifest_template"],
-            sc["test_file"]: sc["test_template"],
-        }
+        print(f"--- INFO: Developer modo MOCK (stack decidida pelo TL: {stack}) ---")
+        mock_files = _generate_mock_project(stack)
         _write_project_files(mock_files, [output_dir, project_dir])
         return {
             **state,
-            "code": mock_files[sc["main_file"]],
+            "code": mock_files.get(default_main, list(mock_files.values())[0]),
             "attempt_count": attempt_count,
             "next_agent": "qa",
             "error": None,
@@ -264,26 +87,23 @@ def developer(state: GraphState) -> dict:
     user_stories = state.get("user_stories", [])
     model_name = os.environ.get("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash:free")
 
-    story_lines = []
-    for us in user_stories[:3]:
-        sid = us.get("id", "")
-        title = us.get("title", "")
-        desc = us.get("description", "")[:150]
-        story_lines.append(f"- {sid}: {title} — {desc}")
+    story_lines = [f"- {us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:3]]
+
+    system_prompt = f"""Você é um Desenvolvedor Sênior.
+Stack definida pelo Tech Lead: {stack}. Gere um projeto completo nesta stack com todos os arquivos necessários (código principal, manifesto de dependências, testes).
+
+REGRAS:
+1. Responda no formato multi-arquivos com o cabeçalho '### FILE: caminho/do/arquivo' seguido por bloco de código markdown.
+2. Inclua o manifesto de dependências relevante (ex: pyproject.toml, package.json, pom.xml, Cargo.toml, go.mod).
+3. Inclua a suíte de testes unitários da stack."""
 
     prompt_parts = [
-        f"Implemente um projeto MULTI-ARQUIVOS completo em {sc['lang']}:",
-        f"\nIdeia: {idea}",
+        f"Ideia do Projeto: {idea}",
         f"\nTech Spec:\n{tech_spec[:2000]}",
         f"\nUser Stories:\n{chr(10).join(story_lines) if story_lines else 'N/A'}",
-        "\nInstruções de estrutura:",
-        f"- Crie o arquivo principal '{sc['main_file']}'",
-        f"- Crie o arquivo de manifesto '{sc['manifest_file']}'",
-        f"- Crie testes unitários em '{sc['test_file']}'",
-        "- Formate a resposta definindo cada arquivo com o cabeçalho:\n### FILE: caminho/do/arquivo\n```\nconteúdo\n```",
     ]
 
-    # Incorporar feedback de retentativas anteriores se houver
+    # Feedback de retentativas
     feedback_history = state.get("feedback_history", [])
     test_report = state.get("test_report", {})
     previous_code = state.get("code", "")
@@ -312,13 +132,7 @@ def developer(state: GraphState) -> dict:
 
     user_prompt = "\n".join(prompt_parts)
 
-    system_prompt = f"""{sc['instruction']}
-
-REGRAS:
-{chr(10).join(f'{i+1}. {r}' for i, r in enumerate(sc['rules']))}
-"""
-
-    print(f"--- Chamando LLM Engine (Geração Multi-Arquivo, model: {model_name})... ---")
+    print(f"--- Chamando LLM Engine (Stack TL: {stack}, Model: {model_name})... ---")
     try:
         raw = call_llm_via_opencode(
             system_prompt=system_prompt,
@@ -346,20 +160,21 @@ REGRAS:
             "error": err_msg,
         }
 
-    # Extrai arquivos gerados pela LLM
-    files_map = _parse_multi_file_response(raw, sc["main_file"])
+    files_map = _parse_multi_file_response(raw, default_main)
 
-    # Garante a presença do manifesto e suíte de testes baseline da stack se omitidos pela LLM
-    if sc["manifest_file"] not in files_map:
-        files_map[sc["manifest_file"]] = sc["manifest_template"]
-    if sc["test_file"] not in files_map:
-        files_map[sc["test_file"]] = sc["test_template"]
+    # Verifica se há manifesto ou arquivo de teste gerado
+    has_manifest = any(
+        f.lower().endswith(("pom.xml", "package.json", "pyproject.toml", "go.mod", "cargo.toml", "build.gradle"))
+        for f in files_map
+    )
+    has_test = any("test" in f.lower() for f in files_map)
 
-    # Escreve todos os arquivos no projeto
+    if not has_manifest and not has_test:
+        print("--- AVISO: A LLM não gerou manifesto ou testes. O QA irá detectar a ausência e reportar falha. ---")
+
     _write_project_files(files_map, [output_dir, project_dir])
 
-    # Código principal selecionado
-    primary_code = files_map.get(sc["main_file"]) or list(files_map.values())[0]
+    primary_code = files_map.get(default_main) or list(files_map.values())[0]
 
     return {
         **state,
@@ -370,8 +185,54 @@ REGRAS:
     }
 
 
+def _get_default_filename_by_stack(stack: str) -> str:
+    s = stack.lower()
+    if "rust" in s:
+        return "src/main.rs"
+    if "java" in s:
+        return "src/main/java/Main.java"
+    if "javascript" in s or "node" in s:
+        return "generated_code.js"
+    if "go" in s:
+        return "main.go"
+    return "generated_code.py"
+
+
+def _generate_mock_project(stack: str) -> dict[str, str]:
+    s = stack.lower()
+    if "rust" in s:
+        return {
+            "Cargo.toml": '[package]\nname = "generated-app"\nversion = "0.1.0"\nedition = "2021"\n[dependencies]\n',
+            "src/main.rs": 'fn main() {\n    println!("Hello from Rust");\n}',
+            "tests/test_main.rs": '#[test]\nfn test_baseline() {\n    assert_eq!(2 + 2, 4);\n}',
+        }
+    elif "java" in s:
+        return {
+            "pom.xml": '<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><groupId>com.lf</groupId><artifactId>app</artifactId><version>1.0</version></project>',
+            "src/main/java/Main.java": 'public class Main { public static void main(String[] args) { System.out.println("Java app"); } }',
+            "src/test/java/MainTest.java": 'import org.junit.jupiter.api.Test;\npublic class MainTest { @Test public void testPass() {} }',
+        }
+    elif "javascript" in s or "node" in s:
+        return {
+            "package.json": '{"name":"generated-app","version":"1.0.0","type":"module","scripts":{"test":"node --test"}}',
+            "generated_code.js": 'console.log("Hello JS");',
+            "test/app.test.js": "import test from 'node:test'; import assert from 'node:assert'; test('ok', () => assert.strictEqual(1, 1));",
+        }
+    elif "go" in s:
+        return {
+            "go.mod": 'module generated-app\n\ngo 1.21\n',
+            "main.go": 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Go app")\n}',
+            "main_test.go": 'package main\n\nimport "testing"\n\nfunc TestOk(t *testing.T) {\n}',
+        }
+    else:
+        return {
+            "pyproject.toml": '[build-system]\nrequires = ["setuptools"]\nbuild-backend = "setuptools.build_meta"\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
+            "generated_code.py": 'def main():\n    print("Python app")\n\nif __name__ == "__main__":\n    main()',
+            "tests/test_main.py": 'def test_ok():\n    assert True',
+        }
+
+
 def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> None:
-    """Cria recursivamente todos os diretórios e salva os arquivos do projeto."""
     for base_dir in set(target_dirs):
         if not base_dir:
             continue

@@ -96,7 +96,7 @@ class TaskDispatcher:
             "test_report": {},
             "ontology_path": ontology,
             "project_dir": ".",
-            "stack": getattr(task, "stack", "python"),
+            "stack": getattr(task, "stack", None),
             "next_agent": target_agent,
 
             "attempt_count": getattr(task, "attempts", 0),

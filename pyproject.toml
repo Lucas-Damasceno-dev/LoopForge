@@ -1,16 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
-
-[project]
-name = "generated-app"
-version = "0.1.0"
-description = "LoopForge Generated Python Application"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = []
-
 [tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-q"
 testpaths = ["tests"]

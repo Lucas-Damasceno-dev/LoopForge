@@ -1,2 +1,2 @@
-def test_baseline_execution():
+def test_ok():
     assert True

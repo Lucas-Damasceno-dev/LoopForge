@@ -150,102 +150,86 @@ O relatório DEVE ter:
 
 
 def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> dict:
-    """Executa testes ou compilação do projeto/arquivos standalone via subprocesso."""
+    """Executa testes com detecção automática baseada nos arquivos e manifestos gerados."""
     result = {"passed": 0, "total": 0, "errors": [], "duration_ms": 0}
     dirs_to_check = [d for d in [project_dir, output_dir] if d and os.path.exists(d)]
 
-    stack_lower = stack.lower()
+    # 1. Inspeção de manifestos conhecidos
+    has_pom = any(os.path.exists(os.path.join(d, "pom.xml")) for d in dirs_to_check)
+    has_gradle = any(os.path.exists(os.path.join(d, "build.gradle")) or os.path.exists(os.path.join(d, "build.gradle.kts")) for d in dirs_to_check)
+    has_cargo = any(os.path.exists(os.path.join(d, "Cargo.toml")) for d in dirs_to_check)
+    has_go_mod = any(os.path.exists(os.path.join(d, "go.mod")) for d in dirs_to_check)
+    has_package_json = any(os.path.exists(os.path.join(d, "package.json")) for d in dirs_to_check)
+    has_csproj = any(list(Path(d).glob("*.csproj")) for d in dirs_to_check)
+    has_gemfile = any(os.path.exists(os.path.join(d, "Gemfile")) for d in dirs_to_check)
 
-    # Java harness
-    if "java" in stack_lower:
-        has_pom = any(os.path.exists(os.path.join(d, "pom.xml")) for d in dirs_to_check)
-        has_gradle = any(os.path.exists(os.path.join(d, "build.gradle")) for d in dirs_to_check)
-
-        if has_pom:
-            _exec_cmd(["mvn", "test", "-q"], project_dir, "mvn test", result)
-        elif has_gradle:
-            _exec_cmd(["gradle", "test", "-q"], project_dir, "gradle test", result)
-        else:
-            # Fallback para standalone Java files
-            java_files = []
-            for d in dirs_to_check:
-                java_files.extend(list(Path(d).glob("*.java")))
-
-            if java_files:
-                target_file = next((f for f in java_files if f.name == "Main.java"), java_files[0])
-                _exec_cmd(["javac", str(target_file)], str(target_file.parent), "javac compile", result)
-                if result["passed"] > 0:
-                    class_name = target_file.stem
-                    _exec_cmd(["java", class_name], str(target_file.parent), "java execution", result)
-            else:
-                result["errors"].append("Nenhum arquivo .java nem pom.xml/build.gradle encontrado para testar.")
-
+    if has_pom:
+        _exec_cmd(["mvn", "test", "-q"], project_dir, "mvn test", result)
+        return result
+    if has_gradle:
+        _exec_cmd(["gradle", "test", "-q"], project_dir, "gradle test", result)
+        return result
+    if has_cargo:
+        _exec_cmd(["cargo", "test"], project_dir, "cargo test", result)
+        return result
+    if has_go_mod:
+        _exec_cmd(["go", "test", "./..."], project_dir, "go test", result)
+        return result
+    if has_package_json:
+        _exec_cmd(["npm", "test"], project_dir, "npm test", result)
+        return result
+    if has_csproj:
+        _exec_cmd(["dotnet", "test"], project_dir, "dotnet test", result)
+        return result
+    if has_gemfile:
+        _exec_cmd(["bundle", "exec", "rspec"], project_dir, "rspec test", result)
         return result
 
-    # Python harness
-    if "python" in stack_lower:
-        has_pytest_files = any(list(Path(d).glob("test_*.py")) or list(Path(d).glob("*_test.py")) for d in dirs_to_check)
+    # 2. Inspeção por extensão de código-fonte e suítes de teste
+    py_files = []
+    java_files = []
+    rs_files = []
+    go_files = []
+    js_files = []
+
+    for d in dirs_to_check:
+        py_files.extend(list(Path(d).glob("**/*.py")))
+        java_files.extend(list(Path(d).glob("**/*.java")))
+        rs_files.extend(list(Path(d).glob("**/*.rs")))
+        go_files.extend(list(Path(d).glob("**/*.go")))
+        js_files.extend(list(Path(d).glob("**/*.js")) + list(Path(d).glob("**/*.ts")))
+
+    if py_files:
+        has_pytest_files = any("test" in f.name.lower() for f in py_files)
         if has_pytest_files:
             _exec_cmd(["pytest", "-x", "--tb=short", "-q"], project_dir, "pytest", result)
         else:
-            py_files = []
-            for d in dirs_to_check:
-                py_files.extend([f for f in Path(d).glob("*.py") if not f.name.startswith("test_")])
-            if py_files:
-                for py_file in py_files[:2]:
-                    _exec_cmd(["python3", "-m", "py_compile", str(py_file)], str(py_file.parent), f"py_compile ({py_file.name})", result)
-            else:
-                _exec_cmd(["pytest", "-x", "--tb=short", "-q"], project_dir, "pytest", result)
+            for py_file in py_files[:2]:
+                _exec_cmd(["python3", "-m", "py_compile", str(py_file)], str(py_file.parent), f"py_compile ({py_file.name})", result)
         return result
 
-    # JavaScript harness
-    if "javascript" in stack_lower or "js" in stack_lower:
-        has_pkg = any(os.path.exists(os.path.join(d, "package.json")) for d in dirs_to_check)
-        if has_pkg:
-            _exec_cmd(["npm", "test"], project_dir, "npm test", result)
-        else:
-            js_files = []
-            for d in dirs_to_check:
-                js_files.extend(list(Path(d).glob("*.js")))
-            if js_files:
-                for js_file in js_files[:2]:
-                    _exec_cmd(["node", "--check", str(js_file)], str(js_file.parent), f"node check ({js_file.name})", result)
-            else:
-                result["errors"].append("Nenhum arquivo .js nem package.json encontrado para testar.")
+    if java_files:
+        target_file = next((f for f in java_files if f.name == "Main.java"), java_files[0])
+        _exec_cmd(["javac", str(target_file)], str(target_file.parent), "javac compile", result)
+        if result["passed"] > 0:
+            _exec_cmd(["java", target_file.stem], str(target_file.parent), "java execution", result)
         return result
 
-    # Go harness
-    if "go" in stack_lower:
-        has_go_mod = any(os.path.exists(os.path.join(d, "go.mod")) for d in dirs_to_check)
-        if has_go_mod:
-            _exec_cmd(["go", "test", "./..."], project_dir, "go test", result)
-        else:
-            go_files = []
-            for d in dirs_to_check:
-                go_files.extend(list(Path(d).glob("*.go")))
-            if go_files:
-                _exec_cmd(["go", "vet", "./..."], str(go_files[0].parent), "go vet", result)
-            else:
-                result["errors"].append("Nenhum arquivo .go encontrado para testar.")
+    if rs_files:
+        _exec_cmd(["rustc", "--crate-type", "bin", "--emit=metadata", str(rs_files[0])], str(rs_files[0].parent), "rustc check", result)
         return result
 
-    # Rust harness
-    if "rust" in stack_lower:
-        has_cargo = any(os.path.exists(os.path.join(d, "Cargo.toml")) for d in dirs_to_check)
-        if has_cargo:
-            _exec_cmd(["cargo", "test"], project_dir, "cargo test", result)
-        else:
-            rs_files = []
-            for d in dirs_to_check:
-                rs_files.extend(list(Path(d).glob("*.rs")))
-            if rs_files:
-                _exec_cmd(["rustc", "--crate-type", "bin", "--emit=metadata", str(rs_files[0])], str(rs_files[0].parent), "rustc check", result)
-            else:
-                result["errors"].append("Nenhum arquivo .rs encontrado para testar.")
+    if go_files:
+        _exec_cmd(["go", "vet", "./..."], str(go_files[0].parent), "go vet", result)
         return result
 
-    # Fallback genérico
-    _exec_cmd(["pytest", "-x", "--tb=short", "-q"], project_dir, "pytest", result)
+    if js_files:
+        for js_file in js_files[:2]:
+            _exec_cmd(["node", "--check", str(js_file)], str(js_file.parent), f"node check ({js_file.name})", result)
+        return result
+
+    # 3. Fallback com erro claro se nenhuma stack/arquivo for reconhecido
+    result["errors"].append("Stack não detectada. Nenhum manifesto ou arquivo fonte reconhecido encontrado.")
     return result
 
 

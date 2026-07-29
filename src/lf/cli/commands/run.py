@@ -5,6 +5,7 @@ import click
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 
+from lf.cli.commands.pr import create_git_pr
 from lf.config.loader import load_config
 from lf.config.schema import TaskSchema
 from lf.guardrails.circuit_breaker import CircuitBreaker
@@ -19,7 +20,7 @@ def _run_interactive_wizard() -> dict:
     console.print("[dim]Defina os parâmetros do seu pipeline de IA agente em poucos passos.[/dim]\n")
 
     idea = Prompt.ask("🤖 Qual o objetivo / ideia da funcionalidade?", default="Implementar serviço REST com autenticação")
-    stack = Prompt.ask("📦 Stack de tecnologia?", choices=["python", "javascript", "go", "rust"], default="python")
+    stack = Prompt.ask("📦 Stack de tecnologia (opcional, Pressione Enter para deixar o Tech Lead decidir)?", default="")
     mode = Prompt.ask("⚡ Modo de roteamento?", choices=["full-path", "fast-path"], default="full-path")
     interactive = Confirm.ask("👤 Ativar revisão humana (HITL) entre os nós?", default=True)
     review_mode = Confirm.ask("🔍 Ativar Modo Revisão (pausa no final antes de salvar em disco)?", default=False)
@@ -27,7 +28,7 @@ def _run_interactive_wizard() -> dict:
 
     return {
         "idea": idea,
-        "stack": stack,
+        "stack": stack if stack else None,
         "mode": mode,
         "interactive": interactive,
         "review_mode": review_mode,
@@ -37,7 +38,8 @@ def _run_interactive_wizard() -> dict:
 
 @click.command(name="run")
 @click.option("--idea", default=None, help="Ideia ou objetivo da funcionalidade")
-@click.option("--stack", default=None, help="Stack de tecnologia (python, java, javascript, go, rust)")
+@click.option("--stack", default=None, help="Stack de tecnologia opcional (se omitido, o Tech Lead decide)")
+@click.option("--pr", is_flag=True, default=False, help="Criar commit e Pull Request no GitHub após a conclusão")
 @click.option("--mock", is_flag=True, default=False, help="Usar modo LLM mock")
 @click.option("--interactive", "-i", is_flag=True, default=False, help="Pausar após nós para aprovação humana (HITL)")
 @click.option("--review-mode", is_flag=True, default=False, help="Modo Revisão: executa tudo e pausa antes de salvar no disco")
@@ -48,6 +50,7 @@ def _run_interactive_wizard() -> dict:
 def run_cmd(
     idea: str | None,
     stack: str | None,
+    pr: bool,
     mock: bool,
     interactive: bool,
     review_mode: bool,
@@ -59,14 +62,12 @@ def run_cmd(
     """Executa a pipeline de tarefas dos agentes autônomos do LoopForge."""
     session_id = str(uuid.uuid4())[:8]
 
-    # 1. Se resume_id for fornecido, executa retomada via checkpoint
     if resume_id:
         dispatcher = TaskDispatcher(mock_llm=mock, interactive=interactive, notify=notify, webhook_url=webhook_url)
         console.print(f"[bold cyan]⚡ Retomando pipeline do checkpoint '{resume_id}'...[/bold cyan]")
         dispatcher.resume(project_id="project", task_id=resume_id)
         return
 
-    # 2. Wizard se não houver ideia/plan ou se --wizard for passado
     if wizard or (not idea and sys.stdin.isatty() and not load_config().plan.tasks):
         wiz = _run_interactive_wizard()
         idea = wiz["idea"]
@@ -76,8 +77,6 @@ def run_cmd(
         notify = wiz["notify"]
 
     cfg = load_config()
-    if stack is None:
-        stack = cfg.stack.language if (cfg.stack and cfg.stack.language) else "python"
     circuit = CircuitBreaker(max_total_cost=cfg.budget_limit_usd)
     dispatcher = TaskDispatcher(
         mock_llm=mock,
@@ -97,12 +96,17 @@ def run_cmd(
         tasks_to_run = [TaskSchema(id="task-1", title="Build application features", agent_id="cpo", stack=stack)]
 
     console.print(f"[bold green]⚡ Iniciando LoopForge Run (Sessão ID: {session_id})...[/bold green]")
+    if stack:
+        console.print(f"[dim]📌 Override de Stack manual do usuário: {stack}[/dim]")
+    else:
+        console.print("[dim]📌 Stack tecnológica será definida autonomamente pelo Tech Lead.[/dim]")
+
     if interactive:
         console.print("[bold yellow]👤 Modo Interativo (HITL) ativado.[/bold yellow]")
-    if review_mode:
-        console.print("[bold magenta]🔍 Modo Revisão ativado (pausa no final antes de aplicar).[/bold magenta]")
 
     shared_state: dict = {}
+    last_output_dir = "."
+
     for task in tasks_to_run:
         if not circuit.can_proceed():
             console.print("[bold red]Circuit breaker ativado! Interrompendo pipeline.[/bold red]")
@@ -113,6 +117,7 @@ def run_cmd(
             state = dispatcher.dispatch(task, project_id=cfg.project_id, shared_state=shared_state)
             shared_state.update({k: v for k, v in state.items() if v})
 
+            last_output_dir = state.get("output_dir", last_output_dir)
             error = state.get("error")
             test_report = state.get("test_report", {})
             has_summary = bool(test_report and "summary" in test_report)
@@ -130,3 +135,14 @@ def run_cmd(
         except Exception as e:
             circuit.record_failure()
             console.print(f"[red]Tarefa {task.id} falhou com erro: {e}[/red]")
+
+    # Se a flag --pr foi passada, dispara a criação de commit e PR no git
+    if pr:
+        console.print(f"\n[bold cyan]🐙 Criando commit e PR no GitHub para a sessão {session_id}...[/bold cyan]")
+        pr_res = create_git_pr(project_dir=last_output_dir, idea=idea or "LoopForge Feature", session_id=session_id)
+        if pr_res["status"] == "success":
+            console.print(f"[bold green]✔ Commit criado:[/bold green] {pr_res['commit_msg']}")
+            if pr_res.get("pr_url"):
+                console.print(f"[bold gold1]🔗 PR criado:[/bold gold1] {pr_res['pr_url']}")
+        else:
+            console.print(f"[bold red]✖ Erro ao criar PR:[/bold red] {pr_res.get('message')}")
