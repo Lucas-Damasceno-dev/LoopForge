@@ -15,13 +15,39 @@ class TestHarnessResult:
 
 
 class TestHarnessRunner:
-    def __init__(self, command: str = "pytest"):
+    """Multi-stack Test Harness (pytest, vitest, jest, go test, cargo test)."""
+
+    def __init__(self, command: str | None = None, stack: str | None = None):
         self.command = command
+        self.stack = stack
+
+    def _detect_command(self, cwd: str | Path) -> str:
+        if self.command:
+            return self.command
+
+        cwd_path = Path(cwd)
+
+        # 1. Stack explícita ou detectada por manifesto
+        if self.stack == "go" or (cwd_path / "go.mod").exists():
+            return "go test ./..."
+
+        if self.stack == "rust" or (cwd_path / "Cargo.toml").exists():
+            return "cargo test"
+
+        if self.stack in ("javascript", "typescript") or (cwd_path / "package.json").exists():
+            if (cwd_path / "vitest.config.ts").exists() or (cwd_path / "vitest.config.js").exists():
+                return "npx vitest run"
+            if (cwd_path / "jest.config.js").exists() or (cwd_path / "jest.config.ts").exists():
+                return "npx jest"
+            return "npm test"
+
+        return "pytest"
 
     def run(self, cwd: str | Path = ".") -> TestHarnessResult:
+        cmd = self._detect_command(cwd)
         try:
             res = subprocess.run(
-                self.command,
+                cmd,
                 shell=True,
                 cwd=cwd,
                 capture_output=True,
