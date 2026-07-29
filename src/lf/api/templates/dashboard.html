@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   
   <style>
     :root {
@@ -407,6 +408,27 @@
         </div>
       </div>
 
+      <!-- Diagrama Visual Interativo Mermaid -->
+      <div class="panel-card" style="margin-bottom: 1.25rem; text-align: center; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-glass);">
+        <div class="section-title-text" style="font-size: 0.85rem; margin-bottom: 0.5rem; justify-content: center;">
+          <i class="fa-solid fa-diagram-project" style="color:var(--purple)"></i> Grafo de Execução LangGraph (Live Interactive Diagram)
+        </div>
+        <div id="mermaidGraphContainer" style="display: flex; justify-content: center; overflow-x: auto; padding: 0.5rem 0;">
+          <pre class="mermaid" id="langgraphMermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e293b', 'primaryTextColor': '#f8fafc', 'primaryBorderColor': '#38bdf8', 'lineColor': '#94a3b8', 'tertiaryColor': '#0f172a'}}}%%
+graph LR
+  START([Start]) --> CPO[CPO Node]
+  CPO --> PM[PM Node]
+  PM --> TL[Tech Lead Node]
+  TL --> DEV[Developer Node]
+  DEV --> QA[QA Node]
+  QA -->|Pass| AUDIT[AppSec & DevOps]
+  QA -->|Fail Retry| DEV
+  AUDIT --> END([End])
+          </pre>
+        </div>
+      </div>
+
       <div class="kanban-grid">
         <div class="agent-column" id="col-cpo">
           <div class="column-head">
@@ -564,6 +586,35 @@
         target.classList.add('active-node');
       }
       document.getElementById('metCurrentAgent').innerText = nodeName;
+      updateMermaidActiveNode(nodeName);
+    }
+
+    function updateMermaidActiveNode(nodeName) {
+      if (window.mermaid) {
+        try {
+          const map = {
+            'cpo': 'flowchart-CPO-',
+            'pm': 'flowchart-PM-',
+            'tech_lead': 'flowchart-TL-',
+            'developer': 'flowchart-DEV-',
+            'qa': 'flowchart-QA-',
+            'appsec': 'flowchart-AUDIT-',
+            'devops': 'flowchart-AUDIT-'
+          };
+          const prefix = map[nodeName.toLowerCase()];
+          const svg = document.querySelector('#mermaidGraphContainer svg');
+          if (svg && prefix) {
+            svg.querySelectorAll('.node').forEach(n => {
+              if (n.id && n.id.includes(prefix)) {
+                n.style.filter = 'drop-shadow(0 0 10px #38bdf8)';
+                n.style.stroke = '#38bdf8';
+              } else {
+                n.style.filter = 'none';
+              }
+            });
+          }
+        } catch(e) {}
+      }
     }
 
     // Connect WebSockets
@@ -650,7 +701,12 @@
       }
     }
 
-    window.onload = initWebSocket;
+    window.onload = () => {
+      if (window.mermaid) {
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+      }
+      initWebSocket();
+    };
   </script>
 </body>
 </html>
