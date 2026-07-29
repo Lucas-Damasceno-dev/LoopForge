@@ -38,3 +38,24 @@ class RunListResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     version: str = "6.0.0"
+
+
+class HumanDecisionCreate(BaseModel):
+    gate_node: str = Field(..., description="Nó do gate humano (ex: developer, qa, appsec)")
+    action: str = Field(..., description="approve, retry, adjust_prompt, abort")
+    feedback_category: str | None = Field(None, description="bug, style, missing_feature, general")
+    feedback_message: str | None = Field(None, description="Mensagem de feedback")
+    user: str = Field("human_operator", description="Identificador do operador")
+
+
+class HumanDecisionResponse(BaseModel):
+    id: str
+    run_id: str
+    gate_node: str
+    action: str
+    feedback_category: str | None = None
+    feedback_message: str | None = None
+    user: str
+    timestamp: datetime
+
+    model_config = {"from_attributes": True}

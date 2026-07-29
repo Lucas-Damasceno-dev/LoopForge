@@ -32,3 +32,18 @@ class PipelineRun(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now_utc, onupdate=_now_utc
     )
+
+
+class HumanDecisionModel(Base):
+    """Modelo ORM para a tabela 'human_decisions'."""
+
+    __tablename__ = "human_decisions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_generate_uuid)
+    run_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    gate_node: Mapped[str] = mapped_column(String(50), nullable=False)
+    action: Mapped[str] = mapped_column(String(20), nullable=False)  # approve, retry, adjust_prompt, abort
+    feedback_category: Mapped[str | None] = mapped_column(String(30), nullable=True)  # bug, style, missing_feature, general
+    feedback_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user: Mapped[str] = mapped_column(String(50), default="human_operator")
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)

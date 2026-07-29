@@ -17,14 +17,17 @@ from lf.api.config import get_api_settings
 from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
 
-from lf.api.models import PipelineRun
+from lf.api.models import HumanDecisionModel, PipelineRun
 from lf.api.schemas import (
     HealthResponse,
+    HumanDecisionCreate,
+    HumanDecisionResponse,
     RunCreate,
     RunListResponse,
     RunResponse,
     RunUpdate,
 )
+
 from lf.api.websocket_manager import ws_manager
 
 
@@ -229,4 +232,64 @@ def create_app() -> FastAPI:
         await session.delete(run)
         await session.commit()
 
+
+    @app.post(
+        "/api/runs/{run_id}/decide",
+        response_model=HumanDecisionResponse,
+        status_code=201,
+        tags=["Human-in-the-Loop"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def record_human_decision(
+        run_id: str,
+        payload: HumanDecisionCreate,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Registra decisão humana (HITL) vinda da Web Dashboard UI ou CLI."""
+        decision = HumanDecisionModel(
+            run_id=run_id,
+            gate_node=payload.gate_node,
+            action=payload.action,
+            feedback_category=payload.feedback_category,
+            feedback_message=payload.feedback_message,
+            user=payload.user,
+        )
+        session.add(decision)
+        await session.commit()
+        await session.refresh(decision)
+
+        # Emite evento via WebSocket para notificar o TaskDispatcher ou UI
+        await ws_manager.broadcast(
+            {
+                "event": "human_decision_submitted",
+                "run_id": run_id,
+                "gate_node": decision.gate_node,
+                "action": decision.action,
+                "feedback_category": decision.feedback_category,
+                "feedback_message": decision.feedback_message,
+                "user": decision.user,
+            }
+        )
+
+        return decision
+
+    @app.get(
+        "/api/runs/{run_id}/decisions",
+        response_model=list[HumanDecisionResponse],
+        tags=["Human-in-the-Loop"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def list_human_decisions(
+        run_id: str,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Lista todo o histórico de decisões humanas (HITL) para uma execução."""
+        from sqlalchemy import select
+        result = await session.execute(
+            select(HumanDecisionModel).where(HumanDecisionModel.run_id == run_id).order_by(HumanDecisionModel.timestamp.asc())
+        )
+        decisions = result.scalars().all()
+        return decisions
+
     return app
+

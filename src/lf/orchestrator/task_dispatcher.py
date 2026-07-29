@@ -1,10 +1,18 @@
 import asyncio
+import json
+import select
+import shutil
 import sqlite3
+import subprocess
+import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from rich.console import Console
+from rich.syntax import Syntax
+from rich.table import Table
 
 from lf.api.websocket_manager import ws_manager
 from lf.config.schema import TaskSchema
@@ -15,11 +23,47 @@ from lf.runner.git.checkpoint import GitCheckpointManager
 from lf.runner.git.pr import create_github_pr
 
 
+def _send_notification(title: str, message: str, webhook_url: str | None = None):
+    """Envia notificação desktop e/ou webhook para Slack/Discord."""
+    try:
+        print("\a", end="", flush=True)
+    except Exception:
+        pass
+
+    if shutil.which("notify-send"):
+        try:
+            subprocess.run(["notify-send", title, message], timeout=3, check=False)
+        except Exception:
+            pass
+
+    if webhook_url:
+        try:
+            import urllib.request
+            payload = json.dumps({"text": f"*{title}*\n{message}"}).encode("utf-8")
+            req = urllib.request.Request(webhook_url, data=payload, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=3)
+        except Exception:
+            pass
+
+
 class TaskDispatcher:
-    def __init__(self, mock_llm: bool = True, interactive: bool = False, circuit_breaker=None):
+    def __init__(
+        self,
+        mock_llm: bool = True,
+        interactive: bool = False,
+        circuit_breaker=None,
+        review_mode: bool = False,
+        notify: bool = False,
+        webhook_url: str | None = None,
+        hitl_timeout_seconds: int = 300,
+    ):
         self.mock_llm = mock_llm
         self.interactive = interactive
         self.circuit_breaker = circuit_breaker
+        self.review_mode = review_mode
+        self.notify = notify
+        self.webhook_url = webhook_url
+        self.hitl_timeout_seconds = hitl_timeout_seconds
         self._last_graph = None
 
     def _get_graph(self, checkpointer=None):
@@ -50,7 +94,7 @@ class TaskDispatcher:
             "test_report": {},
             "ontology_path": ontology,
             "project_dir": ".",
-            "stack": "python",
+            "stack": getattr(task, "stack", "python"),
             "next_agent": target_agent,
 
             "attempt_count": getattr(task, "attempts", 0),
@@ -94,53 +138,203 @@ class TaskDispatcher:
         except Exception:
             pass
 
+    def _get_input_with_timeout(self, prompt_text: str, timeout: int = 300) -> str:
+        """Lê input com suporte a timeout no Unix/Linux."""
+        print(prompt_text, end="", flush=True)
+        try:
+            rlist, _, _ = select.select([sys.stdin], [], [], timeout)
+            if rlist:
+                return sys.stdin.readline().strip()
+            else:
+                print(f"\n[TIMEOUT] Nenhuma resposta recebida em {timeout}s.")
+                return ""
+        except Exception:
+            try:
+                return input()
+            except Exception:
+                return ""
+
+    def _record_decision(
+        self,
+        run_id: str,
+        gate_node: str,
+        action: str,
+        category: str | None = None,
+        message: str | None = None,
+    ):
+        """Salva histórico de decisões humanas no SQLite."""
+        try:
+            db_path = Path(".loopforge/telemetry.sqlite").resolve()
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS human_decisions (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    gate_node TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    feedback_category TEXT,
+                    feedback_message TEXT,
+                    user TEXT DEFAULT 'human_operator',
+                    timestamp TEXT NOT NULL
+                )
+            """)
+            decision_id = str(uuid.uuid4())
+            now_iso = datetime.now(timezone.utc).isoformat()
+            cursor.execute(
+                "INSERT INTO human_decisions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (decision_id, run_id, gate_node, action, category, message, "human_operator", now_iso),
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
-        """Manipula interrupção. Retorna False se o usuário abortou."""
+        """Manipula interrupção humana (HITL) com visual rico, timeout, notificações e feedback categorizado."""
         console = Console()
         node_name = snapshot.next[0] if snapshot.next else "unknown"
         state = snapshot.values
+        run_id = config.get("configurable", {}).get("thread_id", "default-run")
 
-        console.print(f"\n[bold yellow]⏸️  Pausado após nó: {node_name}[/bold yellow]")
+        if self.notify:
+            title = f"⏸️ Pipeline Pausado — Gate: {node_name.upper()}"
+            msg_text = f"LoopForge está aguardando aprovação humana após o nó {node_name}."
+            _send_notification(title, msg_text, webhook_url=self.webhook_url)
+
+        console.print(f"\n[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]")
+        console.print(f"[bold yellow]⏸️  HUMAN-IN-THE-LOOP GATE — Nó: [bold white]{node_name.upper()}[/bold white][/bold yellow]")
+        console.print(f"[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]\n")
 
         if node_name == "developer":
-            tech_spec = state.get("tech_spec", "")[:300]
-            console.print(f"\n[bold]Especificação Técnica (início):[/bold]\n[dim]{tech_spec}...[/dim]")
+            code = state.get("code", "")
+            console.print("[bold cyan]📝 Código Gerado (preview):[/bold cyan]")
+            if code:
+                syntax = Syntax(code[:500] + ("..." if len(code) > 500 else ""), "python", theme="monokai", line_numbers=True)
+                console.print(syntax)
+            else:
+                console.print("[dim]Nenhum código gerado.[/dim]")
+
         elif node_name == "qa":
             report = state.get("test_report", {})
             summary = report.get("summary", {})
-            console.print("\n[bold]Relatório de Testes:[/bold]")
-            console.print(f"  Total: {summary.get('total_tests', '?')}")
-            console.print(f"  Passaram: {summary.get('tests_passed', '?')}")
-            console.print(f"  Falharam: {summary.get('tests_failed', '?')}")
-            if state.get("error"):
-                console.print(f"  [red]Erro: {state['error']}[/red]")
+            table = Table(title="🧪 Relatório de Testes (QA)")
+            table.add_column("Total", justify="right")
+            table.add_column("Passaram", justify="right", style="green")
+            table.add_column("Falharam", justify="right", style="red")
+            table.add_column("Duração (s)", justify="right", style="yellow")
+            table.add_row(
+                str(summary.get("total_tests", 0)),
+                str(summary.get("tests_passed", 0)),
+                str(summary.get("tests_failed", 0)),
+                f"{summary.get('duration_seconds', 0.0):.2f}s",
+            )
+            console.print(table)
 
-        console.print("\n[bold]Opções:[/bold]")
-        console.print("  [green]c[/green] — continuar (aprova este passo)")
-        console.print("  [yellow]r[/yellow] — retentar (re-executa o nó)")
-        console.print("  [blue]a[/blue] — ajustar prompt (editar e continuar)")
-        console.print("  [red]x[/red] — abortar (encerra execução)")
+        elif node_name == "appsec":
+            sec_review = state.get("security_review", {})
+            vulns = sec_review.get("vulnerabilities", [])
+            table = Table(title="🛡️ Auditoria de Segurança (AppSec)")
+            table.add_column("ID", style="dim")
+            table.add_column("Severidade")
+            table.add_column("Regra", style="cyan")
+            table.add_column("Descrição")
 
-        choice = input("\n➜ ").strip().lower()
+            for v in vulns:
+                sev = str(v.get("severity", "Low")).upper()
+                if sev == "CRITICAL":
+                    sev_fmt = f"[bold red]{sev}[/bold red]"
+                elif sev == "HIGH":
+                    sev_fmt = f"[bold magenta]{sev}[/bold magenta]"
+                elif sev == "MEDIUM":
+                    sev_fmt = f"[yellow]{sev}[/yellow]"
+                else:
+                    sev_fmt = f"[cyan]{sev}[/cyan]"
+                table.add_row(str(v.get("id", "-")), sev_fmt, str(v.get("rule_id", "-")), str(v.get("description", "-")))
+            console.print(table)
+
+        console.print("\n[bold]Ações Disponíveis:[/bold]")
+        console.print("  [green]c[/green] — Continuar / Aprovar")
+        console.print("  [yellow]r[/yellow] — Retentar nó")
+        console.print("  [blue]a[/blue] — Solicitar alterações / Ajustar Prompt (Request Changes)")
+        console.print("  [red]x[/red] — Abortar pipeline")
+
+        console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão: Aprovar)[/dim]")
+        choice = self._get_input_with_timeout("➜ Escolha [c/r/a/x] (default: c): ", timeout=self.hitl_timeout_seconds)
+        if not choice:
+            choice = "c"
+
+        choice = choice.strip().lower()
+
+        action = "approve"
+        cat = None
+        msg = None
 
         if choice == "x":
-            console.print("[red]Execução abortada pelo usuário.[/red]")
+            action = "abort"
+            console.print("[red]Pipeline abortado pelo operador humano.[/red]")
+            self._record_decision(run_id, node_name, action, cat, msg)
             return False
+
         elif choice == "r":
+            action = "retry"
             app.update_state(config, {"error": None})
+            self._record_decision(run_id, node_name, action, cat, msg)
             return True
+
         elif choice == "a":
-            feedback = input("✏️  Feedback para o agente:\n➜ ")
+            action = "adjust_prompt"
+            console.print("\n[bold cyan]✏️  Feedback Estruturado (Request Changes):[/bold cyan]")
+            console.print("  Categoria: [1] Bug  [2] Style  [3] Missing Feature  [4] General")
+            cat_choice = self._get_input_with_timeout("➜ Categoria [1-4] (default: 4): ", timeout=60) or "4"
+            cat_map = {"1": "bug", "2": "style", "3": "missing_feature", "4": "general"}
+            cat = cat_map.get(cat_choice.strip(), "general")
+
+            msg = self._get_input_with_timeout("➜ Mensagem detalhada de feedback: ", timeout=120) or "Ajustar implementação."
+
             app.update_state(config, {
                 "error": None,
                 "feedback_history": state.get("feedback_history", []) + [
-                    {"from": "human", "message": feedback, "node": node_name}
+                    {
+                        "from": "human",
+                        "node": node_name,
+                        "category": cat,
+                        "message": msg,
+                    }
                 ],
             })
+            self._record_decision(run_id, node_name, action, cat, msg)
+            return True
+
+        else:
+            action = "approve"
+            console.print("[bold green]✅ Passo Aprovado. Continuando...[/bold green]")
+            self._record_decision(run_id, node_name, action, cat, msg)
+            return True
+
+    def _review_mode_approval_gate(self, final_state: dict) -> bool:
+        """Modo Revisão: Exibe o plano/artefatos completos e solicita aprovação final antes de escrever em disco."""
+        console = Console()
+        console.print(f"\n[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]")
+        console.print(f"[bold magenta]🔍 MODO REVISÃO INTERATIVA — APROVAÇÃO DE MUDANÇAS[/bold magenta]")
+        console.print(f"[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]\n")
+
+        console.print(f"[bold]Ideia / Objetivo:[/bold] {final_state.get('idea')}")
+        console.print(f"[bold]Épico CPO:[/bold] {final_state.get('epic', {}).get('title', 'N/A')}")
+        console.print(f"[bold]User Stories PM:[/bold] {len(final_state.get('user_stories', []))} estória(s)")
+        console.print(f"[bold]Tech Spec Tech Lead:[/bold] {final_state.get('tech_spec', '')[:150]}...")
+        console.print(f"[bold]DevOps Score:[/bold] {final_state.get('devops_review', {}).get('deployability_score', 100.0)}/100")
+
+        console.print("\n[bold yellow]Deseja aplicar todas as mudanças propostas no disco?[/bold yellow]")
+        choice = self._get_input_with_timeout("➜ Aplicar alterações? [s/N]: ", timeout=120).strip().lower()
+
+        if choice in ("s", "sim", "y", "yes"):
+            console.print("[bold green]✅ Mudanças Aprovadas! Aplicando no projeto...[/bold green]")
             return True
         else:
-            console.print("[green]Continuando...[/green]")
-            return True
+            console.print("[bold yellow]⚠️  Mudanças descartadas no modo revisão.[/bold yellow]")
+            return False
 
     def _create_pr_with_labels(self, task: TaskSchema, final_state: dict, project_id: str):
         """Cria PR com labels do Foundry ao final da execução."""
@@ -225,10 +419,19 @@ class TaskDispatcher:
             state_snapshot = graph.get_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
+            if self.review_mode:
+                approved = self._review_mode_approval_gate(result)
+                if not approved:
+                    result["error"] = "Review mode rejected by user"
+
             self._broadcast_ws("pipeline_finished", task.id, {
                 "status": "completed" if not result.get("error") else "failed",
                 "error": result.get("error"),
             })
+
+            if self.notify:
+                status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
+                _send_notification("🚀 Pipeline Finalizado", f"Task {task.id}: {status_label}", webhook_url=self.webhook_url)
 
             self._create_pr_with_labels(task, result, project_id)
             return result
@@ -239,11 +442,11 @@ class TaskDispatcher:
 
     def resume(self, project_id: str = "project", task_id: str = "task-1") -> dict:
         """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via SqliteSaver checkpoint."""
-        checkpoint_path = str(Path(".loopforge/checkpoints.sqlite").resolve())
-        if not Path(checkpoint_path).exists():
+        checkpoint_path = Path(".loopforge/checkpoints.sqlite").resolve()
+        if not checkpoint_path.exists():
             raise RuntimeError(f"Nenhum banco de checkpoints encontrado em {checkpoint_path}")
 
-        conn = sqlite3.connect(checkpoint_path, check_same_thread=False)
+        conn = sqlite3.connect(str(checkpoint_path), check_same_thread=False)
         checkpointer = SqliteSaver(conn)
         thread_id = f"{project_id}-{task_id}"
         config = {"configurable": {"thread_id": thread_id}}
@@ -259,7 +462,6 @@ class TaskDispatcher:
 
         print(f"--- CHECKPOINT RECOVERY: Retomando pipeline (thread: {thread_id}) a partir do nó '{resuming_node}' ---")
 
-        # Limpa o erro gravado no estado para liberar a execução retomada
         graph.update_state(config, {"error": None})
 
         self._broadcast_ws("pipeline_resumed", task_id, {
@@ -268,7 +470,6 @@ class TaskDispatcher:
         })
 
         try:
-            # Passa None para retomar a execução a partir do último nó gravado
             for event in graph.stream(None, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):

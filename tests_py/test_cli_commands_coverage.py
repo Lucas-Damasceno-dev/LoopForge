@@ -89,7 +89,8 @@ def test_cli_plan_and_run(tmp_path):
         res_plan = runner.invoke(plan_cmd, ["--vision", "Test CLI Vision", "--mode", "fast", "--no-interactive"])
         assert res_plan.exit_code == 0
 
-        res_run = runner.invoke(run_cmd, ["--mock"])
+        res_run = runner.invoke(run_cmd, ["--mock", "--idea", "Test CLI Vision"])
         assert res_run.exit_code == 0
-        assert "Starting LoopForge run" in res_run.output
+        assert "LoopForge Run" in res_run.output
+
 

@@ -3,6 +3,8 @@ import click
 from lf.cli.commands.audit import audit_cmd
 from lf.cli.commands.benchmark import benchmark_cmd
 from lf.cli.commands.completion import completion_cmd
+from lf.cli.commands.diff import diff_cmd
+from lf.cli.commands.explore import explore_cmd
 from lf.cli.commands.generate_tests import generate_tests_cmd
 from lf.cli.commands.init import init_cmd
 from lf.cli.commands.plan import plan_cmd
@@ -30,6 +32,9 @@ main.add_command(serve_cmd)
 main.add_command(completion_cmd)
 main.add_command(benchmark_cmd)
 main.add_command(resume_cmd)
+main.add_command(diff_cmd)
+main.add_command(explore_cmd)
+
 
 
 

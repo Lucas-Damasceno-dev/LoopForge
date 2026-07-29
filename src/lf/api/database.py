@@ -47,8 +47,12 @@ async def init_db(settings: APISettings | None = None) -> None:
     engine = create_async_engine(db_url, **kwargs)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+    # Garante que todos os modelos ORM estejam registrados no Base.metadata
+    from lf.api import models  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
 
 
 async def close_db() -> None:
