@@ -14,10 +14,14 @@ console = Console()
 
 @click.command(name="benchmark")
 @click.option("--limit", default=10, type=int, help="Número de problemas curados a executar (padrão: 10)")
+@click.option("--runs", default=None, type=int, help="Alias para --limit (compatibilidade retroativa)")
 @click.option("--mock", is_flag=True, default=True, help="Executar em modo LLM mock para testes ultrarrápidos")
 @click.option("--storage-dir", default=".loopforge/benchmarks", help="Diretório de armazenamento do histórico ELO")
-def benchmark_cmd(limit: int, mock: bool, storage_dir: str):
+def benchmark_cmd(limit: int, runs: int | None, mock: bool, storage_dir: str):
     """Executa a suíte curada de benchmarks e mede a pontuação ELO do pipeline."""
+    if runs is not None:
+        limit = runs
+
     problems = CURATED_BENCHMARK_PROBLEMS[:limit]
     console.print(f"[bold cyan]⚡ Executando LoopForge ELO Benchmark Suite ({len(problems)} problemas curados)...[/bold cyan]\n")
 
@@ -61,7 +65,6 @@ def benchmark_cmd(limit: int, mock: bool, storage_dir: str):
         status_str = "[bold green]PASS[/bold green]" if success else "[bold red]FAIL[/bold red]"
         console.print(f"  • [{prob.id}] {prob.title} ({prob.stack.upper()}) → {status_str} ({dur}s)")
 
-    # ELO Calculation
     elo_delta = suite.calculate_elo_delta(passed=passed_count, total=len(problems))
     prev_elo, new_elo = suite.update_elo_rating(elo_delta)
 
