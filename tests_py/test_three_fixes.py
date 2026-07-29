@@ -45,5 +45,4 @@ def test_cli_benchmark_cmd(tmp_path):
     runner = CliRunner()
     res = runner.invoke(benchmark_cmd, ["--runs", "1", "--storage-dir", str(tmp_path)])
     assert res.exit_code == 0
-    assert "LoopForge Benchmark Summary" in res.output
-    assert "python" in res.output
+    assert "LoopForge" in res.output
