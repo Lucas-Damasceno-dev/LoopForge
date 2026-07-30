@@ -384,6 +384,45 @@ def create_app() -> FastAPI:
         decisions = result.scalars().all()
         return decisions
 
+    # ─── Endpoints da Trilogia Agentic ──────────────────────────────
+    @app.get("/api/genome", tags=["Trilogia Agentic"])
+    async def get_genome_info():
+        """Retorna metadados, AST e métricas de dependência do Codebase Genome."""
+        try:
+            from genome import GenomeScanner
+            scanner = GenomeScanner(".")
+            g = scanner.scan()
+            return g.model_dump()
+        except Exception as e:
+            return {"error": str(e), "modules": [], "bus_factor": 1.0}
+
+    @app.get("/api/registry", tags=["Trilogia Agentic"])
+    async def get_registry_info():
+        """Retorna contratos de interface rastreados e quebras detectadas pelo Agentic Registry."""
+        try:
+            from registry import RegistryChecker
+            checker = RegistryChecker(".")
+            breaking = checker.check()
+            return {"breaking_changes": [b.model_dump() for b in breaking], "status": "ok" if not breaking else "warning"}
+        except Exception as e:
+            return {"error": str(e), "breaking_changes": []}
+
+    @app.get("/api/retro", tags=["Trilogia Agentic"])
+    async def get_retro_info():
+        """Retorna histórico de sessões, causas-raiz e recomendações do Agentic Retro."""
+        try:
+            from retro import RetroStore, SessionAnalyzer
+            store = RetroStore()
+            sessions = store.list_sessions(limit=5)
+            analyzer = SessionAnalyzer()
+            learnings = analyzer.extract_learnings()
+            return {
+                "sessions_count": len(sessions),
+                "learnings": [l.model_dump() for l in learnings],
+            }
+        except Exception as e:
+            return {"error": str(e), "learnings": []}
+
     return app
 
 

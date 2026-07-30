@@ -397,6 +397,22 @@
       </div>
     </div>
 
+    <!-- Trilogia Agentic Widgets -->
+    <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: -0.75rem;">
+      <div class="metric-card" style="border-left: 3px solid var(--cyan);">
+        <div class="metric-title"><i class="fa-solid fa-dna cyan"></i> Codebase Genome</div>
+        <div class="metric-val cyan" id="metGenomeStatus" style="font-size: 0.95rem;">Carregando AST...</div>
+      </div>
+      <div class="metric-card" style="border-left: 3px solid var(--amber);">
+        <div class="metric-title"><i class="fa-solid fa-shield-halved amber"></i> Agentic Registry</div>
+        <div class="metric-val amber" id="metRegistryStatus" style="font-size: 0.95rem;">Carregando Contratos...</div>
+      </div>
+      <div class="metric-card" style="border-left: 3px solid var(--purple);">
+        <div class="metric-title"><i class="fa-solid fa-brain purple"></i> Agentic Retro</div>
+        <div class="metric-val purple" id="metRetroStatus" style="font-size: 0.95rem;">Carregando Learnings...</div>
+      </div>
+    </div>
+
     <div class="kanban-section">
       <div class="section-header">
         <div class="section-title-text">
@@ -701,11 +717,50 @@ graph LR
       }
     }
 
+    async function loadTrilogiaStatus() {
+      try {
+        const [gResp, rResp, retResp] = await Promise.all([
+          fetch('/api/genome').then(r => r.json()).catch(() => null),
+          fetch('/api/registry').then(r => r.json()).catch(() => null),
+          fetch('/api/retro').then(r => r.json()).catch(() => null)
+        ]);
+        if (gResp && gResp.modules) {
+          document.getElementById('metGenomeStatus').innerText = `${gResp.modules.length} Módulos | Bus: ${gResp.bus_factor || 1.0}`;
+        }
+        if (rResp) {
+          const bc = (rResp.breaking_changes || []).length;
+          document.getElementById('metRegistryStatus').innerText = bc === 0 ? "Contratos Seguros" : `${bc} Quebras!`;
+        }
+        if (retResp && retResp.learnings) {
+          document.getElementById('metRetroStatus').innerText = `${retResp.learnings.length} Aprendizados`;
+        }
+      } catch(e) {}
+    }
+
+    async function sendHitlDecision(action) {
+      if (!activeRunId) return alert("Nenhuma run ativa selecionada.");
+      try {
+        const resp = await fetch(`/api/runs/${activeRunId}/decide`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action })
+        });
+        if (resp.ok) {
+          appendLog(`Decisão HITL enviada via Web Dashboard: ${action.toUpperCase()}`, 'success');
+        } else {
+          alert('Erro ao enviar decisão HITL.');
+        }
+      } catch(e) {
+        alert('Erro de conexão ao enviar decisão HITL.');
+      }
+    }
+
     window.onload = () => {
       if (window.mermaid) {
         mermaid.initialize({ startOnLoad: true, theme: 'dark' });
       }
       initWebSocket();
+      loadTrilogiaStatus();
     };
   </script>
 </body>
