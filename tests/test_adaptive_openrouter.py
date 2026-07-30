@@ -59,8 +59,8 @@ def test_openrouter_api_real_ling_flash():
 
     prompt = "Responda apenas com a palavra 'SUCCESS' em letras maiúsculas."
     try:
-        res = call_openrouter_api(prompt=prompt, model=DEFAULT_OPENROUTER_MODEL, api_key=key, timeout=20.0)
-        assert "SUCCESS" in res.upper()
+        res_text, _ = call_openrouter_api(prompt=prompt, model=DEFAULT_OPENROUTER_MODEL, api_key=key)
+        assert "SUCCESS" in res_text.upper()
     except Exception as e:
         pytest.skip(f"OpenRouter API indisponível ou com limite excedido: {e}")
 

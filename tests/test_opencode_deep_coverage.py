@@ -128,7 +128,7 @@ def test_call_llm_cache_hit_and_miss(tmp_path):
 def test_call_llm_openrouter_success(tmp_path):
     with patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-test-key"}):
         with patch("lf.pipeline.llm_factory.call_openrouter_api") as mock_api:
-            mock_api.return_value = json.dumps({
+            mock_api.return_value = (json.dumps({
                 "id": "OR-001",
                 "title": "OpenRouter Result",
                 "count": 5,
@@ -136,7 +136,7 @@ def test_call_llm_openrouter_success(tmp_path):
                 "is_active": True,
                 "items": ["a"],
                 "metadata": {"key": "val"}
-            })
+            }), {"prompt_tokens": 50, "completion_tokens": 30})
 
             res = call_llm_via_opencode(
                 system_prompt="sys",
@@ -196,7 +196,7 @@ def test_call_llm_no_openrouter_key_opencode_runner(tmp_path):
 
 def test_call_llm_schema_invalid_json_raises_runtime_error():
     with patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-test-key"}):
-        with patch("lf.pipeline.llm_factory.call_openrouter_api", return_value="INVALID NON-JSON TEXT"):
+        with patch("lf.pipeline.llm_factory.call_openrouter_api", return_value=("INVALID NON-JSON TEXT", None)):
             with pytest.raises(RuntimeError) as exc_info:
                 call_llm_via_opencode(
                     system_prompt="sys",

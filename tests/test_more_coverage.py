@@ -63,12 +63,13 @@ def test_llm_factory_openrouter(tmp_path):
         }
         mock_post.return_value = mock_response
 
-        res = call_openrouter_api(
+        res_text, res_usage = call_openrouter_api(
             prompt="Hello OpenRouter",
             model="inclusionai/ling-3.0-flash:free",
             api_key="test-key",
         )
-        assert res == "OpenRouter response text"
+        assert res_text == "OpenRouter response text"
+        assert res_usage is None
 
         # Test error response
         mock_response.status_code = 500
