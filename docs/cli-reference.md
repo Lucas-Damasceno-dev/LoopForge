@@ -1,25 +1,46 @@
 # Referência da CLI (`lf` / `loopforge`)
 
-Centralização dos comandos essenciais da CLI do LoopForge v6:
+Todos os 16 comandos registrados em `src/lf/cli/main.py`:
 
 | Comando | Sintaxe | Descrição |
 |---|---|---|
-| `lf run` | `lf run [--idea <txt>] [--stack <stack>] [--pr] [--mock] [-i/--interactive] [--resume <id>]` | Executa o pipeline autônomo dos agentes. A stack é decidida autonomamente pelo Tech Lead se `--stack` for omitido. |
-| `lf serve` | `lf serve [--host 127.0.0.1] [--port 8000]` | Inicia o servidor REST API, transmissão via WebSockets e a Dashboard Web UI em tempo real. |
-| `lf benchmark` | `lf benchmark [--runs <N>] [--mock/--no-mock]` | Executa a suíte de 10 problemas curados multi-stack e calcula a pontuação de rating ELO do pipeline. |
-| `lf resume` | `lf resume --resume <session_id>` | Retoma um pipeline interrompido ou em aprovação a partir de checkpoints no LangGraph. |
-| `lf diff` | `lf diff [--dir <path>]` | Exibe as alterações e diffs de código gerados entre retentativas do nó Developer. |
-| `lf explore` | `lf explore [--dir <path>]` | Navega interativamente pelos artefatos gerados, especificações técnicas e relatórios do QA. |
-| `lf pr` | `lf pr [--dir <path>] [--idea <txt>]` | Inicializa repositório Git no diretório, realiza commit das alterações e abre Pull Request via GitHub CLI (`gh`). |
+| `lf run` | `lf run [--idea] [--stack] [--pr] [--mock] [-i] [--review-mode] [--notify] [--webhook-url] [--resume] [--wizard]` | Executa o pipeline autônomo dos agentes. |
+| `lf serve` | `lf serve [--host 127.0.0.1] [--port 8000]` | Inicia servidor REST API + WebSockets + Dashboard UI. |
+| `lf benchmark` | `lf benchmark [--runs <N>] [--mock/--no-mock]` | Executa suíte de 10 benchmarks curados e calcula rating ELO. |
+| `lf resume` | `lf resume --resume <session_id>` | Retoma pipeline interrompido de checkpoint. |
+| `lf diff` | `lf diff [--dir <path>]` | Exibe diffs de código entre retentativas do Developer. |
+| `lf explore` | `lf explore [--dir <path>]` | Navega interativamente por artefatos e relatórios. |
+| `lf pr` | `lf pr [--dir <path>] [--idea]` | Commit + Pull Request via GitHub CLI. |
+| `lf init` | `lf init [--project-id]` | Inicializa projeto LoopForge (.loopforge.json). |
+| `lf plan` | `lf plan [--list] [--show]` | Gerencia planos de tarefas do pipeline. |
+| `lf status` | `lf status [--task-id]` | Exibe status da execução atual. |
+| `lf release` | `lf release --version <ver>` | Gera changelog e release notes. |
+| `lf completion` | `lf completion <bash\|zsh\|fish>` | Gera script de shell completion. |
+| `lf generate-tests` | `lf generate-tests --dir <path>` | Geração automática de testes via agente. |
+| `lf audit` | `lf audit [--dir <path>]` | Auditoria completa do pipeline. |
+| `lf export` | `lf export --dir <path> [--format]` | Exporta artefatos gerados. |
+| `lf studio` | `lf studio [--port 3000]` | Interface web studio interativa. |
 
 ---
 
-## Flags Globais de `lf run`
+## Flags de `lf run`
 
-- `--idea`: Descrição ou objetivo da funcionalidade.
-- `--stack`: (Opcional) Override manual de tecnologia (`rust`, `java`, `python`, `go`, `javascript`). Se omitido, o Tech Lead decide.
-- `--pr`: Executa `git init`, `git commit` e tenta abrir Pull Request no GitHub ao concluir a tarefa.
-- `--mock`: Utiliza respostas simuladas rápidas para testes de integração offline sem chamadas a APIs pagas.
-- `-i, --interactive`: Ativa aprovação humana (HITL) entre as transições dos nós.
-- `--review-mode`: Pausa a execução no final antes de salvar as alterações em disco.
-- `--notify`: Envia notificações desktop no sistema operacional quando o pipeline requer atenção ou finaliza.
+| Flag | Descrição |
+|---|---|
+| `--idea` | Descrição ou objetivo da funcionalidade |
+| `--stack` | Override manual de tecnologia (`rust`, `java`, `python`, `go`, `js`) |
+| `--pr` | Cria commit e Pull Request no GitHub ao concluir |
+| `--mock` | Usa respostas LLM simuladas (offline) |
+| `-i, --interactive` | Ativa HITL (gates humano entre nós) |
+| `--review-mode` | Pausa antes de salvar artefatos em disco |
+| `--notify` | Notificações desktop (notify-send) |
+| `--webhook-url` | URL de webhook Slack/Discord para notificações |
+| `--resume` | Retoma pipeline pelo ID da tarefa |
+| `--wizard` | Força wizard interativo de inicialização |
+
+---
+
+## Flags Globais
+
+- `--help`: Exibe ajuda do comando
+- `--version`: Exibe versão do LoopForge

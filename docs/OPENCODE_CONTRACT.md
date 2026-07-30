@@ -5,21 +5,45 @@ LoopForge communicates with OpenCode via subprocess. This document defines the c
 ## Invocation Format
 
 ```
-opencode run "PROMPT_TEXT" [-m MODEL]
+opencode run "PROMPT_TEXT" -m MODEL --pure
 ```
 
 - `PROMPT_TEXT`: The full prompt (system + user), passed as a single positional argument
-- `-m MODEL`: Optional model override (default: `openrouter/openrouter/free`)
+- `-m MODEL`: Required model override (no default)
+- `--pure`: Enables pure mode (no tool-use overhead)
 - Working directory: project root
-- Timeout: 300s (configurable via `OpenCodeRunner(timeout_seconds=N)`)
+- Timeout: **600s** (configurable via `OpenCodeRunner(timeout_seconds=N)`)
+- Wrapped with `script -q -c <cmd> /dev/null` to provide a PTY (required by opencode)
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENCODE_MODEL` | `openrouter/openrouter/free` | Model to use |
+| `OPENCODE_MODEL` | `openrouter/inclusionai/ling-3.0-flash:free` | Model to use |
+| `OPENROUTER_BASE_URL` | — | Custom base URL for OmniRoute (e.g., OpenRouter endpoints) |
 | `OPENCODE_MOCK` | `0` | Set to `1` to return mock responses (no subprocess) |
-| `GEMINI_API_KEY` | — | API key for Google models (fallback path in `llm_factory.py`) |
+| `GEMINI_API_KEY` | — | API key for Google GenAI models (fallback in `llm_factory.py`) |
+| `OPENROUTER_API_KEY` | — | Primary provider API key (checked first by `TaskDispatcher._build_initial_state`) |
+
+## LLM Provider Resolution
+
+The effective model is resolved in this priority (see `runner.py:9` and `task_dispatcher.py:110`):
+
+1. `OPENROUTER_MODEL` env var → OpenRouter
+2. `OPENCODE_MODEL` env var → OpenCode subprocess model
+3. Default: `inclusionai/ling-3.0-flash:free` (OpenRouter) or `gemini-2.0-flash` (Google fallback)
+
+Provider auto-detection:
+- If `OPENROUTER_API_KEY` is set → `llm_provider = "openrouter"`
+- Otherwise → `llm_provider = "google"` (uses `GEMINI_API_KEY`)
+
+## Fallback to Google GenAI
+
+When `OPENROUTER_API_KEY` is not defined, the system falls back to Google GenAI:
+
+- `llm_model_name` defaults to `gemini-2.0-flash`
+- Requires `GEMINI_API_KEY` environment variable
+- Handled in `llm_factory.py` via conditional provider dispatch
 
 ## Mock Mode
 
