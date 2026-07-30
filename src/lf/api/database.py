@@ -46,6 +46,21 @@ async def init_db(settings: APISettings | None = None) -> None:
         kwargs["max_overflow"] = settings.db_max_overflow
 
     engine = create_async_engine(db_url, **kwargs)
+
+    if is_sqlite:
+        from sqlalchemy import event
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA busy_timeout=5000")
+            except Exception:
+                pass
+            finally:
+                cursor.close()
+
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     # Garante que todos os modelos ORM estejam registrados no Base.metadata

@@ -8,8 +8,27 @@ import os
 import re
 from pathlib import Path
 
+import json
+import sqlite3
+import uuid
+from datetime import datetime, timezone
+
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
+
+
+def _log_telemetry_event(event_type: str, details: dict) -> None:
+    try:
+        db_path = Path(".loopforge/telemetry.sqlite").resolve()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(db_path), timeout=5.0)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("CREATE TABLE IF NOT EXISTS telemetry_events (id TEXT PRIMARY KEY, event_type TEXT, details TEXT, timestamp TEXT)")
+        conn.execute("INSERT INTO telemetry_events VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), event_type, json.dumps(details), datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 def _clean_code(raw: str) -> str:
@@ -36,22 +55,35 @@ def _extract_generated_code(res: any, output_dir: str, duration: float = 0.0) ->
 
 
 def _parse_multi_file_response(raw_text: str, default_filename: str = "main.py") -> dict[str, str]:
-    """Extrai múltiplos arquivos do texto retornado pela LLM com base em marcadores de cabeçalho."""
+    """Extrai múltiplos arquivos do texto retornado pela LLM com suporte flexível a variadas cercas Markdown."""
     files: dict[str, str] = {}
-    pattern = r"(?:###|\/\/\/|---)\s*(?:FILE|File|file):\s*([^\n\r]+)[\r\n]+```(?:[a-zA-Z0-9_-]+)?\s*[\r\n]+(.*?)```"
-    matches = re.findall(pattern, raw_text, re.DOTALL)
 
-    if matches:
-        for rel_path, content in matches:
+    # Padrão 1: ### FILE: path/to/file \n ```lang ... ```
+    p1 = r"(?:###|\/\/\/|---|\*\*|##)?\s*(?:FILE|File|file|Path|filename):\s*([^\n\r]+)[\r\n]+```(?:[a-zA-Z0-9_-]+)?\s*[\r\n]+(.*?)```"
+    for rel_path, content in re.findall(p1, raw_text, re.DOTALL):
+        clean_path = rel_path.strip().strip("`'\"")
+        files[clean_path] = content.strip()
+
+    # Padrão 2: ```lang filename=path/to/file \n ... ```
+    if not files:
+        p2 = r"```(?:[a-zA-Z0-9_-]+)?\s+(?:filename|file|path)=([^\s\n\r`]+)[\r\n]+(.*?)```"
+        for rel_path, content in re.findall(p2, raw_text, re.DOTALL):
             clean_path = rel_path.strip().strip("`'\"")
             files[clean_path] = content.strip()
-    else:
-        alt_pattern = r"(?:###|\/\/\/|---)\s*(?:FILE|File|file):\s*([^\n\r]+)[\r\n]+(.*?)(?=(?:###|\/\/\/|---)\s*(?:FILE|File|file):|\Z)"
-        alt_matches = re.findall(alt_pattern, raw_text, re.DOTALL)
-        if alt_matches:
-            for rel_path, content in alt_matches:
-                clean_path = rel_path.strip().strip("`'\"")
-                files[clean_path] = _clean_code(content)
+
+    # Padrão 3: ```lang \n // file: path/to/file \n ... ```
+    if not files:
+        p3 = r"```(?:[a-zA-Z0-9_-]+)?[\r\n]+(?:\/\/|#|\/\*)\s*(?:file|filename|path):\s*([^\n\r]+)[\r\n]+(.*?)```"
+        for rel_path, content in re.findall(p3, raw_text, re.DOTALL):
+            clean_path = rel_path.strip().strip("`'\"")
+            files[clean_path] = content.strip()
+
+    # Fallback Padrão 4: FILE: sem cercas de código
+    if not files:
+        p4 = r"(?:###|\/\/\/|---)\s*(?:FILE|File|file):\s*([^\n\r]+)[\r\n]+(.*?)(?=(?:###|\/\/\/|---)\s*(?:FILE|File|file):|\Z)"
+        for rel_path, content in re.findall(p4, raw_text, re.DOTALL):
+            clean_path = rel_path.strip().strip("`'\"")
+            files[clean_path] = _clean_code(content)
 
     if not files:
         files[default_filename] = _clean_code(raw_text)
@@ -113,6 +145,7 @@ REGRAS:
             prompt_parts.append(f"\n\n=== CODEBASE GENOME (DNA do Repositório) ===\n{genome_prompt}")
     except Exception as exc:
         print(f"--- INFO: Genome scanner não utilizado nesta etapa: {exc} ---")
+        _log_telemetry_event("hook_error", {"hook": "GenomeScanner", "error": str(exc), "node": "developer"})
 
     # 🧠 Consulta MemoryManager para obter lições aprendidas passadas relevantes
     try:
