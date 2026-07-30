@@ -31,6 +31,21 @@ class TestHarnessRunner:
         from ...config.registry import TechStackRegistry
 
         cwd_str = str(cwd)
+        if self.stack:
+            handler = TechStackRegistry.get(self.stack)
+            if handler:
+                detected = handler.detect_test_command(cwd_str)
+                if detected:
+                    return detected
+                if handler.language == "go":
+                    return "go test ./..."
+                if handler.language == "rust":
+                    return "cargo test"
+                if handler.language == "java":
+                    return "mvn test"
+                if handler.language == "javascript":
+                    return "npm test"
+
         cmd = TechStackRegistry.detect_command(cwd_str)
         if cmd:
             return cmd

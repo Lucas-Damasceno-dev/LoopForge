@@ -15,10 +15,15 @@ import pytest_asyncio
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_test_db():
-    """Configura banco SQLite em memória para cada teste."""
+    """Configura banco SQLite limpo para cada teste."""
+    from lf.api.database import Base, engine
     os.environ["LF_API_TEST"] = "1"
     os.environ["LF_API_REQUIRE_AUTH"] = "false"
     await init_db()
+    if engine is not None:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
     yield
     await close_db()
     os.environ.pop("LF_API_TEST", None)
