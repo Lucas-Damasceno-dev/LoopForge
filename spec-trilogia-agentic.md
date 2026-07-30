@@ -805,18 +805,18 @@ Converte automaticamente sessões de agentes que falharam ou exigiram intervenç
 ## 📋 Checklists de Implementação (ToDo)
 
 ### 🚀 Monorepo & Infraestrutura Inicial
-- [ ] Configurar workspace monorepo (`packages/genome`, `packages/registry`, `packages/retro`)
-- [ ] Configurar `pyproject.toml` base e resoluções de pacotes locais
+- [x] Configurar workspace monorepo (`packages/genome`, `packages/registry`, `packages/retro`)
+- [x] Configurar `pyproject.toml` base e resoluções de pacotes locais
 
 ### 1. 🧬 Codebase Genome (Fase 1)
-- [ ] **Data & Storage**: Implementar Pydantic Models (`store/models.py`) e Cache SQLite incremental (`store/sqlite.py`)
-- [ ] **Tree-sitter AST Walker**: Implementar `core/scanner.py` e parsers de linguagem (`languages/base.py`, `python.py`, `typescript.py`)
-- [ ] **Symbol Resolvers**: Resolvedor base (`resolvers/base.py`), Python (`py_resolver.py`) e TypeScript (`ts_resolver.py` / path aliases)
-- [ ] **Grafo de Dependências**: Grafo em NetworkX (`core/graph.py`) e cálculo de Bus Factor (`core/bus_factor.py`)
-- [ ] **Checker & `.genomerc`**: Validador de regras de camadas e limites arquiteturais (`core/architecture.py`)
-- [ ] **Convenções & Renderers**: Indução estatística de convenções (`core/conventions.py`), renderers (`markdown`, `summary`, `json`) e `core/diff.py`
-- [ ] **CLI & HTTP Server**: CLI Click (`genome init`, `check`, `diff`, `dump`, `serve`, `query`) e FastAPI REST server (`server/app.py`)
-- [ ] **Suíte de Testes**: Fixtures e testes automatizados em `packages/genome/tests/`
+- [x] **Data & Storage**: Implementar Pydantic Models (`store/models.py`) e Cache SQLite incremental (`store/sqlite.py`)
+- [x] **Tree-sitter AST Walker**: Implementar `core/scanner.py` e parsers de linguagem (`languages/base.py`, `python.py`, `typescript.py`)
+- [x] **Symbol Resolvers**: Resolvedor base (`resolvers/base.py`), Python (`py_resolver.py`) e TypeScript (`ts_resolver.py` / path aliases)
+- [x] **Grafo de Dependências**: Grafo em NetworkX (`core/graph.py`) e cálculo de Bus Factor (`core/bus_factor.py`)
+- [x] **Checker & `.genomerc`**: Validador de regras de camadas e limites arquiteturais (`core/architecture.py`)
+- [x] **Convenções & Renderers**: Indução estatística de convenções (`core/conventions.py`), renderers (`markdown`, `summary`, `json`) e `core/diff.py`
+- [x] **CLI & HTTP Server**: CLI Click (`genome init`, `check`, `diff`, `dump`, `serve`, `query`) e FastAPI REST server (`server/app.py`)
+- [x] **Suíte de Testes**: Fixtures e testes automatizados em `packages/genome/tests/`
 
 ### 2. 🔗 Agentic Interface Registry (Fase 2)
 - [ ] **Modelos & Storage**: Modelos de contrato e snapshot (`store/models.py`, `store/sqlite.py`)

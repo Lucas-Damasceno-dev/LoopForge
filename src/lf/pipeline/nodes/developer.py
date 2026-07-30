@@ -103,6 +103,17 @@ REGRAS:
         f"\nUser Stories:\n{chr(10).join(story_lines) if story_lines else 'N/A'}",
     ]
 
+    # 🧬 Injeta o genoma do repositório se disponível (<2s token-optimized summary)
+    try:
+        from genome import GenomeScanner, render_markdown
+        genome_scanner = GenomeScanner(project_dir or ".")
+        genome_data = genome_scanner.scan()
+        genome_prompt = render_markdown(genome_data)
+        if genome_prompt:
+            prompt_parts.append(f"\n\n=== CODEBASE GENOME (DNA do Repositório) ===\n{genome_prompt}")
+    except Exception as exc:
+        print(f"--- INFO: Genome scanner não utilizado nesta etapa: {exc} ---")
+
     # 🧠 Consulta MemoryManager para obter lições aprendidas passadas relevantes
     try:
         from ...memory.manager import MemoryManager
