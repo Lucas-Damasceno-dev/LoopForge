@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "repo": {
+    "root": "/home/lucasd/Documents/03_Desenvolvimento/code/projects/personal/portfolio/agentes/LoopForge/examples/term-task",
+    "langs": {},
+    "total_files": 0,
+    "total_lines": 0
+  },
+  "conventions": {
+    "error_handling": {
+      "pattern": "standard-exceptions",
+      "lib": null,
+      "usage_rate": 0.9
+    },
+    "testing": null,
+    "custom": {}
+  },
+  "modules": [],
+  "architecture": {
+    "pattern": "custom",
+    "source": "auto-detected",
+    "layers": [],
+    "layer_violations": [],
+    "circular_deps": [],
+    "bus_factor": {
+      "score": 1.0,
+      "high_risk_files": []
+    }
+  },
+  "generated_at": "2026-07-30T22:14:51.114776+00:00",
+  "ttl_seconds": 86400
+}

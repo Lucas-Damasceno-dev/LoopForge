@@ -1,0 +1,12 @@
+# TermTask
+
+A terminal-based Kanban board with Pomodoro timer.
+
+## Features
+- Three columns: To Do, In Progress, Done
+- Add tasks (`a` key)
+- Move tasks between columns with `Enter`
+- Navigate with `Tab`, arrows
+- Pomodoro timer (`p` to start/stop)
+
+## Usage
