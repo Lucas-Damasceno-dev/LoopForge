@@ -11,23 +11,22 @@ class TechStack(BaseModel):
 
 
 def resolve_tech_stack(language: str, framework: str | None = None) -> TechStack:
-    """Resolve coerente de stack, framework, test harness e package manager por linguagem."""
-    lang = language.lower().strip()
-    if lang == "java":
-        fw = framework if framework and framework != "fastapi" else "spring-boot"
-        return TechStack(language="java", framework=fw, testing_harness="junit", package_manager="maven")
-    elif lang in ("javascript", "typescript", "js", "ts"):
-        fw = framework if framework and framework != "fastapi" else "express"
-        return TechStack(language="javascript", framework=fw, testing_harness="vitest", package_manager="npm")
-    elif lang == "go":
-        fw = framework if framework and framework != "fastapi" else "gin"
-        return TechStack(language="go", framework=fw, testing_harness="gotest", package_manager="go")
-    elif lang == "rust":
-        fw = framework if framework and framework != "fastapi" else "actix"
-        return TechStack(language="rust", framework=fw, testing_harness="cargotest", package_manager="cargo")
-    else:
-        fw = framework or "fastapi"
-        return TechStack(language="python", framework=fw, testing_harness="pytest", package_manager="pip")
+    """Resolve de stack utilizando o TechStackRegistry extensível."""
+    from .registry import TechStackRegistry
+
+    handler = TechStackRegistry.get(language)
+    if handler:
+        fw = framework if framework and framework != "fastapi" else handler.default_framework
+        return TechStack(
+            language=handler.language,
+            framework=fw,
+            testing_harness=handler.default_test_harness,
+            package_manager=handler.default_package_manager,
+        )
+
+    # Fallback padronizado Python
+    fw = framework or "fastapi"
+    return TechStack(language="python", framework=fw, testing_harness="pytest", package_manager="pip")
 
 
 class ArtifactSchema(BaseModel):

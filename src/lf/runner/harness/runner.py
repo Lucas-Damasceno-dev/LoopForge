@@ -28,28 +28,12 @@ class TestHarnessRunner:
         if self.command:
             return self.command
 
-        cwd_path = Path(cwd)
+        from ...config.registry import TechStackRegistry
 
-        # 1. Stack explícita ou detectada por manifesto
-        if self.stack == "go" or (cwd_path / "go.mod").exists():
-            return "go test ./..."
-
-        if self.stack == "rust" or (cwd_path / "Cargo.toml").exists():
-            return "cargo test"
-
-        if self.stack == "java" or (cwd_path / "pom.xml").exists() or (cwd_path / "build.gradle").exists() or (cwd_path / "build.gradle.kts").exists():
-            if (cwd_path / "pom.xml").exists():
-                return "mvn test"
-            if (cwd_path / "gradlew").exists():
-                return "./gradlew test"
-            return "gradle test"
-
-        if self.stack in ("javascript", "typescript") or (cwd_path / "package.json").exists():
-            if (cwd_path / "vitest.config.ts").exists() or (cwd_path / "vitest.config.js").exists():
-                return "npx vitest run"
-            if (cwd_path / "jest.config.js").exists() or (cwd_path / "jest.config.ts").exists():
-                return "npx jest"
-            return "npm test"
+        cwd_str = str(cwd)
+        cmd = TechStackRegistry.detect_command(cwd_str)
+        if cmd:
+            return cmd
 
         return "pytest"
 

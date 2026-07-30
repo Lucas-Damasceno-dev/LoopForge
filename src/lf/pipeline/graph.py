@@ -70,6 +70,28 @@ def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "_
     return END
 
 
+class NodeRegistry:
+    """Registro desacoplado de nós do pipeline LangGraph."""
+    _nodes: dict[str, any] = {
+        "cpo": cpo,
+        "pm": product_manager,
+        "tech_lead": tech_lead,
+        "developer": developer,
+        "qa": qa,
+        "appsec": appsec,
+        "devops": devops,
+        "parallel_audit": parallel_audit,
+    }
+
+    @classmethod
+    def register(cls, name: str, node_func: any) -> None:
+        cls._nodes[name] = node_func
+
+    @classmethod
+    def get_all(cls) -> dict[str, any]:
+        return dict(cls._nodes)
+
+
 def build_graph(
     checkpointer: InMemorySaver | None = None,
     interrupt_after: list[str] | None = None,
@@ -78,14 +100,8 @@ def build_graph(
     """Constrói e compila o grafo com checkpointing, auditoria paralela e human-in-the-loop opcional."""
     workflow = StateGraph(GraphState)
 
-    workflow.add_node("cpo", cpo)
-    workflow.add_node("pm", product_manager)
-    workflow.add_node("tech_lead", tech_lead)
-    workflow.add_node("developer", developer)
-    workflow.add_node("qa", qa)
-    workflow.add_node("appsec", appsec)
-    workflow.add_node("devops", devops)
-    workflow.add_node("parallel_audit", parallel_audit)
+    for node_name, node_func in NodeRegistry.get_all().items():
+        workflow.add_node(node_name, node_func)
 
     workflow.set_conditional_entry_point(
         entry_router,

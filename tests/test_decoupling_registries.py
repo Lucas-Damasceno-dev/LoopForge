@@ -1,0 +1,82 @@
+"""Suíte de testes para os padrões Registry de desacoplamento do LoopForge."""
+
+import pytest
+from lf.config.registry import BaseStackHandler, TechStackRegistry
+from lf.config.schema import resolve_tech_stack
+from lf.pipeline.graph import NodeRegistry, build_graph
+from lf.pipeline.llm_factory import BaseLLMProvider, LLMProviderRegistry
+from genome import BaseLanguageScanner, GenomeScanner, ModuleInfo
+
+
+class ElixirStackHandler(BaseStackHandler):
+    @property
+    def language(self) -> str:
+        return "elixir"
+
+    @property
+    def default_framework(self) -> str:
+        return "phoenix"
+
+    @property
+    def default_test_harness(self) -> str:
+        return "mix test"
+
+    @property
+    def default_package_manager(self) -> str:
+        return "mix"
+
+    def detect_test_command(self, project_dir: str) -> str | None:
+        return "mix test"
+
+
+class CustomLLMProvider(BaseLLMProvider):
+    @property
+    def provider_name(self) -> str:
+        return "custom"
+
+    def generate(self, system_prompt: str, user_prompt: str, **kwargs):
+        return "custom_response"
+
+
+class DummyScanner(BaseLanguageScanner):
+    @property
+    def language_name(self) -> str:
+        return "dummy"
+
+    @property
+    def extensions(self) -> list[str]:
+        return [".dummy"]
+
+    def scan_file(self, file_path: str, code: str) -> ModuleInfo:
+        return ModuleInfo(path=file_path, language="dummy")
+
+
+def test_tech_stack_registry_extensibility():
+    TechStackRegistry.register(ElixirStackHandler())
+    resolved = resolve_tech_stack("elixir")
+    assert resolved.language == "elixir"
+    assert resolved.framework == "phoenix"
+    assert resolved.testing_harness == "mix test"
+    assert resolved.package_manager == "mix"
+
+
+def test_llm_provider_registry():
+    LLMProviderRegistry.register(CustomLLMProvider())
+    provider = LLMProviderRegistry.get("custom")
+    assert provider.provider_name == "custom"
+    assert provider.generate("sys", "user") == "custom_response"
+
+
+def test_genome_scanner_registry():
+    GenomeScanner.register_scanner(DummyScanner())
+    scanner = GenomeScanner(".")
+    assert any(s.language_name == "dummy" for s in scanner.scanners)
+
+
+def test_node_registry():
+    def custom_node(state):
+        return state
+
+    NodeRegistry.register("custom_node", custom_node)
+    graph = build_graph()
+    assert "custom_node" in graph.nodes

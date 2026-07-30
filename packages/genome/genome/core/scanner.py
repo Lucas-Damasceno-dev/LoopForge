@@ -8,8 +8,10 @@ from genome.core.architecture import ArchitectureChecker
 from genome.core.bus_factor import calculate_bus_factor
 from genome.core.conventions import infer_conventions
 from genome.core.graph import build_dependency_graph, compute_metrics, detect_circular_dependencies
+from genome.languages.base import BaseLanguageScanner
 from genome.languages.python import PythonScanner
 from genome.languages.typescript import TypeScriptScanner
+from genome.resolvers.base import BaseSymbolResolver
 from genome.resolvers.py_resolver import PythonSymbolResolver
 from genome.resolvers.ts_resolver import TypeScriptSymbolResolver
 from genome.store.models import Genome, LanguageStats, ModuleInfo, RepoMetadata
@@ -17,10 +19,21 @@ from genome.store.sqlite import GenomeStore
 
 
 class GenomeScanner:
+    _registered_scanners: List[BaseLanguageScanner] = [PythonScanner(), TypeScriptScanner()]
+    _registered_resolvers: List[BaseSymbolResolver] = [PythonSymbolResolver(), TypeScriptSymbolResolver()]
+
+    @classmethod
+    def register_scanner(cls, scanner: BaseLanguageScanner) -> None:
+        cls._registered_scanners.append(scanner)
+
+    @classmethod
+    def register_resolver(cls, resolver: BaseSymbolResolver) -> None:
+        cls._registered_resolvers.append(resolver)
+
     def __init__(self, repo_root: str):
         self.repo_root = os.path.abspath(repo_root)
-        self.scanners = [PythonScanner(), TypeScriptScanner()]
-        self.resolvers = [PythonSymbolResolver(), TypeScriptSymbolResolver()]
+        self.scanners = list(self._registered_scanners)
+        self.resolvers = list(self._registered_resolvers)
 
     def _should_ignore(self, rel_path: str) -> bool:
         ignore_dirs = {
