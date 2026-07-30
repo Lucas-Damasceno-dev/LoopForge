@@ -66,6 +66,15 @@ Preencha TODOS os campos obrigatórios:
 
 Foque no valor de negócio. Não inclua implementação técnica."""
 
+    complexity = state.get("complexity_level", "standard")
+    complexity_prompt = ""
+    if complexity == "mvp":
+        complexity_prompt = "\nNÍVEL DE ESCOPO (MVP): Mantenha o épico enxuto, focado na funcionalidade essencial e no menor tempo de entrega possível."
+    elif complexity == "advanced":
+        complexity_prompt = "\nNÍVEL DE ESCOPO (AVANÇADO): Crie um épico completo, detalhado, com múltiplos módulos, métricas avançadas e análise de casos de borda."
+
+    system_prompt = system_prompt + complexity_prompt
+
     try:
         epic = call_llm_via_opencode(
             system_prompt=system_prompt,

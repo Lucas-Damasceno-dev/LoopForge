@@ -54,6 +54,7 @@ class TaskSchema(BaseModel):
     stack: str | None = Field(None, description="Stack tecnológica opcional")
     routing_mode: str = "full"
     task_type: str = "feature"
+    complexity_level: str = "standard"  # "mvp", "standard", "advanced"
 
     def __getitem__(self, item: str) -> Any:
         if item == "persona":

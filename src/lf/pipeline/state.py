@@ -49,6 +49,7 @@ class GraphState(TypedDict):
     read_only: bool
     routing_mode: str  # "full", "fast", "patch", "review-only", "explore"
     task_type: str     # "feature", "bugfix", "refactor", "simple", "full", "fast"
+    complexity_level: str  # "mvp", "standard", "advanced"
 
     # Schema esperado para validação do próximo artefato
     expected_schema: str | None

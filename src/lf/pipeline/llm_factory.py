@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from langchain_core.language_models.fake import FakeListLLM
 
-DEFAULT_OPENROUTER_MODEL = "inclusionai/ling-3.0-flash:free"
+DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "auto/best-free")
 DEFAULT_OPENROUTER_KEY = ""
 _DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -21,36 +21,65 @@ def get_openrouter_model() -> str:
 
 def call_openrouter_api(
     prompt: str,
-    model: str = DEFAULT_OPENROUTER_MODEL,
+    model: str | None = None,
     api_key: str | None = None,
-    base_url: str = _DEFAULT_OPENROUTER_BASE_URL,
+    base_url: str | None = None,
+    system_prompt: str | None = None,
 ) -> tuple[str, dict | None]:
-    """Helper para chamadas OpenRouter API via httpx.
-
-    Returns (text, usage_dict) onde usage_dict contém prompt_tokens e completion_tokens
-    retornados pela API, ou None se indisponível.
-    """
+    """Helper para chamadas OpenRouter API via httpx."""
     import httpx
+    target_model = model or os.environ.get("OPENROUTER_MODEL") or DEFAULT_OPENROUTER_MODEL
     key = api_key or os.environ.get("OPENROUTER_API_KEY", "") or DEFAULT_OPENROUTER_KEY
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
-    url = f"{base_url.rstrip('/')}/chat/completions"
+    effective_base_url = base_url or os.environ.get("OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL)
+    url = f"{effective_base_url.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
     payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
+        "model": target_model,
+        "messages": messages,
+        "stream": False,
     }
 
-    resp = httpx.post(url, headers=headers, json=payload, timeout=30)
+    timeout_val = float(os.environ.get("OPENROUTER_TIMEOUT", "180"))
+    resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_val)
     if resp.status_code == 200:
-        data = resp.json()
-        text = data["choices"][0]["message"]["content"]
-        usage = data.get("usage")
-        return text, usage
+        raw_text = resp.text.strip()
+        if raw_text.startswith("data:") or "\ndata: {" in raw_text:
+            chunks = []
+            usage = None
+            for line in raw_text.splitlines():
+                line = line.strip()
+                if line.startswith("data: ") and line != "data: [DONE]":
+                    try:
+                        cdata = json.loads(line[6:])
+                        choices = cdata.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content") or choices[0].get("message", {}).get("content")
+                            if content:
+                                chunks.append(content)
+                        if cdata.get("usage"):
+                            usage = cdata["usage"]
+                    except Exception:
+                        pass
+            return "".join(chunks), usage
+        else:
+            data = resp.json()
+            choice = data["choices"][0]
+            msg = choice.get("message", {})
+            text = msg.get("content") or choice.get("delta", {}).get("content", "")
+            usage = data.get("usage")
+            return text, usage
 
     raise RuntimeError(f"OpenRouter API request failed with status {resp.status_code}: {resp.text}")
 

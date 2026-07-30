@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .models import OpenCodeResult
 
-DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL", "openrouter/inclusionai/ling-3.0-flash:free")
+DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL") or os.environ.get("OPENROUTER_MODEL") or "auto/best-free"
 
 
 class OpenCodeRunner:

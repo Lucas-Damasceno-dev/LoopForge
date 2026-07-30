@@ -1,0 +1,10 @@
+/home/lucasd/Documents/03_Desenvolvimento/code/projects/personal/portfolio/agentes/LoopForge/examples/git-pet/target/debug/deps/libanstyle-a36aa0c311c55244.rmeta: /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/lib.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/macros.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/color.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/effect.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/reset.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/style.rs
+
+/home/lucasd/Documents/03_Desenvolvimento/code/projects/personal/portfolio/agentes/LoopForge/examples/git-pet/target/debug/deps/anstyle-a36aa0c311c55244.d: /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/lib.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/macros.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/color.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/effect.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/reset.rs /home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/style.rs
+
+/home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/lib.rs:
+/home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/macros.rs:
+/home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/color.rs:
+/home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/effect.rs:
+/home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/reset.rs:
+/home/lucasd/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anstyle-1.0.14/src/style.rs:

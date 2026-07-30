@@ -185,6 +185,12 @@ REGRAS:
         if previous_code:
             prompt_parts.append(f"\n\nCódigo anterior que apresentou falha:\n```\n{previous_code[:1500]}\n```\nCorrija os problemas apontados acima.")
 
+    complexity = state.get("complexity_level", "standard")
+    if complexity == "mvp":
+        prompt_parts.append("\n=== NÍVEL DE COMPLEXIDADE: MVP ===\nFoque em código funcional e enxuto. Priorize os fluxos principais e mantenha a estrutura direta e sem complexidade desnecessária.")
+    elif complexity == "advanced":
+        prompt_parts.append("\n=== NÍVEL DE COMPLEXIDADE: AVANÇADO ===\nImplemente uma solução completa e robusta, incluindo módulos organizados, tratamento extensivo de erros, funções auxiliares e testes unitários completos.")
+
     user_prompt = "\n".join(prompt_parts)
 
     print(f"--- Chamando LLM Engine (Stack TL: {stack}, Model: {model_name})... ---")

@@ -112,6 +112,7 @@ class TaskDispatcher:
 
             "routing_mode": getattr(task, "routing_mode", "full"),
             "task_type": getattr(task, "task_type", "feature"),
+            "complexity_level": getattr(task, "complexity_level", "standard"),
             "is_interactive": self.interactive,
             "expected_schema": None,
             "persona_id": getattr(task, "agent_id", None),

@@ -46,6 +46,8 @@ def _run_interactive_wizard() -> dict:
 @click.option("--notify", is_flag=True, default=False, help="Enviar notificação desktop ao pausar ou finalizar")
 @click.option("--webhook-url", default=None, help="URL de Webhook (Slack/Discord) para notificações")
 @click.option("--resume", "resume_id", default=None, help="Retomar pipeline interrompida pelo ID da tarefa")
+@click.option("--mvp", is_flag=True, default=False, help="Modo MVP: escopo enxuto, prototipagem rápida e requisitos essenciais")
+@click.option("--advanced", is_flag=True, default=False, help="Modo Avançado: escopo completo, múltiplos módulos e alta complexidade")
 @click.option("--wizard", is_flag=True, default=False, help="Forçar o wizard interativo de inicialização")
 def run_cmd(
     idea: str | None,
@@ -57,10 +59,13 @@ def run_cmd(
     notify: bool,
     webhook_url: str | None,
     resume_id: str | None,
+    mvp: bool,
+    advanced: bool,
     wizard: bool,
 ):
     """Executa a pipeline de tarefas dos agentes autônomos do LoopForge."""
     session_id = str(uuid.uuid4())[:8]
+    complexity_level = "mvp" if mvp else ("advanced" if advanced else "standard")
 
     if resume_id:
         dispatcher = TaskDispatcher(mock_llm=mock, interactive=interactive, notify=notify, webhook_url=webhook_url)
@@ -89,13 +94,15 @@ def run_cmd(
 
     tasks_to_run = []
     if idea:
-        tasks_to_run = [TaskSchema(id="task-1", title=idea, agent_id="cpo", stack=stack)]
+        tasks_to_run = [TaskSchema(id="task-1", title=idea, agent_id="cpo", stack=stack, complexity_level=complexity_level)]
     elif cfg.plan.tasks:
         tasks_to_run = cfg.plan.tasks
     else:
-        tasks_to_run = [TaskSchema(id="task-1", title="Build application features", agent_id="cpo", stack=stack)]
+        tasks_to_run = [TaskSchema(id="task-1", title="Build application features", agent_id="cpo", stack=stack, complexity_level=complexity_level)]
 
     console.print(f"[bold green]⚡ Iniciando LoopForge Run (Sessão ID: {session_id})...[/bold green]")
+    if complexity_level != "standard":
+        console.print(f"[bold magenta]🎯 Nível de Complexidade: {complexity_level.upper()}[/bold magenta]")
     if stack:
         console.print(f"[dim]📌 Override de Stack manual do usuário: {stack}[/dim]")
     else:
