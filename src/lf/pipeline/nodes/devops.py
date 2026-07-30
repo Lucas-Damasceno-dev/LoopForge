@@ -20,6 +20,132 @@ class DevOpsManifest(BaseModel):
     execution_timestamp: str = Field(...)
 
 
+def _get_stack_templates(stack_name: str) -> tuple[str, str]:
+    lang = (stack_name or "python").lower().strip()
+    if lang in ("rust", "rs"):
+        df = """# Dockerfile Rust otimizado gerado pelo LoopForge DevOps Agent
+FROM rust:1.77-slim as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+WORKDIR /app
+COPY --from=builder /app/target/release/app ./app
+EXPOSE 8080
+CMD ["./app"]
+"""
+        ci = """name: LoopForge CI Workflow
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+"""
+    elif lang in ("go", "golang"):
+        df = """# Dockerfile Go otimizado gerado pelo LoopForge DevOps Agent
+FROM golang:1.22-alpine as builder
+WORKDIR /app
+COPY . .
+RUN go build -o app .
+
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/app ./app
+EXPOSE 8080
+CMD ["./app"]
+"""
+        ci = """name: LoopForge CI Workflow
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: go test ./...
+"""
+    elif lang in ("java", "spring-boot"):
+        df = """# Dockerfile Java otimizado gerado pelo LoopForge DevOps Agent
+FROM maven:3.9-eclipse-temurin-21-alpine as builder
+WORKDIR /app
+COPY . .
+RUN mvn package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+"""
+        ci = """name: LoopForge CI Workflow
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - run: mvn test
+"""
+    elif lang in ("javascript", "typescript", "js", "ts"):
+        df = """# Dockerfile Node.js otimizado gerado pelo LoopForge DevOps Agent
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]
+"""
+        ci = """name: LoopForge CI Workflow
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test
+"""
+    else:
+        df = """# Dockerfile Python otimizado gerado pelo LoopForge DevOps Agent
+FROM python:3.12-slim
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir .
+EXPOSE 8000
+CMD ["python", "-m", "lf", "serve"]
+"""
+        ci = """name: LoopForge CI Workflow
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e ".[dev]"
+      - run: pytest --cov=src
+"""
+    return df, ci
+
+
 def devops(state: GraphState) -> dict:
     """Nó DevOps: Avalia deployabilidade e propõe/gera Dockerfile e CI."""
     print("---EXECUTANDO NÓ: DevOps (Deployability & CI Analysis)---")
@@ -85,54 +211,8 @@ def devops(state: GraphState) -> dict:
     dockerfile_created = False
     ci_created = False
 
-    dockerfile_content = """# Dockerfile otimizado gerado pelo LoopForge DevOps Agent
-FROM python:3.12-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
-
-RUN pip install --no-cache-dir .
-
-EXPOSE 8000
-CMD ["python", "-m", "lf", "serve"]
-"""
-
-    ci_content = """name: LoopForge CI Workflow
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
-      - name: Run Linters
-        run: ruff check src/
-      - name: Run Tests
-        run: pytest --cov=src
-"""
+    stack_name = state.get("stack", "python")
+    dockerfile_content, ci_content = _get_stack_templates(stack_name)
 
     if auto_create:
         if not dockerfile_exists:

@@ -194,7 +194,8 @@ REGRAS:
     if not has_manifest and not has_test:
         print("--- AVISO: A LLM não gerou manifesto ou testes. O QA irá detectar a ausência e reportar falha. ---")
 
-    _write_project_files(files_map, [output_dir, project_dir])
+    if not state.get("read_only", False):
+        _write_project_files(files_map, [output_dir, project_dir])
 
     # 🔗 Hook do Agentic Interface Registry: rastreia mudanças e verifica quebras de contrato
     try:

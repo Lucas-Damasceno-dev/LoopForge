@@ -103,6 +103,51 @@ class SQLiteLLMCache:
             conn.execute("INSERT OR REPLACE INTO cache (prompt_hash, response) VALUES (?, ?)", (h, response))
 
 
+class CostTracker:
+    """Rastreamento de tokens e cálculo de custo estimado em USD por chamada LLM."""
+
+    PRICING_PER_1K_TOKENS = {
+        "inclusionai/ling-3.0-flash:free": (0.0, 0.0),
+        "anthropic/claude-3.5-sonnet": (0.003, 0.015),
+        "openai/gpt-4o-mini": (0.00015, 0.0006),
+        "default": (0.001, 0.002),
+    }
+
+    def __init__(self, db_path: str | Path = ".loopforge/telemetry.sqlite"):
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    def _init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_costs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    model TEXT NOT NULL,
+                    prompt_tokens INTEGER NOT NULL,
+                    completion_tokens INTEGER NOT NULL,
+                    cost_usd REAL NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
+    def track(self, model: str, prompt_text: str, response_text: str) -> float:
+        prompt_tokens = max(1, len(prompt_text) // 4)
+        completion_tokens = max(1, len(response_text) // 4)
+
+        rates = self.PRICING_PER_1K_TOKENS.get(model, self.PRICING_PER_1K_TOKENS["default"])
+        cost = ((prompt_tokens / 1000.0) * rates[0]) + ((completion_tokens / 1000.0) * rates[1])
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO llm_costs (model, prompt_tokens, completion_tokens, cost_usd) VALUES (?, ?, ?, ?)",
+                (model, prompt_tokens, completion_tokens, cost),
+            )
+        return cost
+
+
 # --- LLM PROVIDER ABSTRACTION LAYER ---
 
 class BaseLLMProvider(ABC):

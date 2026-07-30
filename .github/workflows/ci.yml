@@ -29,7 +29,7 @@ jobs:
 
       - name: Code Formatting & Linting (Ruff - E,F,W,I,N,UP,SIM)
         run: |
-          python -m ruff check --select E,F,W,I,N,UP,SIM src/lf tests_py
+          python -m ruff check --select E,F,W,I,N,UP,SIM src/lf tests
 
       - name: Type Checking (Mypy)
         run: |
@@ -37,4 +37,4 @@ jobs:
 
       - name: Unit Tests & Coverage Threshold Enforcement (>= 75%)
         run: |
-          python -m pytest --cov=src/lf --cov-report=term-missing --cov-fail-under=75 tests_py/
+          python -m pytest --cov=src/lf --cov-report=term-missing --cov-fail-under=75 tests/

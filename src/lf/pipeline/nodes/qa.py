@@ -150,87 +150,11 @@ O relatório DEVE ter:
 
 
 def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> dict:
-    """Executa testes com detecção automática baseada nos arquivos e manifestos gerados."""
-    result = {"passed": 0, "total": 0, "errors": [], "duration_ms": 0}
-    dirs_to_check = [d for d in [project_dir, output_dir] if d and os.path.exists(d)]
-
-    # 1. Inspeção de manifestos conhecidos
-    has_pom = any(os.path.exists(os.path.join(d, "pom.xml")) for d in dirs_to_check)
-    has_gradle = any(os.path.exists(os.path.join(d, "build.gradle")) or os.path.exists(os.path.join(d, "build.gradle.kts")) for d in dirs_to_check)
-    has_cargo = any(os.path.exists(os.path.join(d, "Cargo.toml")) for d in dirs_to_check)
-    has_go_mod = any(os.path.exists(os.path.join(d, "go.mod")) for d in dirs_to_check)
-    has_package_json = any(os.path.exists(os.path.join(d, "package.json")) for d in dirs_to_check)
-    has_csproj = any(list(Path(d).glob("*.csproj")) for d in dirs_to_check)
-    has_gemfile = any(os.path.exists(os.path.join(d, "Gemfile")) for d in dirs_to_check)
-
-    if has_pom:
-        _exec_cmd(["mvn", "test", "-q"], project_dir, "mvn test", result)
-        return result
-    if has_gradle:
-        _exec_cmd(["gradle", "test", "-q"], project_dir, "gradle test", result)
-        return result
-    if has_cargo:
-        _exec_cmd(["cargo", "test"], project_dir, "cargo test", result)
-        return result
-    if has_go_mod:
-        _exec_cmd(["go", "test", "./..."], project_dir, "go test", result)
-        return result
-    if has_package_json:
-        _exec_cmd(["npm", "test"], project_dir, "npm test", result)
-        return result
-    if has_csproj:
-        _exec_cmd(["dotnet", "test"], project_dir, "dotnet test", result)
-        return result
-    if has_gemfile:
-        _exec_cmd(["bundle", "exec", "rspec"], project_dir, "rspec test", result)
-        return result
-
-    # 2. Inspeção por extensão de código-fonte e suítes de teste
-    py_files = []
-    java_files = []
-    rs_files = []
-    go_files = []
-    js_files = []
-
-    for d in dirs_to_check:
-        py_files.extend(list(Path(d).glob("**/*.py")))
-        java_files.extend(list(Path(d).glob("**/*.java")))
-        rs_files.extend(list(Path(d).glob("**/*.rs")))
-        go_files.extend(list(Path(d).glob("**/*.go")))
-        js_files.extend(list(Path(d).glob("**/*.js")) + list(Path(d).glob("**/*.ts")))
-
-    if py_files:
-        has_pytest_files = any("test" in f.name.lower() for f in py_files)
-        if has_pytest_files:
-            _exec_cmd(["pytest", "-x", "--tb=short", "-q"], project_dir, "pytest", result)
-        else:
-            for py_file in py_files[:2]:
-                _exec_cmd(["python3", "-m", "py_compile", str(py_file)], str(py_file.parent), f"py_compile ({py_file.name})", result)
-        return result
-
-    if java_files:
-        target_file = next((f for f in java_files if f.name == "Main.java"), java_files[0])
-        _exec_cmd(["javac", str(target_file)], str(target_file.parent), "javac compile", result)
-        if result["passed"] > 0:
-            _exec_cmd(["java", target_file.stem], str(target_file.parent), "java execution", result)
-        return result
-
-    if rs_files:
-        _exec_cmd(["rustc", "--crate-type", "bin", "--emit=metadata", str(rs_files[0])], str(rs_files[0].parent), "rustc check", result)
-        return result
-
-    if go_files:
-        _exec_cmd(["go", "vet", "./..."], str(go_files[0].parent), "go vet", result)
-        return result
-
-    if js_files:
-        for js_file in js_files[:2]:
-            _exec_cmd(["node", "--check", str(js_file)], str(js_file.parent), f"node check ({js_file.name})", result)
-        return result
-
-    # 3. Fallback com erro claro se nenhuma stack/arquivo for reconhecido
-    result["errors"].append("Stack não detectada. Nenhum manifesto ou arquivo fonte reconhecido encontrado.")
-    return result
+    """Executa testes utilizando o TestHarnessRunner unificado do LoopForge."""
+    from ...runner.harness.runner import TestHarnessRunner
+    target_dir = project_dir if (project_dir and os.path.exists(project_dir)) else output_dir
+    runner = TestHarnessRunner(stack=stack)
+    return runner.run(target_dir)
 
 
 def _exec_cmd(cmd: list[str], cwd: str, name: str, result: dict) -> None:

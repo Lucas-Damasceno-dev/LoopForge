@@ -159,6 +159,26 @@ class TaskDispatcher:
 
 
 
+    def _check_remote_decision(self, run_id: str) -> dict | None:
+        """Verifica se há decisão gravada remotamente via API para a run_id."""
+        try:
+            db_path = Path(".loopforge/telemetry.sqlite").resolve()
+            if not db_path.exists():
+                return None
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT action, feedback_category, feedback_message FROM human_decisions WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1",
+                (run_id,),
+            )
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {"action": row[0], "category": row[1], "message": row[2]}
+        except Exception:
+            pass
+        return None
+
     def _record_decision(
         self,
         run_id: str,
@@ -295,8 +315,14 @@ class TaskDispatcher:
         console.print("  [red]x[/red] — Abortar pipeline")
 
         console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: ABORTAR)[/dim]")
-        raw_choice = self._get_input_with_timeout("➜ Escolha [c/r/a/x] (default: x): ", timeout=self.hitl_timeout_seconds)
-        choice = raw_choice.strip().lower() if raw_choice else "x"
+        remote_decision = self._check_remote_decision(run_id)
+        if remote_decision:
+            choice_map = {"approve": "c", "retry": "r", "adjust_prompt": "a", "abort": "x"}
+            choice = choice_map.get(remote_decision["action"], "c")
+            console.print(f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]")
+        else:
+            raw_choice = self._get_input_with_timeout("➜ Escolha [c/r/a/x] (default: x): ", timeout=self.hitl_timeout_seconds)
+            choice = raw_choice.strip().lower() if raw_choice else "x"
 
         action = "approve"
         cat = None
