@@ -27,7 +27,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run tests
-        run: python -m pytest tests_py/ -v --tb=short
+        run: python -m pytest tests/ -v --tb=short
 
   build-and-publish:
     needs: test

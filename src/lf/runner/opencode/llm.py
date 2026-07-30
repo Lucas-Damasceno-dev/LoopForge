@@ -86,7 +86,7 @@ Responda SOMENTE o objeto JSON puro."""
     if openrouter_key:
         model_name = model or DEFAULT_OPENROUTER_MODEL
         try:
-            raw_response_text = call_openrouter_api(
+            raw_response_text, _ = call_openrouter_api(
                 final_prompt, model=model_name, api_key=openrouter_key,
                 system_prompt=system_prompt,
             )
