@@ -161,6 +161,8 @@ class TaskDispatcher:
 
     def _check_remote_decision(self, run_id: str) -> dict | None:
         """Verifica se há decisão gravada remotamente via API para a run_id."""
+        if not run_id or run_id in ("default-run", "test", "test-run", "test-thread"):
+            return None
         try:
             db_path = Path(".loopforge/telemetry.sqlite").resolve()
             if not db_path.exists():
