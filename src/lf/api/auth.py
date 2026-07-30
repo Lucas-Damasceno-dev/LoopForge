@@ -17,10 +17,6 @@ def verify_authentication(
     """Verifica autenticação via HTTP Basic ou header X-API-Key se ativada."""
     settings = APISettings()
 
-    import os
-    if os.getenv("LF_API_TEST") == "1" or os.getenv("LF_API_TEST") == "true":
-        return True
-
     if not settings.require_auth and not settings.api_key:
         return True
 
