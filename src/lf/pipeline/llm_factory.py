@@ -11,27 +11,33 @@ from pydantic import BaseModel
 from langchain_core.language_models.fake import FakeListLLM
 
 DEFAULT_OPENROUTER_MODEL = "inclusionai/ling-3.0-flash:free"
+DEFAULT_OPENROUTER_KEY = ""
+_DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 def get_openrouter_model() -> str:
     return os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL)
 
 
-def call_openrouter_api(prompt: str, model: str | None = None) -> str:
+def call_openrouter_api(
+    prompt: str,
+    model: str = DEFAULT_OPENROUTER_MODEL,
+    api_key: str | None = None,
+    base_url: str = _DEFAULT_OPENROUTER_BASE_URL,
+) -> str:
     """Helper para chamadas OpenRouter API."""
     import requests
-    api_key = os.getenv("OPENROUTER_API_KEY", "")
-    target_model = model or get_openrouter_model()
-    if not api_key:
-        return f"Mock LLM Response for model {target_model}"
+    key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+    if not key:
+        return f"Mock OpenRouter response for: {prompt[:50]}"
 
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": target_model,
+        "model": model,
         "messages": [{"role": "user", "content": prompt}],
     }
     try:
@@ -41,7 +47,7 @@ def call_openrouter_api(prompt: str, model: str | None = None) -> str:
             return data["choices"][0]["message"]["content"]
     except Exception:
         pass
-    return f"Fallback response for model {target_model}"
+    return f"Fallback response for: {prompt[:50]}"
 
 
 def compress_prompt(text: str, max_chars: int = 6000) -> str:
