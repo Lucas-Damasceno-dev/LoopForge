@@ -53,7 +53,8 @@ def call_openrouter_api(
     timeout_val = float(os.environ.get("OPENROUTER_TIMEOUT", "180"))
     resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_val)
     if resp.status_code == 200:
-        raw_text = resp.text.strip()
+        raw_text = resp.text if hasattr(resp, "text") and isinstance(resp.text, str) else ""
+        raw_text = raw_text.strip()
         if raw_text.startswith("data:") or "\ndata: {" in raw_text:
             chunks = []
             usage = None
