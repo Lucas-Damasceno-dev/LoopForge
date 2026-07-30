@@ -25,11 +25,11 @@ def call_openrouter_api(
     api_key: str | None = None,
     base_url: str = _DEFAULT_OPENROUTER_BASE_URL,
 ) -> str:
-    """Helper para chamadas OpenRouter API."""
-    import requests
-    key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+    """Helper para chamadas OpenRouter API via httpx."""
+    import httpx
+    key = api_key or os.environ.get("OPENROUTER_API_KEY", "") or DEFAULT_OPENROUTER_KEY
     if not key:
-        return f"Mock OpenRouter response for: {prompt[:50]}"
+        raise RuntimeError("OPENROUTER_API_KEY is not set")
 
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
@@ -40,14 +40,13 @@ def call_openrouter_api(
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
     }
-    try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=30)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
-    except Exception:
-        pass
-    return f"Fallback response for: {prompt[:50]}"
+
+    resp = httpx.post(url, headers=headers, json=payload, timeout=30)
+    if resp.status_code == 200:
+        data = resp.json()
+        return data["choices"][0]["message"]["content"]
+
+    raise RuntimeError(f"OpenRouter API request failed with status {resp.status_code}: {resp.text}")
 
 
 def compress_prompt(text: str, max_chars: int = 6000) -> str:

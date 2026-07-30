@@ -26,7 +26,9 @@ class ElixirStackHandler(BaseStackHandler):
         return "mix"
 
     def detect_test_command(self, project_dir: str) -> str | None:
-        return "mix test"
+        if os.path.exists(os.path.join(project_dir, "mix.exs")):
+            return "mix test"
+        return None
 
 
 class CustomLLMProvider(BaseLLMProvider):
