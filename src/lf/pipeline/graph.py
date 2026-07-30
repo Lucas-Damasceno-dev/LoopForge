@@ -92,6 +92,27 @@ class NodeRegistry:
         return dict(cls._nodes)
 
 
+class EdgeRegistry:
+    """Registro desacoplado de transições entre nós do grafo."""
+    _conditional_edges: dict[str, dict[str, str]] = {
+        "cpo": {"pm": "pm", "__end__": END},
+        "pm": {"tech_lead": "tech_lead", "__end__": END},
+        "tech_lead": {"developer": "developer", "__end__": END},
+        "developer": {"qa": "qa", "__end__": END},
+        "parallel_audit": {"developer": "developer", "__end__": END},
+    }
+
+    @classmethod
+    def register(cls, source_node: str, targets: dict[str, str]) -> None:
+        if source_node not in cls._conditional_edges:
+            cls._conditional_edges[source_node] = {}
+        cls._conditional_edges[source_node].update(targets)
+
+    @classmethod
+    def get_edges(cls, source_node: str) -> dict[str, str]:
+        return dict(cls._conditional_edges.get(source_node, {}))
+
+
 def build_graph(
     checkpointer: InMemorySaver | None = None,
     interrupt_after: list[str] | None = None,
@@ -113,30 +134,21 @@ def build_graph(
         },
     )
 
-    workflow.add_conditional_edges("cpo", router, {"pm": "pm", "__end__": END})
-    workflow.add_conditional_edges("pm", router, {"tech_lead": "tech_lead", "__end__": END})
-    workflow.add_conditional_edges("tech_lead", router, {"developer": "developer", "__end__": END})
-    workflow.add_conditional_edges("developer", router, {"qa": "qa", "__end__": END})
-
-    # QA decide: passou → parallel_audit (AppSec + DevOps simultâneos), falhou → retry developer
-    workflow.add_conditional_edges(
-        "qa",
-        should_retry,
-        {
-            "parallel_audit": "parallel_audit",
-            "developer": "developer",
-            "__end__": END,
-        },
-    )
-
-    workflow.add_conditional_edges(
-        "parallel_audit",
-        router,
-        {
-            "developer": "developer",
-            "__end__": END,
-        },
-    )
+    for source_node in NodeRegistry.get_all().keys():
+        if source_node == "qa":
+            workflow.add_conditional_edges(
+                "qa",
+                should_retry,
+                {
+                    "parallel_audit": "parallel_audit",
+                    "developer": "developer",
+                    "__end__": END,
+                },
+            )
+        else:
+            edges = EdgeRegistry.get_edges(source_node)
+            if edges:
+                workflow.add_conditional_edges(source_node, router, edges)
 
     gates = list(interrupt_after) if interrupt_after else []
     if human_gate_enabled:

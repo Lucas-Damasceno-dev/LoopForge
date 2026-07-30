@@ -4,8 +4,19 @@ Desacopla a resolução de linguagens, ferramentas de teste e gerenciadores de p
 
 from abc import ABC, abstractmethod
 import os
-from typing import Dict, Optional, Type
-from pydantic import BaseModel
+from typing import Dict, Optional
+
+
+ALIASES: Dict[str, str] = {
+    "js": "javascript",
+    "ts": "javascript",
+    "typescript": "javascript",
+    "node": "javascript",
+    "express": "javascript",
+    "py": "python",
+    "rs": "rust",
+    "golang": "go",
+}
 
 
 class BaseStackHandler(ABC):
@@ -32,6 +43,9 @@ class BaseStackHandler(ABC):
     @abstractmethod
     def detect_test_command(self, project_dir: str) -> Optional[str]:
         pass
+
+    def get_fallback_test_command(self) -> str:
+        return self.default_test_harness
 
 
 class PythonStackHandler(BaseStackHandler):
@@ -83,6 +97,9 @@ class JavaStackHandler(BaseStackHandler):
             return "./gradlew test"
         return None
 
+    def get_fallback_test_command(self) -> str:
+        return "mvn test"
+
 
 class RustStackHandler(BaseStackHandler):
     @property
@@ -106,6 +123,9 @@ class RustStackHandler(BaseStackHandler):
             return "cargo test"
         return None
 
+    def get_fallback_test_command(self) -> str:
+        return "cargo test"
+
 
 class GoStackHandler(BaseStackHandler):
     @property
@@ -128,6 +148,9 @@ class GoStackHandler(BaseStackHandler):
         if os.path.exists(os.path.join(project_dir, "go.mod")):
             return "go test ./..."
         return None
+
+    def get_fallback_test_command(self) -> str:
+        return "go test ./..."
 
 
 class JSStackHandler(BaseStackHandler):
@@ -155,6 +178,9 @@ class JSStackHandler(BaseStackHandler):
             return "npm test"
         return None
 
+    def get_fallback_test_command(self) -> str:
+        return "npm test"
+
 
 class TechStackRegistry:
     """Registro global extensível para manipuladores de linguagem/stack."""
@@ -166,10 +192,11 @@ class TechStackRegistry:
 
     @classmethod
     def get(cls, language: str) -> Optional[BaseStackHandler]:
-        lang_lower = language.lower()
-        if "js" in lang_lower or "typescript" in lang_lower or "node" in lang_lower:
-            lang_lower = "javascript"
-        return cls._handlers.get(lang_lower)
+        if not language:
+            return None
+        lang_lower = language.lower().strip()
+        lang_resolved = ALIASES.get(lang_lower, lang_lower)
+        return cls._handlers.get(lang_resolved)
 
     @classmethod
     def detect_command(cls, project_dir: str) -> Optional[str]:
@@ -180,7 +207,6 @@ class TechStackRegistry:
         return None
 
 
-# Registrar handlers padrão
 for _handler in [
     PythonStackHandler(),
     JavaStackHandler(),

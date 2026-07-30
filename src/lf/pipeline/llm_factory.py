@@ -200,6 +200,57 @@ class OpenCodeCLIProvider(BaseLLMProvider):
         )
 
 
+class OpenRouterProvider(BaseLLMProvider):
+    @property
+    def provider_name(self) -> str:
+        return "openrouter"
+
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str = DEFAULT_OPENROUTER_MODEL,
+        temperature: float = 0.2,
+        schema_model: Optional[Type[BaseModel]] = None,
+        mock: bool = False,
+        cache: bool = True,
+        circuit_breaker: Any = None,
+    ) -> Any:
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+        if mock:
+            return f"[MOCK OpenRouter] Response for: {user_prompt[:50]}"
+        text = call_openrouter_api(full_prompt, model=model)
+        CostTracker().track(model, full_prompt, text)
+        if schema_model:
+            try:
+                return json.loads(text)
+            except Exception:
+                pass
+        return text
+
+
+class MockLLMProvider(BaseLLMProvider):
+    @property
+    def provider_name(self) -> str:
+        return "mock"
+
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str = "mock",
+        temperature: float = 0.0,
+        schema_model: Optional[Type[BaseModel]] = None,
+        mock: bool = True,
+        cache: bool = False,
+        circuit_breaker: Any = None,
+    ) -> Any:
+        mock_text = f"[MOCK Provider] Resposta para: {user_prompt[:80]}"
+        if schema_model:
+            return schema_model.model_construct()
+        return mock_text
+
+
 class LLMProviderRegistry:
     """Registro desacoplado de provedores de LLM para orquestração heterogênea."""
     _providers: Dict[str, BaseLLMProvider] = {}
@@ -216,3 +267,28 @@ class LLMProviderRegistry:
 
 
 LLMProviderRegistry.register(OpenCodeCLIProvider())
+LLMProviderRegistry.register(OpenRouterProvider())
+LLMProviderRegistry.register(MockLLMProvider())
+
+
+def execute_llm(
+    system_prompt: str,
+    user_prompt: str,
+    provider_name: str | None = None,
+    model: str = DEFAULT_OPENROUTER_MODEL,
+    schema_model: Optional[Type[BaseModel]] = None,
+    mock: bool = False,
+    cache: bool = True,
+    circuit_breaker: Any = None,
+) -> Any:
+    """Ponto de entrada unificado que consome o LLMProviderRegistry."""
+    target_provider = LLMProviderRegistry.get(provider_name)
+    return target_provider.generate(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model=model,
+        schema_model=schema_model,
+        mock=mock,
+        cache=cache,
+        circuit_breaker=circuit_breaker,
+    )
