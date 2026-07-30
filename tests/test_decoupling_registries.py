@@ -1,5 +1,6 @@
 """Suíte de testes para os padrões Registry de desacoplamento do LoopForge."""
 
+import os
 import pytest
 from lf.config.registry import BaseStackHandler, TechStackRegistry
 from lf.config.schema import resolve_tech_stack

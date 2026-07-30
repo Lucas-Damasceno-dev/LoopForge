@@ -16,9 +16,10 @@ class Base(DeclarativeBase):
 
 
 def _build_database_url(settings: APISettings) -> str:
-    """Retorna URL do banco. Se LF_API_TEST estiver setado, usa SQLite em memória."""
+    """Retorna URL do banco. Se LF_API_TEST estiver setado, usa SQLite de teste."""
     if os.getenv("LF_API_TEST"):
-        return "sqlite+aiosqlite:///:memory:"
+        os.makedirs(".loopforge", exist_ok=True)
+        return "sqlite+aiosqlite:///.loopforge/test_api.sqlite"
     return settings.database_url
 
 
