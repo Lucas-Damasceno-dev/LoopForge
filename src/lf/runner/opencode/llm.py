@@ -115,7 +115,18 @@ Responda SOMENTE o objeto JSON puro."""
                 f"LLM não retornou JSON válido para {schema_model.__name__}. "
                 f"Resposta: {raw_response_text[:500]}"
             )
-        validated = schema_model(**parsed)
+        if isinstance(parsed, dict):
+            validated = schema_model(**parsed)
+        elif isinstance(parsed, list):
+            try:
+                validated = schema_model.model_validate(parsed)
+            except Exception:
+                if len(parsed) > 0 and isinstance(parsed[0], dict):
+                    validated = schema_model(**parsed[0])
+                else:
+                    raise TypeError(f"Não foi possível converter lista para {schema_model.__name__}")
+        else:
+            raise TypeError(f"Formato JSON inesperado para {schema_model.__name__}: {type(parsed)}")
         result_dict = validated.model_dump()
 
         if cache:
