@@ -19,6 +19,12 @@ async def setup_test_db():
     from lf.api.database import Base, engine
     os.environ["LF_API_TEST"] = "1"
     os.environ["LF_API_REQUIRE_AUTH"] = "false"
+    db_file = ".loopforge/test_api.sqlite"
+    if os.path.exists(db_file):
+        try:
+            os.remove(db_file)
+        except Exception:
+            pass
     await init_db()
     if engine is not None:
         async with engine.begin() as conn:
