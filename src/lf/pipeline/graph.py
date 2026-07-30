@@ -20,16 +20,24 @@ from .nodes.tech_lead import tech_lead
 from .state import GraphState
 
 
-def entry_router(state: GraphState) -> Literal["cpo", "developer"]:
-    """Decide o nó de entrada inicial (Fast-Path vs Full-Path)."""
+def entry_router(state: GraphState) -> Literal["cpo", "tech_lead", "developer", "qa"]:
+    """Decide o nó de entrada inicial (patch, review-only, explore, full)."""
     routing_mode = state.get("routing_mode", "full")
     task_type = state.get("task_type", "feature")
 
-    if routing_mode == "fast" or task_type in ("fast", "bugfix", "refactor", "simple"):
-        print("--- ROTEAMENTO ADAPTATIVO: Ativando FAST-PATH (Developer -> QA -> Parallel Audit) ---")
+    if routing_mode == "patch" or task_type in ("patch", "bugfix", "fast", "simple"):
+        print("--- ROTEAMENTO ADAPTATIVO: Modo PATCH (Developer -> QA) ---")
         return "developer"
 
-    print("--- ROTEAMENTO ADAPTATIVO: Ativando FULL-PATH (CPO -> PM -> Tech Lead -> Dev -> QA -> Parallel Audit) ---")
+    if routing_mode == "review-only" or task_type == "review":
+        print("--- ROTEAMENTO ADAPTATIVO: Modo REVIEW-ONLY (QA -> Parallel Audit) ---")
+        return "qa"
+
+    if routing_mode == "explore" or task_type == "explore":
+        print("--- ROTEAMENTO ADAPTATIVO: Modo EXPLORE (Tech Lead Spike) ---")
+        return "tech_lead"
+
+    print("--- ROTEAMENTO ADAPTATIVO: Modo FULL (CPO -> PM -> Tech Lead -> Dev -> QA -> Audit) ---")
     return "cpo"
 
 
@@ -83,7 +91,9 @@ def build_graph(
         entry_router,
         {
             "cpo": "cpo",
+            "tech_lead": "tech_lead",
             "developer": "developer",
+            "qa": "qa",
         },
     )
 

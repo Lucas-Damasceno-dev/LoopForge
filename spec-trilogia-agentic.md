@@ -819,25 +819,25 @@ Converte automaticamente sessões de agentes que falharam ou exigiram intervenç
 - [x] **Suíte de Testes**: Fixtures e testes automatizados em `packages/genome/tests/`
 
 ### 2. 🔗 Agentic Interface Registry (Fase 2)
-- [ ] **Modelos & Storage**: Modelos de contrato e snapshot (`store/models.py`, `store/sqlite.py`)
-- [ ] **Scanner de Interfaces**: Extração de assinaturas e funções exportadas via AST (`core/scanner.py`)
-- [ ] **Detector de Breaking Changes**: Analisador de impacto de contrato (`core/analyzer.py`, `core/checker.py`, `core/differ.py`)
-- [ ] **Watcher & Notifiers**: Monitor de arquivos (`core/tracker.py`) e notificadores (`stdout`, `slack`, `file`)
-- [ ] **CLI & API**: CLI Click (`registry track`, `check`, `diff`, `watch`) e FastAPI server (`serve`)
-- [ ] **Integração LoopForge**: Hooks no Tech Lead, Developer e QA em `src/lf/pipeline/nodes/`
+- [x] **Modelos & Storage**: Modelos de contrato e snapshot (`store/models.py`, `store/sqlite.py`)
+- [x] **Scanner de Interfaces**: Extração de assinaturas e funções exportadas via AST (`core/scanner.py`)
+- [x] **Detector de Breaking Changes**: Analisador de impacto de contrato (`core/analyzer.py`, `core/checker.py`)
+- [x] **Watcher & Notifiers**: Monitor de arquivos (`core/tracker.py`, `cli/cmd_watch.py`) e notificadores (`stdout`, `slack`, `file`)
+- [x] **CLI & API**: CLI Click (`registry track`, `check`, `watch`, `serve`) e FastAPI server (`server/app.py`)
+- [x] **Integração LoopForge**: Hooks no Tech Lead, Developer e QA em `src/lf/pipeline/nodes/`
 
 ### 3. 🧠 Agentic Retro (Fase 3)
-- [ ] **Storage & AgDR Parser**: Parser de logs no formato AgDR (`core/parser.py`) e SQLite store (`store/sqlite.py`)
-- [ ] **Analyzer & Recommender**: Análise de causa raiz/padrões (`core/analyzer.py`, `core/historian.py`) e gerador de sugestões (`core/recommender.py`)
-- [ ] **Renderizador de Relatórios**: Template Markdown e gerador (`report/renderer.py`, `template.md`)
-- [ ] **CLI**: CLI Click (`retro start`, `end`, `analyze`, `list`, `feed`, `suggest`)
-- [ ] **Integração LoopForge**: Hook `on_pipeline_complete` em `src/lf/orchestrator/`
+- [x] **Storage & AgDR Parser**: Parser de logs no formato AgDR (`core/parser.py`) e SQLite store (`store/sqlite.py`)
+- [x] **Analyzer & Recommender**: Análise de causa raiz/padrões (`core/analyzer.py`, `core/historian.py`) e gerador de sugestões (`core/recommender.py`)
+- [x] **Renderizador de Relatórios**: Template Markdown e gerador (`report/renderer.py`, `template.md`)
+- [x] **CLI**: CLI Click (`retro analyze`, `list`, `feed`, `suggest`)
+- [x] **Integração LoopForge**: Hook de síntese no nó `lessons.py` (`src/lf/pipeline/nodes/lessons.py`)
 
 ### 4. 🛠️ Módulos de Expansão & LoopForge Core (Fase 4)
-- [ ] **Roteamento Dinâmico**: Implementar `Router Node` (`patch`, `review-only`, `explore`, `full`) em `src/lf/pipeline/`
-- [ ] **Atribuição Heterogênea**: Mapeamento de LLMs antagônicos por persona
-- [ ] **FlakeIsolator**: Disjuntor de testes flaky em tempo real no nó QA
-- [ ] **FailToEval**: Gerador de benchmarks de regressão a partir de falhas/intervenções humanas
+- [x] **Roteamento Dinâmico**: Implementar `Router Node` (`patch`, `review-only`, `explore`, `full`) em `src/lf/pipeline/graph.py`
+- [x] **Atribuição Heterogênea**: Mapeamento de LLMs antagônicos por persona (CPO/PM: Gemini, Tech Lead/Dev: Claude/DeepSeek, QA: Haiku/antagônico)
+- [x] **FlakeIsolator**: Disjuntor de testes flaky em tempo real (`src/lf/runner/harness/flake_isolator.py`)
+- [x] **FailToEval**: Gerador de benchmarks de regressão a partir de falhas (`src/lf/orchestrator/fail_to_eval.py`)
 
 ---
 

@@ -196,6 +196,16 @@ REGRAS:
 
     _write_project_files(files_map, [output_dir, project_dir])
 
+    # 🔗 Hook do Agentic Interface Registry: rastreia mudanças e verifica quebras de contrato
+    try:
+        from registry import RegistryChecker
+        reg_checker = RegistryChecker(project_dir or ".")
+        breaking_changes = reg_checker.check(agent="developer")
+        if breaking_changes:
+            print(f"--- AVISO: Agentic Registry detectou {len(breaking_changes)} quebras de contrato no nó Developer! ---")
+    except Exception as exc:
+        print(f"--- INFO: Agentic Registry hook ignorado: {exc} ---")
+
     primary_code = files_map.get(default_main) or list(files_map.values())[0]
 
     return {
