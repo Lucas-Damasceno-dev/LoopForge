@@ -16,18 +16,57 @@ def parallel_audit(state: GraphState) -> dict:
     """Executa AppSec e DevOps simultaneamente em paralelo e gera o lessons.md."""
     print("--- EXECUTANDO EM PARALELO: AppSec + DevOps Audit ---")
 
+    timeout_seconds = 300
+    res_appsec: dict = {}
+    res_devops: dict = {}
+    worker_errors: list[str] = []
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_appsec = executor.submit(appsec, state)
         future_devops = executor.submit(devops, state)
+        future_to_worker = {
+            future_appsec: "appsec",
+            future_devops: "devops",
+        }
 
-        res_appsec = future_appsec.result()
-        res_devops = future_devops.result()
+        try:
+            for future in concurrent.futures.as_completed(
+                [future_appsec, future_devops],
+                timeout=timeout_seconds,
+            ):
+                worker = future_to_worker[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    worker_errors.append(f"{worker} falhou: {exc}")
+                    if worker == "appsec":
+                        res_appsec = {"error": f"appsec falhou: {exc}"}
+                    else:
+                        res_devops = {"error": f"devops falhou: {exc}"}
+                    continue
+
+                if worker == "appsec":
+                    res_appsec = result
+                else:
+                    res_devops = result
+        except concurrent.futures.TimeoutError:
+            for future, worker in future_to_worker.items():
+                if not future.done():
+                    future.cancel()
+                    worker_errors.append(f"{worker} timeout após {timeout_seconds}s")
+                    if worker == "appsec":
+                        res_appsec = {"error": f"appsec timeout após {timeout_seconds}s"}
+                    else:
+                        res_devops = {"error": f"devops timeout após {timeout_seconds}s"}
 
     sec_review = res_appsec.get("security_review") or res_appsec.get("security_report", {})
     sec_report = res_appsec.get("security_report") or sec_review
     ops_report = res_devops.get("devops_report") or res_devops.get("devops_manifest", {})
     ops_manifest = res_devops.get("devops_manifest") or ops_report
     err = res_appsec.get("error") or res_devops.get("error")
+    if worker_errors:
+        combined_worker_errors = " | ".join(worker_errors)
+        err = f"{err} | {combined_worker_errors}" if err else combined_worker_errors
 
     next_agent = res_appsec.get("next_agent", "FINISH")
 

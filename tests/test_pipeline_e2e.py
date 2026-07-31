@@ -143,6 +143,8 @@ def test_pipeline_e2e_max_retries_exhausted(initial_state: GraphState):
 
     # Com max_retries=0 e testes falhando, o pipeline deve finalizar
     assert result is not None
+    assert result.get("error")
+    assert "QA retries exhausted" in result.get("error")
     # next_agent deve chegar a FINISH ou __end__
     assert result.get("next_agent") in ("FINISH", "__end__", None)
 

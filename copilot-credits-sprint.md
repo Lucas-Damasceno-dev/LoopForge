@@ -26,8 +26,8 @@
 |---|---|---|---|---|
 | T1 | CI | Corrigir erros de lint + alinhar `--select` do CI com config do pyproject | alta | ✅ concluída |
 | T2 | CI | Ativar gate real de mypy (remover `ignore_errors = true`, corrigir tipos) | alta | ❌ recusada pelo usuário |
-| T3 | Testes | Testes para módulos com 0% cobertura (`fail_to_eval.py`, `flake_isolator.py`) | alta | ✅ escolhida |
-| T4 | Config | Fix bug de precedência no `config/loader.py` (YAML parsing sempre) + teste de regressão | alta | ✅ escolhida |
+| T3 | Testes | Testes para módulos com 0% cobertura (`fail_to_eval.py`, `flake_isolator.py`) | alta | ✅ concluída |
+| T4 | Config | Fix bug de precedência no `config/loader.py` (YAML parsing sempre) + teste de regressão | alta | ✅ concluída |
 | T5 | Pipeline | Tornar `parallel_audit` resiliente: `as_completed(timeout)`, capturar exceção, setar `error` | alta | ✅ escolhida |
 | T6 | Pipeline | Marcar run como falho quando retry esgota (`should_retry` + WS `completed` no dispatcher) | alta | ✅ escolhida |
 | T7 | Runner | Auto-formatter opt-in (`run_auto_formatter` muta projeto do usuário sem flag) | média | ✅ escolhida |
@@ -61,10 +61,15 @@ Tasks paralelas só compartilham arquivos que **não** se sobrepõem. Ordens imp
 | 3 | 2026-07-31 ~17:20 | T1 (tentativa 3) | `... --max-autopilot-continues 5 < /dev/null` | Recusou: "126 E501 é arriscado num turno" — 0 changes, 4.87 créditos. **Re-escopo**: alinhar CI + 3 erros reais | 4.87 |
 | 4 | 2026-07-31 ~17:30 | T1 (tentativa 4/final) | `... T1-FINAL < /dev/null` | ✅ Concluída: ci.yml sem `--select`; SIM105/SIM102/F841 corrigidos; ruff "All checks passed" (config) + pytest verde. Sessão resumível: `3fc41788-726a-4886-add5-17bf005b1344` | 5.98 |
 | 5 | 2026-07-31 ~17:40 | T1 (pós) | fix direto (orquestrador) | W292 residual em `tests/test_main.py` (newline final) corrigido via printf — ruff "All checks passed" + pytest test_main 1 passed | 0 |
-| 6 | 2026-07-31 ~18:00 | T3 (Onda 2) | testes p/ fail_to_eval.py + flake_isolator.py (PID 21628) | ⏳ em execução | — |
-| 7 | 2026-07-31 ~18:00 | T4 (Onda 2) | fix precedência loader.py + teste (PID 21654) | ⏳ em execução | — |
-| 8 | 2026-07-31 ~18:00 | T7 (Onda 2) | auto-formatter opt-in + teste (PID 21709) | ⏳ em execução | — |
-| 9 | 2026-07-31 ~18:00 | T11 (Onda 2) | fix detect_test_command falso positivo + teste (PID 21761) | ⏳ em execução | — |
+| 6 | 2026-07-31 ~18:00 | T3 (Onda 2) | testes p/ fail_to_eval.py + flake_isolator.py (PID 21628) | ✅ 11 testes (4+7), isolado 11 passed; suíte completa 173 passed/1 skipped. Sessão: `0d3b143c-037f-421c-b047-c4de252b0ed8` | 12.10 |
+| 7 | 2026-07-31 ~18:00 | T4 (Onda 2) | fix precedência loader.py + teste (PID 21654) | ✅ 5 testes; +1 de regressão adicionado pelo orquestrador (`.json` com `null` → default, pina o bug real) = 6 testes. Verificado por mim: 6 passed. Sessão: `1064b400-5c70-4dfa-aed4-d4d6a11b8ab5` | 5.12 |
+| 8 | 2026-07-31 ~18:00 | T7 (Onda 2) | auto-formatter opt-in + teste (PID 21709) | ✅ `auto_format: bool = False` no `__init__`, run() só formata se True; test_auto_formatter.py cobre opt-in (11 passed isolado). Sessão: `5e29402a-a772-4dbd-b4cb-3d5d8f7451f8` | 4.95 |
+| 9 | 2026-07-31 ~18:00 | T11 (Onda 2) | fix detect_test_command falso positivo + teste (PID 21761) | ✅ PythonStackHandler exige evidência real (tests/, conftest.py, config pytest); contrato `str\|None` consistente; 4 testes. Sessão: `4f40144e-4e32-4c16-a010-f853b305d822` | 8.36 |
+| 10 | 2026-07-31 ~18:20 | Onda 2 (verificação) | exp-2 (explorer) reutilizado | ✅ Aprovado: sem mutação fora do escopo; ajustes menores aplicados (teste T4 + W292). **Lições**: erros `sqlite3 disk I/O` nos runs paralelos eram artefato de 4 pytest concorrentes no mesmo `.sqlite` — re-rodar suíte sequencial para validar; processo LoopForge em background reescreveu test_main.py (W292 voltou) — re-aplicar fix | 0 |
+| 11 | 2026-07-31 ~18:40 | T5 (Onda 3) | parallel_audit resiliente: as_completed(timeout) + try/except (PID 27687) | ⏳ em execução | — |
+| 12 | 2026-07-31 ~18:40 | T6 (Onda 3) | retry esgotado → run falho (graph.py + task_dispatcher.py) (PID 27712) | ⏳ em execução | — |
+| 13 | 2026-07-31 ~18:40 | T8 (Onda 3) | testes qa.py + llm_factory.py (cobertura) (PID 27751) | ⏳ em execução | — |
+| 14 | 2026-07-31 ~18:40 | T9 (Onda 3) | Literal + constraints em schema.py (PID 27800) | ⏳ em execução | — |
 
 ## Checklist pós-sprint
 

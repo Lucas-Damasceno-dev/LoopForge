@@ -52,9 +52,9 @@ class TaskSchema(BaseModel):
     max_retries: int = 3
     depends_on: list[str] = Field(default_factory=list)
     stack: str | None = Field(None, description="Stack tecnológica opcional")
-    routing_mode: str = "full"
-    task_type: str = "feature"
-    complexity_level: str = "standard"  # "mvp", "standard", "advanced"
+    routing_mode: Literal["full", "fast", "patch", "review-only", "explore"] = "full"
+    task_type: Literal["feature", "bugfix", "patch", "review", "explore", "fast", "simple"] = "feature"
+    complexity_level: Literal["mvp", "standard", "advanced"] = "standard"
 
     def __getitem__(self, item: str) -> Any:
         if item == "persona":
@@ -90,6 +90,6 @@ class LoopForgeConfig(BaseModel):
     stack: TechStack = Field(default_factory=TechStack)
     llm_provider: str = "google"
     llm_model: str = "gemini-1.5-flash"
-    budget_limit_usd: float = 10.0
-    max_parallel_tasks: int = 2
+    budget_limit_usd: float = Field(10.0, ge=0)
+    max_parallel_tasks: int = Field(2, gt=0)
     plan: PlanSchema = Field(default_factory=PlanSchema)

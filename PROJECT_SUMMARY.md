@@ -1,15 +1,15 @@
-# 📊 Project Executive Summary: Corrigir bug na função de cálculo de impostos
+# 📊 Project Executive Summary: Criar sistema de tarefas
 
 ![QA Status](https://img.shields.io/badge/QA-PASS-brightgreen)
 ![Security Audit](https://img.shields.io/badge/AppSec-PASS-brightgreen)
-![Stack](https://img.shields.io/badge/Stack-NÃO ESPECIFICADA-blue)
+![Stack](https://img.shields.io/badge/Stack-PYTHON-blue)
 
-> **Stack:** `Não especificada` | **Status QA:** `PASS` (10/10) | **Data:** 2026-07-31 20:51:12 UTC
+> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-07-31 20:56:58 UTC
 
 ## 🏗️ Diagrama de Arquitetura do Projeto Gerado
 ```mermaid
 graph TD
-    Client[Client / User] --> API[API Service (NÃO ESPECIFICADA)]
+    Client[Client / User] --> API[API Service (PYTHON)]
     API --> Logic[Business Logic Core]
     Logic --> Tests[QA Test Suite (PASS)]
 ```

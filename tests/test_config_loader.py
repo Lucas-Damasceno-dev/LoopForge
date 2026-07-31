@@ -47,6 +47,16 @@ def test_load_config_arquivo_vazio_retorna_default(tmp_path: pytest.TempPathFact
     assert config.model_dump() == load_config(tmp_path / "inexistente.json").model_dump()
 
 
+def test_load_config_json_null_retorna_default(tmp_path: pytest.TempPathFactory) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text("null", encoding="utf-8")
+
+    config = load_config(config_path)
+
+    assert config.llm_provider == "google"
+    assert config.model_dump() == load_config(tmp_path / "inexistente.json").model_dump()
+
+
 def test_load_config_arquivo_inexistente_preserva_comportamento_atual(
     tmp_path: pytest.TempPathFactory,
 ) -> None:

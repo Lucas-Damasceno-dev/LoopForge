@@ -511,8 +511,10 @@ class TaskDispatcher:
                 if not approved:
                     result["error"] = "Review mode rejected by user"
 
-            self._broadcast_ws("pipeline_finished", task.id, {
-                "status": "completed" if not result.get("error") else "failed",
+            final_status = "completed" if not result.get("error") else "failed"
+            final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
+            self._broadcast_ws(final_event, task.id, {
+                "status": final_status,
                 "error": result.get("error"),
             })
 
@@ -568,8 +570,10 @@ class TaskDispatcher:
             state_snapshot = graph.get_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
-            self._broadcast_ws("pipeline_finished", task_id, {
-                "status": "completed" if not result.get("error") else "failed",
+            final_status = "completed" if not result.get("error") else "failed"
+            final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
+            self._broadcast_ws(final_event, task_id, {
+                "status": final_status,
                 "error": result.get("error"),
             })
 
