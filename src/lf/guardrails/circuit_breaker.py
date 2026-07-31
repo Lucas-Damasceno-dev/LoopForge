@@ -105,7 +105,7 @@ class CircuitBreaker:
         return self.__getstate__()
 
     @classmethod
-    def from_snapshot(cls, data: dict) -> "CircuitBreaker":
+    def from_snapshot(cls, data: dict) -> CircuitBreaker:
         """Reconstrói o objeto a partir de um snapshot (dict de primitivos)."""
         cb = cls.__new__(cls)
         cb.__setstate__(data)

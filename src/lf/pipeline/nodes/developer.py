@@ -15,6 +15,7 @@ from pathlib import Path
 
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
+from ...guardrails.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
