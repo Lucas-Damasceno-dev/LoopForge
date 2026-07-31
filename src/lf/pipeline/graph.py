@@ -67,10 +67,9 @@ def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "_
     if qa_attempt < max_retries:
         return "developer"
 
-    state["error"] = (
-        f"QA retries exhausted after {qa_attempt} attempt(s) with failing tests "
-        f"(max_retries={max_retries})."
-    )
+    # NOTA: NÃO mutar o estado aqui — should_retry é função de aresta condicional do LangGraph
+    # e mutações in-place não propagam para o estado final. O erro de retries esgotados é
+    # setado dentro do nó parallel_audit (cujo retorno é propagado pelo grafo).
     print("--- AVISO: Retentativas de QA esgotadas. Executando auditoria final e gerando lições aprendidas... ---")
     return "parallel_audit"
 

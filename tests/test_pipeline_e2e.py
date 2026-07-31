@@ -132,11 +132,22 @@ def test_pipeline_e2e_no_crash_on_missing_fields():
     assert "error" not in result or result.get("error") is None
 
 
-def test_pipeline_e2e_max_retries_exhausted(initial_state: GraphState):
+def test_pipeline_e2e_max_retries_exhausted(initial_state: GraphState, monkeypatch):
     """Verifica comportamento quando max_retries é atingido."""
     initial_state["max_retries"] = 0  # Zero retries = falha imediata
-    # Força QA a reportar falhas
-    initial_state["test_report"] = {"summary": {"tests_failed": 1, "total_tests": 1}}
+
+    # O nó QA em mock sobrescreve test_report com PASS (qa._mock_report);
+    # patcheamos para reportar FAIL e assim exercitar o caminho de exaustão.
+    from lf.pipeline.nodes.qa import _mock_report
+
+    def _failing_mock_report(report_id: str, timestamp: str) -> dict:
+        report = _mock_report(report_id, timestamp)
+        report["summary"]["status"] = "FAIL"
+        report["summary"]["tests_passed"] = 0
+        report["summary"]["tests_failed"] = 10
+        return report
+
+    monkeypatch.setattr("lf.pipeline.nodes.qa._mock_report", _failing_mock_report)
 
     graph = build_graph()
     result = graph.invoke(initial_state)

@@ -68,6 +68,21 @@ def parallel_audit(state: GraphState) -> dict:
         combined_worker_errors = " | ".join(worker_errors)
         err = f"{err} | {combined_worker_errors}" if err else combined_worker_errors
 
+    # Retries de QA esgotados com testes ainda falhando: registrar o erro aqui (no nó),
+    # pois mutações no should_retry (aresta condicional) não propagam no LangGraph.
+    test_report = state.get("test_report", {})
+    tests_failed = (
+        test_report.get("summary", {}).get("tests_failed", 1) if isinstance(test_report, dict) else 1
+    )
+    qa_attempt = state.get("qa_attempt_count", 0)
+    max_retries = state.get("max_retries", 3)
+    if tests_failed and qa_attempt >= max_retries:
+        retry_error = (
+            f"QA retries exhausted after {qa_attempt} attempt(s) with failing tests "
+            f"(max_retries={max_retries})."
+        )
+        err = f"{err} | {retry_error}" if err else retry_error
+
     next_agent = res_appsec.get("next_agent", "FINISH")
 
     updated_state = {
