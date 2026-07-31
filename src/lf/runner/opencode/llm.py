@@ -90,15 +90,12 @@ Responda SOMENTE o objeto JSON puro."""
                 system_prompt=system_prompt,
             )
         except Exception as e:
-            if is_default_or:
-                print(f"--- AVISO: OpenRouter API falhou ({e}), tentando OpenCodeRunner fallback ---")
-                runner = OpenCodeRunner(timeout_seconds=300)
-                result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
-                if not result.success:
-                    raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
-                raw_response_text = result.clean_stdout
-            else:
-                raise
+            print(f"--- AVISO: LLM API ({model_name}) falhou após retentativas ({e}). Executando OpenCodeRunner fallback ---")
+            runner = OpenCodeRunner(timeout_seconds=300)
+            result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
+            if not result.success:
+                raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
+            raw_response_text = result.clean_stdout
     else:
         runner = OpenCodeRunner(timeout_seconds=300)
         result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)

@@ -27,9 +27,12 @@ def call_openrouter_api(
     api_key: str | None = None,
     base_url: str | None = None,
     system_prompt: str | None = None,
+    max_retries: int = 2,
 ) -> tuple[str, dict | None]:
-    """Helper para chamadas OpenRouter API via httpx."""
+    """Helper para chamadas OpenRouter API via httpx com retentativas automáticas e backoff."""
+    import time
     import httpx
+
     target_model = model or os.environ.get("OPENROUTER_MODEL") or DEFAULT_OPENROUTER_MODEL
     key = api_key or os.environ.get("OPENROUTER_API_KEY", "") or DEFAULT_OPENROUTER_KEY
     if not key:
@@ -52,39 +55,51 @@ def call_openrouter_api(
         "stream": False,
     }
 
-    timeout_val = float(os.environ.get("OPENROUTER_TIMEOUT", "180"))
-    resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_val)
-    if resp.status_code == 200:
-        raw_text = resp.text if hasattr(resp, "text") and isinstance(resp.text, str) else ""
-        raw_text = raw_text.strip()
-        if raw_text.startswith("data:") or "\ndata: {" in raw_text:
-            chunks = []
-            usage = None
-            for line in raw_text.splitlines():
-                line = line.strip()
-                if line.startswith("data: ") and line != "data: [DONE]":
-                    try:
-                        cdata = json.loads(line[6:])
-                        choices = cdata.get("choices", [])
-                        if choices:
-                            delta = choices[0].get("delta", {})
-                            content = delta.get("content") or choices[0].get("message", {}).get("content")
-                            if content:
-                                chunks.append(content)
-                        if cdata.get("usage"):
-                            usage = cdata["usage"]
-                    except Exception:
-                        pass
-            return "".join(chunks), usage
-        else:
-            data = resp.json()
-            choice = data["choices"][0]
-            msg = choice.get("message", {})
-            text = msg.get("content") or choice.get("delta", {}).get("content", "")
-            usage = data.get("usage")
-            return text, usage
+    base_timeout = float(os.environ.get("OPENROUTER_TIMEOUT", "120"))
+    last_error: Exception | None = None
 
-    raise RuntimeError(f"OpenRouter API request failed with status {resp.status_code}: {resp.text}")
+    for attempt in range(max_retries + 1):
+        try:
+            timeout_val = base_timeout * (1.0 + attempt * 0.5)
+            resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_val)
+            if resp.status_code == 200:
+                raw_text = resp.text if hasattr(resp, "text") and isinstance(resp.text, str) else ""
+                raw_text = raw_text.strip()
+                if raw_text.startswith("data:") or "\ndata: {" in raw_text:
+                    chunks = []
+                    usage = None
+                    for line in raw_text.splitlines():
+                        line = line.strip()
+                        if line.startswith("data: ") and line != "data: [DONE]":
+                            try:
+                                cdata = json.loads(line[6:])
+                                choices = cdata.get("choices", [])
+                                if choices:
+                                    delta = choices[0].get("delta", {})
+                                    content = delta.get("content") or choices[0].get("message", {}).get("content")
+                                    if content:
+                                        chunks.append(content)
+                                if cdata.get("usage"):
+                                    usage = cdata["usage"]
+                            except Exception:
+                                pass
+                    return "".join(chunks), usage
+                else:
+                    data = resp.json()
+                    choice = data["choices"][0]
+                    msg = choice.get("message", {})
+                    text = msg.get("content") or choice.get("delta", {}).get("content", "")
+                    usage = data.get("usage")
+                    return text, usage
+            else:
+                last_error = RuntimeError(f"OpenRouter API request failed with status {resp.status_code}: {resp.text[:200]}")
+        except Exception as err:
+            last_error = err
+            if attempt < max_retries:
+                print(f"--- AVISO: Chamada LLM API (tentativa {attempt + 1}/{max_retries + 1}) falhou ({err}). Retentando em {(attempt + 1) * 2}s... ---")
+                time.sleep((attempt + 1) * 2)
+
+    raise last_error or RuntimeError("OpenRouter API request failed after retries")
 
 
 def compress_prompt(text: str, max_chars: int = 6000) -> str:
