@@ -1,10 +1,11 @@
 """Testes unitários e E2E para error recovery com checkpoint e o comando CLI 'lf resume'."""
 
 import os
+
 from click.testing import CliRunner
 
-from lf.config.schema import TaskSchema
 from lf.cli.commands.resume import resume_cmd
+from lf.config.schema import TaskSchema
 from lf.orchestrator.task_dispatcher import TaskDispatcher
 
 

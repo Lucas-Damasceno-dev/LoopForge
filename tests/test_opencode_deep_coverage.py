@@ -11,7 +11,10 @@ from pydantic import BaseModel, Field
 
 from lf.guardrails.circuit_breaker import CircuitBreaker
 from lf.pipeline.llm_factory import SQLiteLLMCache
-from lf.runner.opencode.llm import _extract_json_from_text, _mock_response, call_llm_via_opencode
+from lf.runner.opencode.llm import (
+    _mock_response,
+    call_llm_via_opencode,
+)
 from lf.runner.opencode.models import OpenCodeResult
 from lf.runner.opencode.runner import OpenCodeRunner, detect_changed_files
 
@@ -39,37 +42,34 @@ def test_opencode_runner_circuit_breaker_open():
 
 def test_opencode_runner_real_subprocess_success(tmp_path):
     runner = OpenCodeRunner(timeout_seconds=10)
-    with patch("shutil.which", return_value="/usr/bin/opencode"):
-        with patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = subprocess.CompletedProcess(
-                    args=[], returncode=0, stdout="opencode output", stderr=""
-                )
-                res = runner.run("create app", project_root=tmp_path)
-                assert res.success is True
-                assert res.stdout == "opencode output"
+    with patch("shutil.which", return_value="/usr/bin/opencode"), patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="opencode output", stderr=""
+            )
+            res = runner.run("create app", project_root=tmp_path)
+            assert res.success is True
+            assert res.stdout == "opencode output"
 
 
 def test_opencode_runner_timeout_expired(tmp_path):
     runner = OpenCodeRunner(timeout_seconds=5)
-    with patch("shutil.which", return_value="/usr/bin/opencode"):
-        with patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
-            with patch("subprocess.run") as mock_run:
-                mock_run.side_effect = subprocess.TimeoutExpired(cmd="opencode", timeout=5, output="partial")
-                res = runner.run("slow task", project_root=tmp_path)
-                assert res.exit_code == 124
-                assert "timed out" in res.stderr
+    with patch("shutil.which", return_value="/usr/bin/opencode"), patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(cmd="opencode", timeout=5, output="partial")
+            res = runner.run("slow task", project_root=tmp_path)
+            assert res.exit_code == 124
+            assert "timed out" in res.stderr
 
 
 def test_opencode_runner_general_exception(tmp_path):
     runner = OpenCodeRunner(timeout_seconds=5)
-    with patch("shutil.which", return_value="/usr/bin/opencode"):
-        with patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
-            with patch("subprocess.run") as mock_run:
-                mock_run.side_effect = Exception("OS Subprocess Error")
-                res = runner.run("failing task", project_root=tmp_path)
-                assert res.exit_code == 1
-                assert "OS Subprocess Error" in res.stderr
+    with patch("shutil.which", return_value="/usr/bin/opencode"), patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = Exception("OS Subprocess Error")
+            res = runner.run("failing task", project_root=tmp_path)
+            assert res.exit_code == 1
+            assert "OS Subprocess Error" in res.stderr
 
 
 def test_detect_changed_files_git_status(tmp_path):

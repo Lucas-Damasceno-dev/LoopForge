@@ -134,7 +134,7 @@ def build_graph(
         },
     )
 
-    for source_node in NodeRegistry.get_all().keys():
+    for source_node in NodeRegistry.get_all():
         if source_node == "qa":
             workflow.add_conditional_edges(
                 "qa",

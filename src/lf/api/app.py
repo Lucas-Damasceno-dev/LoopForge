@@ -6,7 +6,16 @@ import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
@@ -16,7 +25,6 @@ from lf.api.auth import verify_authentication
 from lf.api.config import get_api_settings
 from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
-
 from lf.api.models import HumanDecisionModel, PipelineRun
 from lf.api.schemas import (
     HealthResponse,
@@ -27,7 +35,6 @@ from lf.api.schemas import (
     RunResponse,
     RunUpdate,
 )
-
 from lf.api.websocket_manager import ws_manager
 
 
@@ -418,7 +425,7 @@ def create_app() -> FastAPI:
             learnings = analyzer.extract_learnings()
             return {
                 "sessions_count": len(sessions),
-                "learnings": [l.model_dump() for l in learnings],
+                "learnings": [item.model_dump() for item in learnings],
             }
         except Exception as e:
             return {"error": str(e), "learnings": []}
@@ -438,6 +445,7 @@ async def _execute_pipeline_in_background(
     import asyncio
     import os
     import time
+
     from lf.api.database import session_factory
     from lf.api.models import PipelineRun
     from lf.config.schema import TaskSchema

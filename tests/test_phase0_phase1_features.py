@@ -1,15 +1,10 @@
 """Testes de validação para Decisão de Stack pelo Tech Lead, lessons.md e lf pr."""
-import os
-import pytest
-from pathlib import Path
 from click.testing import CliRunner
 
 from lf.cli.commands.pr import create_git_pr, pr_cmd
-from lf.cli.commands.run import run_cmd
-from lf.orchestrator.task_dispatcher import TaskDispatcher
 from lf.pipeline.nodes.developer import developer
 from lf.pipeline.nodes.lessons import generate_lessons_md
-from lf.pipeline.nodes.qa import _run_harness, qa
+from lf.pipeline.nodes.qa import qa
 from lf.pipeline.nodes.tech_lead import tech_lead
 
 

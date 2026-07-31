@@ -1,8 +1,10 @@
 """Testes da API REST, WebSockets e Auth do LoopForge v6 (Módulo Core lf.api)."""
 
+import contextlib
 import os
 
 import pytest
+import pytest_asyncio
 from click.testing import CliRunner
 from httpx import ASGITransport, AsyncClient
 
@@ -10,8 +12,6 @@ from lf.api.app import create_app
 from lf.api.database import close_db, init_db
 from lf.cli.commands.serve import serve_cmd
 
-
-import pytest_asyncio
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_test_db():
@@ -21,10 +21,8 @@ async def setup_test_db():
     os.environ["LF_API_REQUIRE_AUTH"] = "false"
     db_file = ".loopforge/test_api.sqlite"
     if os.path.exists(db_file):
-        try:
+        with contextlib.suppress(Exception):
             os.remove(db_file)
-        except Exception:
-            pass
     await init_db()
     if engine is not None:
         async with engine.begin() as conn:

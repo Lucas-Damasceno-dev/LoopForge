@@ -9,7 +9,7 @@ class GitCheckpointManager:
     def create_checkpoint(self, message: str) -> str:
         """Creates git commit checkpoint."""
         subprocess.run(["git", "add", "."], cwd=self.repo_path, capture_output=True)
-        res = subprocess.run(
+        subprocess.run(
             ["git", "commit", "-m", f"checkpoint: {message}"],
             cwd=self.repo_path,
             capture_output=True,

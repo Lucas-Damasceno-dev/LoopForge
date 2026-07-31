@@ -2,8 +2,7 @@
 
 import json
 import os
-from datetime import datetime, timezone
-from typing import Dict, Optional
+from datetime import UTC, datetime
 
 
 class FailToEval:
@@ -16,11 +15,11 @@ class FailToEval:
         self,
         task_id: str,
         prompt: str,
-        initial_files: Dict[str, str],
-        expected_patch_files: Dict[str, str],
+        initial_files: dict[str, str],
+        expected_patch_files: dict[str, str],
         failure_reason: str = "QA Failure / Human Interrupt",
     ) -> str:
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         benchmark_id = f"bench_{task_id}_{int(datetime.now().timestamp())}"
 
         data = {

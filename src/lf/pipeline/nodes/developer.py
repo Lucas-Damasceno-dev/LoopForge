@@ -4,14 +4,13 @@ Nó Developer: recebe a stack decidida pelo Tech Lead e gera um projeto MULTI-AR
 """
 from __future__ import annotations
 
+import json
 import os
 import re
-from pathlib import Path
-
-import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
@@ -24,7 +23,7 @@ def _log_telemetry_event(event_type: str, details: dict) -> None:
         conn = sqlite3.connect(str(db_path), timeout=5.0)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("CREATE TABLE IF NOT EXISTS telemetry_events (id TEXT PRIMARY KEY, event_type TEXT, details TEXT, timestamp TEXT)")
-        conn.execute("INSERT INTO telemetry_events VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), event_type, json.dumps(details), datetime.now(timezone.utc).isoformat()))
+        conn.execute("INSERT INTO telemetry_events VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), event_type, json.dumps(details), datetime.now(UTC).isoformat()))
         conn.commit()
         conn.close()
     except Exception:
@@ -304,11 +303,29 @@ def _generate_mock_project(stack: str) -> dict[str, str]:
         }
 
 
+PROTECTED_ROOT_FILES = {
+    "pyproject.toml",
+    ".loopforge.json",
+    "AGENTS.md",
+    "README.md",
+    "uv.lock",
+}
+
+
 def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
     for base_dir in set(target_dirs):
         if not base_dir:
             continue
+        base_path = Path(base_dir).resolve()
+        is_repo_root = (base_path == repo_root)
+
         for rel_path, content in files_map.items():
+            norm_rel = os.path.normpath(rel_path)
+            if is_repo_root and (norm_rel in PROTECTED_ROOT_FILES or norm_rel.startswith(".github")):
+                print(f"--- AVISO: Dogfooding Protection ativado: Bloqueada sobrescrita do arquivo do repositório '{rel_path}' ---")
+                continue
+
             full_path = os.path.join(base_dir, rel_path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:

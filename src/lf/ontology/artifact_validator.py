@@ -4,6 +4,7 @@ Compila schemas JSON em Pydantic models dinâmicos.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Any
@@ -53,7 +54,7 @@ class ArtifactValidator:
             if prop_name in required:
                 fields[prop_name] = (field_type, ...)
             else:
-                fields[prop_name] = (Optional[field_type], None)
+                fields[prop_name] = (field_type | None, None)
 
         model = create_model(schema_id, **fields)
         self._cache[schema_id] = model
@@ -112,7 +113,5 @@ class ArtifactValidator:
 # from __future__ import annotations
 
 # Importação condicional para evitar erros de importação
-try:
-    from typing import Optional
-except ImportError:
+with contextlib.suppress(ImportError):
     pass

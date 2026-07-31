@@ -1,14 +1,16 @@
-import hashlib
 import json
 import os
 import re
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any
+
 from pydantic import BaseModel
 
-from langchain_core.language_models.fake import FakeListLLM
+from .cache import SQLiteLLMCache, _connect_sqlite, _semantic_normalize_prompt
+
+__all__ = ["SQLiteLLMCache", "_semantic_normalize_prompt"]
 
 DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "auto/best-free")
 DEFAULT_OPENROUTER_KEY = ""
@@ -95,9 +97,6 @@ def compress_prompt(text: str, max_chars: int = 6000) -> str:
         half = max_chars // 2
         compressed = compressed[:half] + "\n\n[... PROMPT COMPRESSÃO SEMÂNTICA LOOPFORGE ...]\n\n" + compressed[-half:]
     return compressed.strip()
-
-
-from .cache import SQLiteLLMCache, _connect_sqlite, _semantic_normalize_prompt
 
 
 class CostTracker:
@@ -208,7 +207,7 @@ class BaseLLMProvider(ABC):
         user_prompt: str,
         model: str = DEFAULT_OPENROUTER_MODEL,
         temperature: float = 0.2,
-        schema_model: Optional[Type[BaseModel]] = None,
+        schema_model: type[BaseModel] | None = None,
         mock: bool = False,
         cache: bool = True,
         circuit_breaker: Any = None,
@@ -227,7 +226,7 @@ class OpenCodeCLIProvider(BaseLLMProvider):
         user_prompt: str,
         model: str = DEFAULT_OPENROUTER_MODEL,
         temperature: float = 0.2,
-        schema_model: Optional[Type[BaseModel]] = None,
+        schema_model: type[BaseModel] | None = None,
         mock: bool = False,
         cache: bool = True,
         circuit_breaker: Any = None,
@@ -256,7 +255,7 @@ class OpenRouterProvider(BaseLLMProvider):
         user_prompt: str,
         model: str = DEFAULT_OPENROUTER_MODEL,
         temperature: float = 0.2,
-        schema_model: Optional[Type[BaseModel]] = None,
+        schema_model: type[BaseModel] | None = None,
         mock: bool = False,
         cache: bool = True,
         circuit_breaker: Any = None,
@@ -288,7 +287,7 @@ class MockLLMProvider(BaseLLMProvider):
         user_prompt: str,
         model: str = "mock",
         temperature: float = 0.0,
-        schema_model: Optional[Type[BaseModel]] = None,
+        schema_model: type[BaseModel] | None = None,
         mock: bool = True,
         cache: bool = False,
         circuit_breaker: Any = None,
@@ -301,7 +300,7 @@ class MockLLMProvider(BaseLLMProvider):
 
 class LLMProviderRegistry:
     """Registro desacoplado de provedores de LLM para orquestração heterogênea."""
-    _providers: Dict[str, BaseLLMProvider] = {}
+    _providers: dict[str, BaseLLMProvider] = {}
     _default_provider: str = "opencode"
 
     @classmethod
@@ -309,7 +308,7 @@ class LLMProviderRegistry:
         cls._providers[provider.provider_name.lower()] = provider
 
     @classmethod
-    def get(cls, name: Optional[str] = None) -> BaseLLMProvider:
+    def get(cls, name: str | None = None) -> BaseLLMProvider:
         target = (name or cls._default_provider).lower()
         return cls._providers.get(target, cls._providers.get("opencode", OpenCodeCLIProvider()))
 
@@ -324,7 +323,7 @@ def execute_llm(
     user_prompt: str,
     provider_name: str | None = None,
     model: str = DEFAULT_OPENROUTER_MODEL,
-    schema_model: Optional[Type[BaseModel]] = None,
+    schema_model: type[BaseModel] | None = None,
     mock: bool = False,
     cache: bool = True,
     circuit_breaker: Any = None,

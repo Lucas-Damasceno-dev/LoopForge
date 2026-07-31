@@ -1,14 +1,17 @@
 """Suíte de testes para validar Benchmark ELO, GitHub Action, Otimizações LLM, Dashboard WS, CLI e Auditoria Paralela."""
-import os
-import pytest
 from pathlib import Path
+
 from click.testing import CliRunner
 
 from lf.cli.commands.benchmark import benchmark_cmd
 from lf.cli.main import main as cli_main
-from lf.pipeline.llm_factory import SQLiteLLMCache, _semantic_normalize_prompt, compress_prompt
+from lf.pipeline.llm_factory import (
+    SQLiteLLMCache,
+    _semantic_normalize_prompt,
+    compress_prompt,
+)
 from lf.pipeline.nodes.parallel_audit import parallel_audit
-from lf.telemetry.benchmark import BenchmarkSuite, RunBenchmark
+from lf.telemetry.benchmark import BenchmarkSuite
 from lf.telemetry.benchmark_dataset import CURATED_BENCHMARK_PROBLEMS
 
 

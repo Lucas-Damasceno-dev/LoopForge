@@ -1,4 +1,3 @@
-import hashlib
 import json
 import os
 from datetime import UTC
@@ -73,9 +72,9 @@ Responda SOMENTE o objeto JSON puro."""
         final_prompt = full_prompt
 
     from ...pipeline.llm_factory import (
+        _DEFAULT_OPENROUTER_BASE_URL,
         DEFAULT_OPENROUTER_KEY,
         DEFAULT_OPENROUTER_MODEL,
-        _DEFAULT_OPENROUTER_BASE_URL,
         call_openrouter_api,
     )
     openrouter_key = os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY

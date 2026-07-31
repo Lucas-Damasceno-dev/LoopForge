@@ -9,7 +9,6 @@ import os
 import subprocess
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -152,6 +151,7 @@ O relatório DEVE ter:
 def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> dict:
     """Executa testes utilizando o TestHarnessRunner unificado do LoopForge."""
     from dataclasses import asdict
+
     from ...runner.harness.runner import TestHarnessRunner
     target_dir = project_dir if (project_dir and os.path.exists(project_dir)) else output_dir
     runner = TestHarnessRunner(stack=stack)

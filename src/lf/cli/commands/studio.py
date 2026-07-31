@@ -1,7 +1,6 @@
 """Comando CLI 'lf studio' / 'lf ui' para exibir o Terminal Studio TUI do LoopForge v6."""
 from __future__ import annotations
 
-import sys
 import time
 
 import click
@@ -111,7 +110,7 @@ def studio_cmd(duration: int):
     start_time = time.time()
     idx = 3
 
-    with Live(layout, refresh_per_second=4, screen=False) as live:
+    with Live(layout, refresh_per_second=4, screen=False):
         while time.time() - start_time < duration:
             current_node = nodes_sequence[idx % len(nodes_sequence)]
             layout["main"]["pipeline_graph"].update(build_pipeline_panel(current_node))

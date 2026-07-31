@@ -38,10 +38,7 @@ def create_plan_from_vision(vision_path_or_text: str, output_dir: str, routing_m
     else:
         vision = vision_path_or_text
 
-    if routing_mode == "fast":
-        persona_flow = ["developer", "qa"]
-    else:
-        persona_flow = ["cpo", "pm", "tech_lead", "developer", "qa"]
+    persona_flow = ["developer", "qa"] if routing_mode == "fast" else ["cpo", "pm", "tech_lead", "developer", "qa"]
 
     tasks: list[TaskSchema] = []
     for i, persona in enumerate(persona_flow):

@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class TaskState(str, Enum):
+class TaskState(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     VALIDATING = "validating"
@@ -9,7 +9,7 @@ class TaskState(str, Enum):
     DONE = "done"
 
 
-class PipelineNode(str, Enum):
+class PipelineNode(StrEnum):
     CPO = "cpo"
     PM = "pm"
     TECH_LEAD = "tech_lead"

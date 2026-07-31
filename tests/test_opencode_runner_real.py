@@ -1,7 +1,6 @@
 """Testes de execução real do OpenCodeRunner e TestHarnessRunner."""
-from pathlib import Path
-from lf.runner.opencode.runner import OpenCodeRunner
 from lf.config.registry import TechStackRegistry
+from lf.runner.opencode.runner import OpenCodeRunner
 
 
 def test_opencode_runner_initialization():

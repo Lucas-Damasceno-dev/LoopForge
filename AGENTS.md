@@ -9,9 +9,9 @@
 
 ## Test & Verify
 
-- Active test suite: `tests/` (31 files). **`tests_py/` is empty/deprecated** — do not add tests there.
-- Local: `pytest tests/`. CI targets `tests_py/` (discrepancy — CI may run zero tests).
-- CI pipeline order: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests_py` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests_py/`.
+- Active test suite: `tests/` (32 files).
+- Local & CI: `pytest tests/`. CI targets `tests/`.
+- CI pipeline order: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests/`.
 - CI matrix: Python 3.11 + 3.12.
 
 ## Architecture
@@ -39,7 +39,7 @@
 
 ## LLM & Environment
 
-- Primary provider: **OpenRouter** (`OPENROUTER_API_KEY`). Default model: `inclusionai/ling-3.0-flash:free` (or `OPENROUTER_MODEL`).
+- Primary provider: **OpenRouter** (`OPENROUTER_API_KEY`). Default model: `oc/deepseek-v4-flash-free` (or `OPENROUTER_MODEL`).
 - Fallback: Google GenAI (`GEMINI_API_KEY`).
 - Mock mode: `--mock` flag or `OPENCODE_MOCK=1`. When set or `opencode` binary not found, returns mock responses (no subprocess).
 - OpenCode subprocess uses: `script -q -c "opencode run 'PROMPT' -m MODEL --pure" /dev/null`.

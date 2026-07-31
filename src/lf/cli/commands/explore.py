@@ -1,6 +1,7 @@
 """Comando CLI 'lf explore' para navegar interativamente pelo histórico de execuções e decisões humanas."""
 import sqlite3
 from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
@@ -20,7 +21,7 @@ def explore_cmd(db_path: str):
     conn = sqlite3.connect(str(db_file))
     cursor = conn.cursor()
 
-    console.print(f"[bold cyan]🔍 LoopForge Execution & HITL Decision History Explorer[/bold cyan]\n")
+    console.print("[bold cyan]🔍 LoopForge Execution & HITL Decision History Explorer[/bold cyan]\n")
 
     # 1. Pipeline Runs Table
     try:

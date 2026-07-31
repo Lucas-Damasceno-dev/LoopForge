@@ -1,6 +1,3 @@
-import pytest
-import os
-from pathlib import Path
 from lf.pipeline.nodes.appsec import appsec
 from lf.pipeline.nodes.devops import devops
 

@@ -5,7 +5,6 @@ Usa template tech_spec_template.md do The Foundry e Pydantic para feedback.
 from __future__ import annotations
 
 import os
-import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -100,7 +99,7 @@ Responda com:
 
         if validation.get("needs_feedback"):
             feedback_msg = validation.get('feedback_message', '')
-            print(f"--- AVISO: Tech Lead solicita feedback: ---")
+            print("--- AVISO: Tech Lead solicita feedback: ---")
             print(f"--- {feedback_msg[:500]} ---")
             new_feedback.append(
                 {"from": "tech_lead", "message": feedback_msg, "timestamp": now_iso}

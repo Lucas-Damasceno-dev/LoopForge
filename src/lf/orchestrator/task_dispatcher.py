@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import json
 import os
 import select
@@ -8,7 +9,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -27,16 +28,12 @@ from lf.runner.git.pr import create_github_pr
 
 def _send_notification(title: str, message: str, webhook_url: str | None = None):
     """Envia notificação desktop e/ou webhook para Slack/Discord."""
-    try:
+    with contextlib.suppress(Exception):
         print("\a", end="", flush=True)
-    except Exception:
-        pass
 
     if shutil.which("notify-send"):
-        try:
+        with contextlib.suppress(Exception):
             subprocess.run(["notify-send", title, message], timeout=3, check=False)
-        except Exception:
-            pass
 
     if webhook_url:
         try:
@@ -131,7 +128,7 @@ class TaskDispatcher:
             message = {
                 "event": event_type,
                 "task_id": task_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 **payload,
             }
             try:
@@ -236,7 +233,7 @@ class TaskDispatcher:
                 )
             """)
             decision_id = str(uuid.uuid4())
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             cursor.execute(
                 "INSERT INTO human_decisions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (decision_id, run_id, gate_node, action, category, message, "human_operator", now_iso),
@@ -260,9 +257,9 @@ class TaskDispatcher:
             msg_text = f"LoopForge aguardando aprovação humana antes de executar o nó {next_node}."
             _send_notification(title, msg_text, webhook_url=self.webhook_url)
 
-        console.print(f"\n[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]")
+        console.print("\n[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]")
         console.print(f"[bold yellow]⏸️  HUMAN-IN-THE-LOOP GATE — Próximo Nó: [bold white]{next_node.upper()}[/bold white][/bold yellow]")
-        console.print(f"[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]\n")
+        console.print("[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]\n")
 
         # 1. Se estamos pausados antes de QA, o nó que recém-executou foi o DEVELOPER -> mostra o código gerado
         if next_node == "qa":
@@ -405,9 +402,9 @@ class TaskDispatcher:
     def _review_mode_approval_gate(self, final_state: dict) -> bool:
         """Modo Revisão: Exibe o plano/artefatos completos e solicita aprovação final antes de escrever em disco."""
         console = Console()
-        console.print(f"\n[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]")
-        console.print(f"[bold magenta]🔍 MODO REVISÃO INTERATIVA — APROVAÇÃO DE MUDANÇAS[/bold magenta]")
-        console.print(f"[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]\n")
+        console.print("\n[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]")
+        console.print("[bold magenta]🔍 MODO REVISÃO INTERATIVA — APROVAÇÃO DE MUDANÇAS[/bold magenta]")
+        console.print("[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]\n")
 
         console.print(f"[bold]Ideia / Objetivo:[/bold] {final_state.get('idea')}")
         console.print(f"[bold]Épico CPO:[/bold] {final_state.get('epic', {}).get('title', 'N/A')}")

@@ -1,12 +1,13 @@
 """Suíte de testes para os padrões Registry de desacoplamento do LoopForge."""
 
 import os
-import pytest
+
+from genome import BaseLanguageScanner, GenomeScanner, ModuleInfo
+
 from lf.config.registry import BaseStackHandler, TechStackRegistry
 from lf.config.schema import resolve_tech_stack
 from lf.pipeline.graph import EdgeRegistry, NodeRegistry, build_graph
 from lf.pipeline.llm_factory import BaseLLMProvider, LLMProviderRegistry, execute_llm
-from genome import BaseLanguageScanner, GenomeScanner, ModuleInfo
 
 
 class ElixirStackHandler(BaseStackHandler):

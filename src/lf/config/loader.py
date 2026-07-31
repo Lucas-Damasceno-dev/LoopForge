@@ -17,10 +17,7 @@ def load_config(config_path: str | Path = ".loopforge.json") -> LoopForgeConfig:
             return LoopForgeConfig()
 
     content = path.read_text(encoding="utf-8")
-    if path.suffix in [".yaml", ".yml"]:
-        data = yaml.safe_load(content) or {}
-    else:
-        data = json.loads(content)
+    data = yaml.safe_load(content) or {} if path.suffix in [".yaml", ".yml"] else json.loads(content)
 
     return LoopForgeConfig(**data)
 

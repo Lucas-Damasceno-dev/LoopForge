@@ -75,9 +75,8 @@ class SecurityScanner:
                 lines = content.splitlines()
                 dangerous_lines = set()
                 for node in ast.walk(tree):
-                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                        if node.func.id in ("eval", "exec"):
-                            dangerous_lines.add(node.lineno)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec"):
+                        dangerous_lines.add(node.lineno)
 
                 if not dangerous_lines:
                     continue

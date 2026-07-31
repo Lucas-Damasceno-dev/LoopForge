@@ -1,6 +1,5 @@
 """Carregador de templates HTML para o Web Dashboard UI do LoopForge."""
 
-import os
 from functools import lru_cache
 from pathlib import Path
 

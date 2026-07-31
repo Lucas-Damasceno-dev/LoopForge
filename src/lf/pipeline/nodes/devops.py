@@ -1,9 +1,9 @@
-#-*- coding: utf-8 -*-
 """Nó DevOps: análise de deployabilidade, geração de Dockerfile e CI workflow."""
 from __future__ import annotations
+
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -152,7 +152,7 @@ def devops(state: GraphState) -> dict:
 
     project_dir = state.get("project_dir", os.getcwd())
     output_dir = state.get("output_dir", ".")
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     manifest_id = f"DEVOPS-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
 
     if state.get("mock_llm"):

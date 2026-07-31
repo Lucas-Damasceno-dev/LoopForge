@@ -13,7 +13,7 @@ console = Console()
 def release_cmd(version: str, dry_run: bool):
     """Gera notas de release semânticas e atualiza o CHANGELOG.md."""
     now_date = datetime.now(UTC).strftime("%Y-%m-%d")
-    
+
     release_notes = f"""## [{version}] - {now_date}
 
 ### 🚀 Funcionalidades

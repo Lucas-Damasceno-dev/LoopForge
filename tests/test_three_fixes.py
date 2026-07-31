@@ -2,13 +2,13 @@
 
 import os
 from unittest.mock import patch
+
 from click.testing import CliRunner
 
 from lf.api.config import APISettings
 from lf.cli.commands.benchmark import benchmark_cmd
 from lf.cli.commands.serve import serve_cmd
 from lf.pipeline.nodes.appsec import appsec
-from lf.pipeline.nodes.qa import qa
 
 
 def test_auth_enabled_by_default():

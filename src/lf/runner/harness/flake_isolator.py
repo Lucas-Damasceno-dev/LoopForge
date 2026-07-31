@@ -2,7 +2,6 @@
 
 import os
 import subprocess
-from typing import Dict, List, Tuple
 
 
 class FlakeIsolator:
@@ -36,7 +35,7 @@ class FlakeIsolator:
 
         return False
 
-    def filter_flaky_failures(self, failed_tests: List[Dict], test_cmd: str) -> Tuple[List[Dict], List[Dict]]:
+    def filter_flaky_failures(self, failed_tests: list[dict], test_cmd: str) -> tuple[list[dict], list[dict]]:
         """Separa falhas legítimas de falhas pré-existentes / flaky."""
         legitimate = []
         flaky = []

@@ -1,9 +1,9 @@
-#-*- coding: utf-8 -*-
 """Nó AppSec: revisão de segurança estática e contextual com LLM do código gerado."""
 from __future__ import annotations
+
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -34,7 +34,7 @@ def appsec(state: GraphState) -> dict:
     print("---EXECUTANDO NÓ: AppSec (Security Review)---")
 
     project_dir = state.get("project_dir", os.getcwd())
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     review_id = f"SEC-REV-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
 
     if state.get("mock_llm"):
@@ -50,9 +50,7 @@ def appsec(state: GraphState) -> dict:
     has_critical_or_high = False
 
     for v in scanner_vulns:
-        if v.rule_id == "SEC-001":
-            severity = "Critical"
-        elif v.rule_id == "SEC-002":
+        if v.rule_id == "SEC-001" or v.rule_id == "SEC-002":
             severity = "Critical"
         elif v.rule_id == "SEC-003":
             severity = "High"

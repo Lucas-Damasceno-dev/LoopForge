@@ -2,12 +2,10 @@
 Desacopla a resolução de linguagens, ferramentas de teste e gerenciadores de pacote do core.
 """
 
-from abc import ABC, abstractmethod
 import os
-from typing import Dict, Optional
+from abc import ABC, abstractmethod
 
-
-ALIASES: Dict[str, str] = {
+ALIASES: dict[str, str] = {
     "js": "javascript",
     "ts": "javascript",
     "typescript": "javascript",
@@ -41,7 +39,7 @@ class BaseStackHandler(ABC):
         pass
 
     @abstractmethod
-    def detect_test_command(self, project_dir: str) -> Optional[str]:
+    def detect_test_command(self, project_dir: str) -> str | None:
         pass
 
     def get_fallback_test_command(self) -> str:
@@ -65,7 +63,7 @@ class PythonStackHandler(BaseStackHandler):
     def default_package_manager(self) -> str:
         return "pip"
 
-    def detect_test_command(self, project_dir: str) -> Optional[str]:
+    def detect_test_command(self, project_dir: str) -> str | None:
         if os.path.exists(os.path.join(project_dir, "pyproject.toml")) or any(
             f.endswith(".py") for f in os.listdir(project_dir) if os.path.isfile(os.path.join(project_dir, f))
         ):
@@ -90,7 +88,7 @@ class JavaStackHandler(BaseStackHandler):
     def default_package_manager(self) -> str:
         return "maven"
 
-    def detect_test_command(self, project_dir: str) -> Optional[str]:
+    def detect_test_command(self, project_dir: str) -> str | None:
         if os.path.exists(os.path.join(project_dir, "pom.xml")):
             return "mvn test"
         if os.path.exists(os.path.join(project_dir, "build.gradle")):
@@ -118,7 +116,7 @@ class RustStackHandler(BaseStackHandler):
     def default_package_manager(self) -> str:
         return "cargo"
 
-    def detect_test_command(self, project_dir: str) -> Optional[str]:
+    def detect_test_command(self, project_dir: str) -> str | None:
         if os.path.exists(os.path.join(project_dir, "Cargo.toml")):
             return "cargo test"
         return None
@@ -144,7 +142,7 @@ class GoStackHandler(BaseStackHandler):
     def default_package_manager(self) -> str:
         return "go"
 
-    def detect_test_command(self, project_dir: str) -> Optional[str]:
+    def detect_test_command(self, project_dir: str) -> str | None:
         if os.path.exists(os.path.join(project_dir, "go.mod")):
             return "go test ./..."
         return None
@@ -170,7 +168,7 @@ class JSStackHandler(BaseStackHandler):
     def default_package_manager(self) -> str:
         return "npm"
 
-    def detect_test_command(self, project_dir: str) -> Optional[str]:
+    def detect_test_command(self, project_dir: str) -> str | None:
         pkg_path = os.path.join(project_dir, "package.json")
         if os.path.exists(pkg_path):
             if os.path.exists(os.path.join(project_dir, "vitest.config.ts")) or os.path.exists(os.path.join(project_dir, "vitest.config.js")):
@@ -184,14 +182,14 @@ class JSStackHandler(BaseStackHandler):
 
 class TechStackRegistry:
     """Registro global extensível para manipuladores de linguagem/stack."""
-    _handlers: Dict[str, BaseStackHandler] = {}
+    _handlers: dict[str, BaseStackHandler] = {}
 
     @classmethod
     def register(cls, handler: BaseStackHandler) -> None:
         cls._handlers[handler.language.lower()] = handler
 
     @classmethod
-    def get(cls, language: str) -> Optional[BaseStackHandler]:
+    def get(cls, language: str) -> BaseStackHandler | None:
         if not language:
             return None
         lang_lower = language.lower().strip()
@@ -199,7 +197,7 @@ class TechStackRegistry:
         return cls._handlers.get(lang_resolved)
 
     @classmethod
-    def detect_command(cls, project_dir: str) -> Optional[str]:
+    def detect_command(cls, project_dir: str) -> str | None:
         for handler in cls._handlers.values():
             cmd = handler.detect_test_command(project_dir)
             if cmd:

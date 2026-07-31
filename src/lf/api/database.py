@@ -2,6 +2,7 @@
 
 Unifica a persistência REST e Telemetria em `.loopforge/telemetry.sqlite`.
 """
+import contextlib
 import os
 from collections.abc import AsyncGenerator
 
@@ -75,10 +76,8 @@ async def close_db() -> None:
     """Fecha o engine e libera conexões."""
     global engine, session_factory
     if engine:
-        try:
+        with contextlib.suppress(Exception):
             await engine.dispose()
-        except Exception:
-            pass
     engine = None
     session_factory = None
 

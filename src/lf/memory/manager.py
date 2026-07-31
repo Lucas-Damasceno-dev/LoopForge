@@ -87,8 +87,8 @@ class MemoryManager:
             return ""
 
         lines = ["### 🧠 Lições Aprendidas em Execuções Anteriores (Memory Context):"]
-        for idx, l in enumerate(lessons, 1):
-            stack_badge = f"[{l['stack'].upper()}]"
-            lines.append(f"{idx}. {stack_badge} Ideia: '{l['idea']}'")
-            lines.append(f"   Lição: {l['lesson_text'].strip()[:250]}...")
+        for idx, item in enumerate(lessons, 1):
+            stack_badge = f"[{item['stack'].upper()}]"
+            lines.append(f"{idx}. {stack_badge} Ideia: '{item['idea']}'")
+            lines.append(f"   Lição: {item['lesson_text'].strip()[:250]}...")
         return "\n".join(lines)

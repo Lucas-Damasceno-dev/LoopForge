@@ -1,6 +1,6 @@
 {
-  "project_id": "test",
-  "project_name": "Test",
+  "project_id": "loopforge",
+  "project_name": "LoopForge",
   "version": "6.0.0",
   "ontology_path": "examples/the-foundry",
   "stack": {
@@ -10,39 +10,11 @@
     "package_manager": "pip"
   },
   "llm_provider": "openrouter",
-  "llm_model": "cohere/north-mini-code:free",
-  "budget_limit_usd": 5.0,
+  "llm_model": "oc/deepseek-v4-flash-free",
+  "budget_limit_usd": 10.0,
   "max_parallel_tasks": 2,
   "plan": {
-    "tasks": [
-      {
-        "id": "T-001",
-        "title": "Executar developer: Criar um modulo python chamado math_util",
-        "persona": "developer",
-        "routing_mode": "fast",
-        "status": "pending",
-        "depends_on": [],
-        "max_retries": 3,
-        "attempts": 0
-      },
-      {
-        "id": "T-002",
-        "title": "Executar qa: Criar um modulo python chamado math_util",
-        "persona": "qa",
-        "routing_mode": "fast",
-        "status": "pending",
-        "depends_on": [
-          "T-001"
-        ],
-        "max_retries": 3,
-        "attempts": 0
-      }
-    ],
-    "graph": {
-      "T-001": [],
-      "T-002": [
-        "T-001"
-      ]
-    }
+    "tasks": [],
+    "graph": {}
   }
 }

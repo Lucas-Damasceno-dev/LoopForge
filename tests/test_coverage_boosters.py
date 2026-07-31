@@ -4,12 +4,11 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel, Field
 
 from lf.api.app import create_app
-from lf.api.auth import verify_authentication
-from lf.api.config import get_api_settings
 from lf.api.database import close_db, init_db
 from lf.pipeline.nodes.qa import qa
 from lf.pipeline.nodes.tech_lead import tech_lead
@@ -25,8 +24,6 @@ class DummySchema(BaseModel):
     title: str = Field(...)
     count: int = Field(0)
 
-
-import pytest_asyncio
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_test_env():

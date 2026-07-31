@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
+
 from ...pipeline.state import GraphState
 
 
@@ -15,7 +16,7 @@ def generate_lessons_md(state: GraphState) -> str:
     attempts = state.get("attempt_count", 1)
     test_report = state.get("test_report", {})
     sec_report = state.get("security_review") or state.get("security_report", {})
-    ops_report = state.get("devops_report") or state.get("devops_manifest", {})
+    state.get("devops_report") or state.get("devops_manifest", {})
     idea = state.get("idea", "Desenvolvimento de Projeto")
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
@@ -41,8 +42,8 @@ def generate_lessons_md(state: GraphState) -> str:
 
     content = f"""# 📋 LoopForge Execution Lessons & Report
 
-**Data de Execução:** {now_str}  
-**Projeto / Ideia:** {idea}  
+**Data de Execução:** {now_str}
+**Projeto / Ideia:** {idea}
 **Stack Decidida pelo Tech Lead:** `{stack}`
 
 ---

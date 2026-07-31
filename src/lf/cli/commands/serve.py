@@ -1,6 +1,7 @@
 """Comando oficial CLI 'lf serve' para subir a API REST, WebSockets e Dashboard Web UI."""
 import os
 import secrets
+
 import click
 import uvicorn
 from rich.console import Console

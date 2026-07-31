@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -23,7 +23,7 @@ class RunBenchmark:
     estimated_cost_usd: float
     node_benchmarks: list[NodeBenchmark] = field(default_factory=list)
     success: bool = True
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class BenchmarkSuite:
@@ -41,10 +41,10 @@ class BenchmarkSuite:
             json.dump(data, f, indent=2, ensure_ascii=False)
         return path
 
-    def calculate_elo_delta(self, passed: int, total: int, K: float = 32.0, expected_score: float = 0.5) -> float:
+    def calculate_elo_delta(self, passed: int, total: int, k_factor: float = 32.0, expected_score: float = 0.5) -> float:
         """Calcula a variação do ELO com base no percentual de testes aprovados."""
         actual_score = (passed / total) if total > 0 else 0.0
-        return round(K * (actual_score - expected_score), 1)
+        return round(k_factor * (actual_score - expected_score), 1)
 
     def load_elo_rating(self) -> float:
         """Retorna a pontuação ELO atual acumulada."""
@@ -74,7 +74,7 @@ class BenchmarkSuite:
                 print(f"--- AVISO: Erro ao ler histórico ELO ({e}), iniciando novo ---")
 
         history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "previous_elo": current,
             "new_elo": new_elo,
             "delta": elo_delta,

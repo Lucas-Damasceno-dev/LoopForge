@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import difflib
-import os
 import subprocess
 from pathlib import Path
 
 import click
-from rich.columns import Columns
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax

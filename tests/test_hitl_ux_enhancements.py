@@ -2,7 +2,9 @@
 
 import os
 from unittest.mock import patch
+
 import pytest
+import pytest_asyncio
 from click.testing import CliRunner
 from httpx import ASGITransport, AsyncClient
 
@@ -14,8 +16,6 @@ from lf.cli.commands.run import run_cmd
 from lf.config.schema import TaskSchema
 from lf.orchestrator.task_dispatcher import TaskDispatcher, _send_notification
 
-
-import pytest_asyncio
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_test_env(tmp_path):
@@ -82,10 +82,9 @@ def test_task_dispatcher_review_mode(tmp_path):
 
 
 def test_send_notification():
-    with patch("shutil.which", return_value="/usr/bin/notify-send"):
-        with patch("subprocess.run") as mock_sub:
-            _send_notification("Title", "Message")
-            assert mock_sub.called
+    with patch("shutil.which", return_value="/usr/bin/notify-send"), patch("subprocess.run") as mock_sub:
+        _send_notification("Title", "Message")
+        assert mock_sub.called
 
 
 def test_cli_diff_command(tmp_path):
