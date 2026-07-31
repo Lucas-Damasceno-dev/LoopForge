@@ -81,7 +81,7 @@ def test_proposed_dir_equal_files_shows_green(monkeypatch, tmp_path):
     target.mkdir()
     (proposed / "same.py").write_text("print('igual')\n")
     (target / "same.py").write_text("print('igual')\n")
-    monkeypatch.setattr(diff_module, "Path", lambda p: tmp_path / p.lstrip("/"))
+    monkeypatch.setattr(diff_module, "Path", lambda p: proposed if str(p).startswith("/tmp/loopforge/") else p)
     _run_diff(project_id=project_id, target_dir=str(target), interactive=False)
     assert "Nenhuma diferença encontrada entre os arquivos propostos e o workspace." in diff_module.console.export_text()
 
@@ -96,7 +96,7 @@ def test_proposed_dir_diff_and_new_file_non_interactive(monkeypatch, tmp_path):
     (proposed / "changed.py").write_text("print('novo')\n")
     (target / "changed.py").write_text("print('antigo')\n")
     (proposed / "new_file.py").write_text("print('arquivo novo')\n")
-    monkeypatch.setattr(diff_module, "Path", lambda p: tmp_path / p.lstrip("/"))
+    monkeypatch.setattr(diff_module, "Path", lambda p: proposed if str(p).startswith("/tmp/loopforge/") else p)
     _run_diff(project_id=project_id, target_dir=str(target), interactive=False)
     rendered = diff_module.console.export_text()
     assert "📄 changed.py:" in rendered
@@ -112,7 +112,7 @@ def test_proposed_dir_interactive_uses_side_by_side_files(monkeypatch, tmp_path)
     target.mkdir()
     (proposed / "mod.py").write_text("print('A')\n")
     (target / "mod.py").write_text("print('B')\n")
-    monkeypatch.setattr(diff_module, "Path", lambda p: tmp_path / p.lstrip("/"))
+    monkeypatch.setattr(diff_module, "Path", lambda p: proposed if str(p).startswith("/tmp/loopforge/") else p)
     calls = []
     monkeypatch.setattr(
         diff_module,
