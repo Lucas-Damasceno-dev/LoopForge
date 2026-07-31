@@ -3,7 +3,7 @@ import json
 import os
 from datetime import UTC
 
-from ...pipeline.llm_factory import SQLiteLLMCache
+from ...pipeline.cache import SQLiteLLMCache
 from .runner import DEFAULT_OPENCODE_MODEL, OpenCodeRunner
 
 

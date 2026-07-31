@@ -4,8 +4,8 @@
   "version": "6.0.0",
   "ontology_path": "examples/the-foundry",
   "stack": {
-    "language": "js",
-    "framework": "none",
+    "language": "python",
+    "framework": "fastapi",
     "testing_harness": "pytest",
     "package_manager": "pip"
   },

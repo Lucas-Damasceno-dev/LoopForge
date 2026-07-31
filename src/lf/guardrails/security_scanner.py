@@ -1,3 +1,4 @@
+import ast
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,28 +58,40 @@ class SecurityScanner:
         return vulnerabilities
 
     def fix_vulnerabilities(self, root_dir: str | Path = ".") -> int:
-        """Autocorrige vulnerabilidades simples encontradas nos arquivos."""
+        """Autocorrige vulnerabilidades identificadas via análise estática segura com AST."""
         root = Path(root_dir)
         fixed_count = 0
 
         for p in root.rglob("*.py"):
-            if ".venv" in p.parts or "node_modules" in p.parts:
+            if any(part in {".venv", "node_modules", ".git", ".loopforge"} for part in p.parts):
                 continue
             try:
                 content = p.read_text(encoding="utf-8")
+                try:
+                    tree = ast.parse(content)
+                except SyntaxError:
+                    continue
+
+                lines = content.splitlines()
+                dangerous_lines = set()
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                        if node.func.id in ("eval", "exec"):
+                            dangerous_lines.add(node.lineno)
+
+                if not dangerous_lines:
+                    continue
+
                 new_lines = []
                 modified = False
-                for line in content.splitlines():
-                    # Neutraliza eval/exec com warning comment
-                    if "eval(" in line and "# SEC-FIX" not in line:
-                        line = line.replace("eval(", "# SEC-FIX: eval neutralized\n# eval(")
+                for idx, line in enumerate(lines, 1):
+                    if idx in dangerous_lines and "# SEC-FIX" not in line:
+                        new_lines.append(f"# SEC-FIX: dangerous call on line {idx} neutralized")
+                        new_lines.append(f"# {line}")
                         modified = True
                         fixed_count += 1
-                    elif "exec(" in line and "# SEC-FIX" not in line:
-                        line = line.replace("exec(", "# SEC-FIX: exec neutralized\n# exec(")
-                        modified = True
-                        fixed_count += 1
-                    new_lines.append(line)
+                    else:
+                        new_lines.append(line)
 
                 if modified:
                     p.write_text("\n".join(new_lines), encoding="utf-8")
