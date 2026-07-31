@@ -67,7 +67,8 @@ def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "_
     if qa_attempt < max_retries:
         return "developer"
 
-    return END
+    print("--- AVISO: Retentativas de QA esgotadas. Executando auditoria final e gerando lições aprendidas... ---")
+    return "parallel_audit"
 
 
 class NodeRegistry:

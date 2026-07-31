@@ -27,6 +27,15 @@ def generate_lessons_md(state: GraphState) -> str:
     total_tests = qa_summary.get("total_tests", tests_passed + tests_failed)
     qa_status = "PASS" if (tests_failed == 0 and total_tests >= 0) else "FAIL"
 
+    # Salva a lição aprendida no MemoryManager para consultas futuras cross-project
+    try:
+        from ...memory.manager import MemoryManager
+        mem = MemoryManager()
+        lesson_text = f"Resultado QA: {qa_status} ({tests_passed}/{total_tests} testes). Ideia: {idea}"
+        mem.save_lesson(run_id=str(state.get("task_id", "run")), stack=stack, idea=idea, lesson_text=lesson_text)
+    except Exception:
+        pass
+
     # AppSec warnings
     vulns = []
     if isinstance(sec_report, dict):

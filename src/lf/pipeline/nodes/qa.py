@@ -117,11 +117,16 @@ O relatório DEVE ter:
     if not isinstance(report, dict) or "summary" not in report:
         report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
 
-    # Se harness falhou, garante que summary reflete a falha real
-    if harness_result.get("passed", 0) == 0 or harness_result.get("errors"):
+    # Se harness falhou ou a compilação/testes falharam, garante que o summary e feedback contenham o erro real
+    raw_output = harness_result.get("output", "").strip()
+    harness_success = harness_result.get("success", False)
+    harness_failed = harness_result.get("failed", 0)
+    harness_passed = harness_result.get("passed", 0)
+
+    if not harness_success or harness_failed > 0 or harness_passed == 0 or harness_result.get("errors"):
         report["summary"]["status"] = "FAIL"
-        report["summary"]["tests_passed"] = harness_result.get("passed", 0)
-        report["summary"]["tests_failed"] = max(1, len(harness_result.get("errors", [])))
+        report["summary"]["tests_passed"] = harness_passed
+        report["summary"]["tests_failed"] = max(1, harness_failed, len(harness_result.get("errors", [])))
 
     report["id"] = report_id
     report["execution_timestamp"] = now_iso
@@ -144,8 +149,18 @@ O relatório DEVE ter:
         qa_attempt += 1
         print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
         failed_cnt = report.get("summary", {}).get("tests_failed", 1)
-        err_details = harness_result.get("errors", ["Testes falharam"])
-        msg = f"{failed_cnt} teste(s) falharam: {'; '.join(err_details[:2])}"
+        
+        # Extrai os detalhes reais do erro do compilador/harness
+        err_list = harness_result.get("errors", [])
+        if err_list:
+            err_details = "; ".join(err_list[:3])
+        elif raw_output:
+            # Pega as últimas 800 letras do stdout/stderr (onde fica a mensagem de erro do compilador)
+            err_details = raw_output[-800:].replace("\n", " ").strip()
+        else:
+            err_details = "Falha de compilação ou execução de testes."
+            
+        msg = f"FALHA NO QA (Tentativa {qa_attempt}): {failed_cnt} teste(s)/compilação falharam. Detalhes técnicos do erro:\n{err_details}"
         new_feedback = feedback_history + [{"from": "qa", "message": msg, "timestamp": now_iso}]
 
     return {

@@ -272,25 +272,20 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
 
     files_map = _parse_multi_file_response(raw, default_main)
 
-    # 🔍 Gate Único de Qualidade: Validação sintática AST/Compiler antes do QA
+    # Limpa subdiretórios antigos do projeto se for um retry para evitar acúmulo de arquiteturas conflitantes
+    qa_attempts = state.get("qa_attempt_count", 0)
+    if qa_attempts > 0 and not state.get("read_only", False):
+        _cleanup_stale_project_dirs([output_dir, project_dir])
+
+    if not state.get("read_only", False):
+        _write_project_files(files_map, [output_dir, project_dir])
+
+    # 🔍 Gate Único de Qualidade: Validação sintática AST/Compiler após gravação dos arquivos
     syntax_errors = _check_syntax_and_types(files_map, stack, project_dir)
     if syntax_errors:
         print(f"--- AVISO: Sintaxe inválida detectada pelo AST Gate ({len(syntax_errors)} erros): ---")
         for err in syntax_errors:
             print(f"  - {err}")
-
-    # Verifica se há manifesto ou arquivo de teste gerado
-    has_manifest = any(
-        f.lower().endswith(("pom.xml", "package.json", "pyproject.toml", "go.mod", "cargo.toml", "build.gradle"))
-        for f in files_map
-    )
-    has_test = any("test" in f.lower() for f in files_map)
-
-    if not has_manifest and not has_test:
-        print("--- AVISO: A LLM não gerou manifesto ou testes. O QA irá detectar a ausência e reportar falha. ---")
-
-    if not state.get("read_only", False):
-        _write_project_files(files_map, [output_dir, project_dir])
 
     # 🔗 Hook do Agentic Interface Registry: rastreia mudanças e verifica quebras de contrato
     try:
@@ -369,10 +364,28 @@ PROTECTED_ROOT_FILES = {
 }
 
 
-def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> None:
-    for base_dir in set(target_dirs):
-        if not base_dir:
+def _cleanup_stale_project_dirs(target_dirs: list[str]) -> None:
+    """Limpa diretórios de código de tentativas anteriores para evitar colisões entre arquiteturas diferentes."""
+    import shutil
+    stale_dirs = {"cmd", "internal", "src", "pkg", "migrations"}
+    unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
+    for base_dir in unique_dirs:
+        base_path = Path(base_dir).resolve()
+        if (base_path / "AGENTS.md").exists() and (base_path / "src" / "lf").exists():
             continue
+        for s_dir in stale_dirs:
+            target = base_path / s_dir
+            if target.exists() and target.is_dir():
+                try:
+                    shutil.rmtree(target)
+                    print(f"--- INFO: Limpando diretório antigo de tentativa anterior: {target} ---")
+                except Exception as exc:
+                    print(f"--- AVISO: Não foi possível remover subdiretório antigo '{target}': {exc} ---")
+
+
+def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> None:
+    unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
+    for base_dir in unique_dirs:
         base_path = Path(base_dir).resolve()
         is_loopforge_repo = (base_path / "AGENTS.md").exists() and (base_path / "src" / "lf").exists()
 
