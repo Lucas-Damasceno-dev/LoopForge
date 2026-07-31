@@ -72,6 +72,45 @@ class CircuitBreaker:
         # half-open: permite 1 tentativa
         return True
 
+    def __getstate__(self) -> dict:
+        """Serializa para msgpack (SqliteSaver do LangGraph exige tipos primitivos)."""
+        return {
+            "max_consecutive_failures": self.max_consecutive_failures,
+            "max_iterations": self.max_iterations,
+            "max_total_cost": self.max_total_cost,
+            "cost_per_iteration": self.cost_per_iteration,
+            "reset_timeout": self.reset_timeout,
+            "state": self.state,
+            "consecutive_failures": self.consecutive_failures,
+            "total_iterations": self.total_iterations,
+            "total_cost": self.total_cost,
+            "last_failure_time": self.last_failure_time,
+        }
+
+    def __setstate__(self, data: dict) -> None:
+        """Reconstrói o objeto a partir do estado serializado."""
+        self.max_consecutive_failures = data["max_consecutive_failures"]
+        self.max_iterations = data["max_iterations"]
+        self.max_total_cost = data["max_total_cost"]
+        self.cost_per_iteration = data["cost_per_iteration"]
+        self.reset_timeout = data["reset_timeout"]
+        self.state = data["state"]
+        self.consecutive_failures = data["consecutive_failures"]
+        self.total_iterations = data["total_iterations"]
+        self.total_cost = data["total_cost"]
+        self.last_failure_time = data["last_failure_time"]
+
+    def snapshot(self) -> dict:
+        """Retorna estado serializável (msgpack-safe) do CircuitBreaker."""
+        return self.__getstate__()
+
+    @classmethod
+    def from_snapshot(cls, data: dict) -> "CircuitBreaker":
+        """Reconstrói o objeto a partir de um snapshot (dict de primitivos)."""
+        cb = cls.__new__(cls)
+        cb.__setstate__(data)
+        return cb
+
     def to_dict(self) -> dict:
         return {
             "state": self.state,

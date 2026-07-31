@@ -20,6 +20,7 @@ from rich.table import Table
 
 from lf.api.websocket_manager import ws_manager
 from lf.config.schema import TaskSchema
+from lf.guardrails.circuit_breaker import CircuitBreaker
 from lf.ontology.state_machine.definition import TaskState
 from lf.ontology.state_machine.labels import get_git_label
 from lf.pipeline.graph import build_graph
@@ -67,6 +68,13 @@ class TaskDispatcher:
         self.webhook_url = webhook_url
         self.hitl_timeout_seconds = hitl_timeout_seconds
         self._last_graph = None
+        if self.circuit_breaker is None:
+            self.circuit_breaker = CircuitBreaker(max_total_cost=10.0)
+
+    def _resolve_circuit_breaker(self):
+        if self.circuit_breaker is not None:
+            return self.circuit_breaker
+        return CircuitBreaker(max_total_cost=10.0)
 
     def _get_graph(self, checkpointer=None):
         """Retorna grafo compilado (cache por sessão)."""
@@ -116,12 +124,14 @@ class TaskDispatcher:
             "is_interactive": self.interactive,
             "expected_schema": None,
             "persona_id": getattr(task, "agent_id", None),
+            "circuit_breaker": self._resolve_circuit_breaker().snapshot(),
         }
 
         if shared_state:
             for k, v in shared_state.items():
                 if v and k not in ("error", "next_agent"):
                     state[k] = v
+        state["circuit_breaker"] = self._resolve_circuit_breaker().snapshot()
 
         return state
 

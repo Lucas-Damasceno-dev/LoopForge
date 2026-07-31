@@ -130,6 +130,105 @@ def _parse_multi_file_response(raw_text: str, default_filename: str = "main.py")
     return files
 
 
+def _extract_failing_snippets(test_report: dict, project_dir: str, previous_code: str, max_chars: int = 1200) -> list[str]:
+    snippets: list[str] = []
+    if not isinstance(test_report, dict):
+        return snippets
+
+    output_dir = Path(".").resolve()
+    base_dirs = [Path(project_dir).resolve(), output_dir]
+
+    main_file_names = {"generated_code.py", "main.py", "generated_code.js", "main.go", "src/main.rs", "src/main/java/Main.java"}
+    previous_code_normalized = (previous_code or "").strip()
+
+    seen_paths: set[str] = set()
+    results_by_suite = test_report.get("results_by_suite", [])
+    if not isinstance(results_by_suite, list):
+        return snippets
+
+    path_with_line_pattern = re.compile(r"([A-Za-z0-9_\-./]+\.py):(\d+)")
+    tests_path_pattern = re.compile(r"(tests/[A-Za-z0-9_\-./]+\.py)")
+
+    for suite in results_by_suite:
+        if not isinstance(suite, dict):
+            continue
+        failed_details = suite.get("failed_tests_details", [])
+        if not isinstance(failed_details, list):
+            continue
+
+        for detail in failed_details:
+            if not isinstance(detail, dict):
+                continue
+            err_text = detail.get("error") or detail.get("message") or detail.get("test_name") or ""
+            if not isinstance(err_text, str) or not err_text:
+                continue
+
+            candidate_path = None
+            line_no = 1
+
+            match_with_line = path_with_line_pattern.search(err_text)
+            if match_with_line:
+                candidate_path = match_with_line.group(1)
+                line_no = int(match_with_line.group(2))
+            else:
+                match_tests_path = tests_path_pattern.search(err_text)
+                if match_tests_path:
+                    candidate_path = match_tests_path.group(1)
+
+            if not candidate_path:
+                continue
+
+            normalized_candidate = candidate_path.lstrip("./")
+            if normalized_candidate in main_file_names:
+                continue
+            if normalized_candidate in seen_paths:
+                continue
+
+            file_path = None
+            for base in base_dirs:
+                candidate_abs = (base / normalized_candidate).resolve()
+                try:
+                    candidate_abs.relative_to(base)
+                except ValueError:
+                    continue
+                if candidate_abs.exists() and candidate_abs.is_file():
+                    file_path = candidate_abs
+                    break
+
+            if file_path is None:
+                continue
+
+            try:
+                content = file_path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+
+            if previous_code_normalized and content.strip() == previous_code_normalized:
+                continue
+
+            lines = content.splitlines()
+            if not lines:
+                continue
+
+            center = max(1, line_no)
+            start = max(1, center - 10)
+            end = min(len(lines), center + 10)
+            excerpt = "\n".join(lines[start - 1 : end])
+            header = f"# --- Trecho de {normalized_candidate} (linha {center}) ---"
+            snippet = f"{header}\n{excerpt}"
+
+            if len(snippet) > max_chars:
+                snippet = snippet[:max_chars].rstrip()
+
+            snippets.append(snippet)
+            seen_paths.add(normalized_candidate)
+
+            if len(snippets) >= 2:
+                return snippets
+
+    return snippets
+
+
 def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: str = ".") -> list[str]:
     """Valida sintaxe básica e compilabilidade (AST/cargo check/go vet/node check) antes do QA."""
     import ast
@@ -183,7 +282,12 @@ def developer(state: GraphState) -> dict:
 
     if state.get("mock_llm"):
         print(f"--- INFO: Developer modo MOCK (stack decidida pelo TL: {stack}) ---")
+        contract_tests = state.get("contract_tests", "")
         mock_files = _generate_mock_project(stack)
+        if contract_tests:
+            mock_files, skipped_tests_count = _filter_test_paths_from_file_map(mock_files)
+            if skipped_tests_count > 0:
+                print(f"--- INFO: Developer pulou {skipped_tests_count} arquivo(s) tests/ (contrato de testes ativo) ---")
         _write_project_files(mock_files, [output_dir, project_dir])
         return {
             **state,
@@ -288,6 +392,11 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
 
         if previous_code:
             prompt_parts.append(f"\n\nCódigo anterior que apresentou falha:\n```\n{previous_code[:1500]}\n```\nCorrija os problemas apontados acima.")
+            failing_snippets = _extract_failing_snippets(test_report, project_dir, previous_code)
+            if failing_snippets:
+                prompt_parts.append(
+                    "\n\nTrechos dos arquivos citados nas falhas:\n" + "\n".join(failing_snippets)
+                )
 
     complexity = state.get("complexity_level", "standard")
     if complexity == "mvp":
@@ -298,6 +407,18 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     user_prompt = "\n".join(prompt_parts)
 
     print(f"--- Chamando LLM Engine (Stack TL: {stack}, Model: {model_name})... ---")
+    cb_data = state.get("circuit_breaker")
+    cb = CircuitBreaker.from_snapshot(cb_data) if isinstance(cb_data, dict) else cb_data
+    if cb is not None:
+        cb.record_iteration()
+        if cb.budget_exceeded:
+            print("--- CIRCUIT BREAKER: orçamento excedido, abortando iteração do Developer ---")
+            return {
+                **state,
+                "attempt_count": attempt_count,
+                "next_agent": "parallel_audit",
+                "error": "Circuit breaker acionado: custo estimado excedeu o limite de budget.",
+            }
     try:
         raw = call_llm_via_opencode(
             system_prompt=system_prompt,
@@ -326,6 +447,11 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
         }
 
     files_map = _parse_multi_file_response(raw, default_main)
+    contract_tests = state.get("contract_tests", "")
+    if contract_tests:
+        files_map, skipped_tests_count = _filter_test_paths_from_file_map(files_map)
+        if skipped_tests_count > 0:
+            print(f"--- INFO: Developer pulou {skipped_tests_count} arquivo(s) tests/ (contrato de testes ativo) ---")
 
     # Limpa subdiretórios antigos do projeto se for um retry para evitar acúmulo de arquiteturas conflitantes
     qa_attempts = state.get("qa_attempt_count", 0)
@@ -455,3 +581,14 @@ def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> N
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"--- INFO: Arquivo do projeto salvo: {full_path} ({len(content)} chars) ---")
+
+
+def _is_tests_path(rel_path: str) -> bool:
+    normalized = rel_path.replace("\\", "/").strip("/")
+    parts = [part for part in normalized.split("/") if part]
+    return "tests" in parts
+
+
+def _filter_test_paths_from_file_map(files_map: dict[str, str]) -> tuple[dict[str, str], int]:
+    filtered = {path: content for path, content in files_map.items() if not _is_tests_path(path)}
+    return filtered, len(files_map) - len(filtered)

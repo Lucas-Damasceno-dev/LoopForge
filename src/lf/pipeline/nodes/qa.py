@@ -97,6 +97,7 @@ def qa(state: GraphState) -> dict:
     )
     passed = report.get("summary", {}).get("tests_passed", 0)
     criteria_coverage_feedback = ""
+    contract_tests_feedback = ""
     if total_criteria > 0 and passed < total_criteria:
         report["summary"]["status"] = "FAIL"
         report["summary"]["tests_failed"] = max(report["summary"].get("tests_failed", 1), total_criteria - passed)
@@ -104,6 +105,17 @@ def qa(state: GraphState) -> dict:
             f"- [QA Cobertura de Critérios]: {total_criteria} acceptance criteria definidos, "
             f"mas apenas {passed} teste(s) passaram. Cada critério deve ter pelo menos 1 teste (regra 7)."
         )
+    contract_tests = state.get("contract_tests")
+    if contract_tests:
+        tests_dir = Path(product_dir) / "tests"
+        contract_test_files = list(tests_dir.glob("test_*.py")) + list(tests_dir.glob("*_test.py"))
+        if not contract_test_files:
+            report["summary"]["status"] = "FAIL"
+            report["summary"]["tests_failed"] = max(report["summary"].get("tests_failed", 1), 1)
+            contract_tests_feedback = (
+                "- [QA Contrato de Testes]: o contrato de testes definido pelo Test Writer não foi encontrado em tests/. "
+                "O código deve fazer os testes-contrato passarem."
+            )
 
     output_dir = state.get("output_dir", ".")
     if output_dir:
@@ -136,6 +148,8 @@ def qa(state: GraphState) -> dict:
         msg = f"FALHA NO QA (Tentativa {qa_attempt}): {failed_cnt} teste(s)/compilação falharam. Detalhes técnicos do erro:\n{err_details}"
         if criteria_coverage_feedback:
             msg = f"{msg}\n{criteria_coverage_feedback}"
+        if contract_tests_feedback:
+            msg = f"{msg}\n{contract_tests_feedback}"
         new_feedback = feedback_history + [{"from": "qa", "message": msg, "timestamp": now_iso}]
 
     return {
