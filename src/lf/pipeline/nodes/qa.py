@@ -68,7 +68,7 @@ def qa(state: GraphState) -> dict:
     if state.get("mock_llm"):
         print("--- INFO: QA modo MOCK ---")
         report = _mock_report(report_id, now_iso)
-        return {**state, "test_report": report, "next_agent": "appsec"}
+        return {**state, "test_report": report, "next_agent": "parallel_audit"}
 
     # Fase 1: Executar harness real no projeto
     harness_result = _run_harness(project_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
@@ -142,7 +142,7 @@ O relatório DEVE ter:
         print(f"--- INFO: Test report salvo em {path} ---")
 
     is_pass = report.get("summary", {}).get("status") == "PASS" and report.get("summary", {}).get("tests_failed", 1) == 0
-    next_agent = "appsec" if is_pass else "developer"
+    next_agent = "parallel_audit" if is_pass else "developer"
 
     qa_attempt = state.get("qa_attempt_count", 0)
     new_feedback = feedback_history

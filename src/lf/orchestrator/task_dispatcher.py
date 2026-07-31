@@ -156,7 +156,8 @@ class TaskDispatcher:
             try:
                 return input()
             except Exception:
-                return "c"
+                # Fallback consistente com o timeout Unix (aborta em vez de aprovar)
+                return "x"
 
 
 
@@ -337,6 +338,24 @@ class TaskDispatcher:
                     sev_fmt = f"[cyan]{sev}[/cyan]"
                 table.add_row(str(v.get("id", "-")), sev_fmt, str(v.get("rule_id", "-")), str(v.get("description", "-")))
             console.print(table)
+
+        # 5. Se estamos pausados antes do PARALLEL AUDIT, mostra resumo da auditoria final
+        elif next_node == "parallel_audit":
+            sec_review = state.get("security_review", {})
+            ops_report = state.get("devops_report", {})
+            vulns = sec_review.get("vulnerabilities", [])
+            console.print("[bold magenta]🔎 Auditoria Final (AppSec + DevOps):[/bold magenta]")
+            table = Table(title="🛡️ Vulnerabilidades (AppSec)")
+            table.add_column("ID", style="dim")
+            table.add_column("Severidade")
+            table.add_column("Descrição")
+            for v in vulns:
+                sev = str(v.get("severity", "Low")).upper()
+                sev_fmt = f"[bold red]{sev}[/bold red]" if sev == "CRITICAL" else f"[yellow]{sev}[/yellow]"
+                table.add_row(str(v.get("id", "-")), sev_fmt, str(v.get("description", "-")))
+            console.print(table)
+            deployable = ops_report.get("deployable") or ops_report.get("status")
+            console.print(f"[cyan]Deployabilidade (DevOps):[/cyan] {deployable if deployable else ops_report}")
 
         console.print("\n[bold]Ações Disponíveis:[/bold]")
         console.print("  [green]c[/green] — Continuar / Aprovar")

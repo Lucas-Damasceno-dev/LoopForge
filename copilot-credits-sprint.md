@@ -72,12 +72,24 @@ Tasks paralelas só compartilham arquivos que **não** se sobrepõem. Ordens imp
 | 14 | 2026-07-31 ~18:40 | T9 (Onda 3) | Literal + constraints em schema.py (PID 27800) | ✅ 6.8cr; routing_mode/task_type/complexity_level → Literal; budget ge=0, max_parallel gt=0; defaults LLM PRESERVADOS (T12 não aplicado). test_schema_validation.py. Sessão: `edb71cf5-f28d-4cc2-8752-98aec414c486` | 6.8 |
 | 15 | 2026-07-31 ~19:10 | T6 (pós) | fix direto (orquestrador) | Fix do T6: removida mutação in-place em should_retry; bloco retry_error no nó parallel_audit (`tests_failed and qa_attempt >= max_retries`); 2 testes ajustados p/ patchear `_mock_report` (FAIL). Resultado: 2 testes passando + suíte 194 passed/1 skipped + ruff All checks passed | 0 |
 | 16 | 2026-07-31 ~19:15 | Onda 3 (verificação) | exp-4/exp-5/exp-6 (explorer) | ✅ T5/T6/T8/T9 aprovados; Onda 2 sem regressão (diff HEAD~6 vazio, 26/26 testes); sem mutação fora do escopo. **Notas**: QA mock não incrementa qa_attempt_count (pré-existente); timeout 300s não é hard-stop (cancel não interrompe thread); `routing_mode="fast"` puro cai no caminho full (pré-existente); W292 em test_main.py recorre (LoopForge background reescreve o arquivo) | 0 |
-| 17 | 2026-07-31 ~19:25 | T10 (Onda 4) | logging nos 5 `except Exception: pass` (task_dispatcher.py:139/199, developer.py:29-30, lessons.py:36-37, cache.py:23) (PID 37119) | ⏳ em execução | — |
-| 18 | 2026-07-31 ~19:25 | T12 (Onda 4) | defaults LLM → OpenRouter em schema.py:91-92 + ajustar testes (PID 37146) | ⏳ em execução | — |
+| 17 | 2026-07-31 ~19:25 | T10 (Onda 4) | logging nos 5 `except Exception: pass` (task_dispatcher.py:139/199, developer.py:29-30, lessons.py:36-37, cache.py:23) (PID 37119) | ⚠️ Relatou "5/5" mas converteu só 1/5 (task_dispatcher.py:142) com mensagens trocadas (_broadcast_ws/_send_notification). **Fix manual pelo orquestrador**: convertidos os 5 pontos + import logging/logger nos 3 arquivos + mensagens des-trocadas. Re-verificado por exp-9: ✅ todos corretos, ruff All checks passed | 6.51 |
+| 18 | 2026-07-31 ~19:25 | T12 (Onda 4) | defaults LLM → OpenRouter em schema.py:91-92 + ajustar testes (PID 37146) | ✅ `llm_provider="openrouter"`/`llm_model="oc/deepseek-v4-flash-free"`; T9 literals/constraints preservados; test_config_loader.py:56 ajustado; nenhum teste asserta "google"/"gemini-1.5-flash" como default. Verificado por exp-8: ✅ 14 passed + ruff. **Nota**: init.py:37-38 ainda grava fallback "google"/"gemini-1.5-flash" no config (fora do escopo, follow-up candidato) | 3.78 |
 
 ## Checklist pós-sprint
 
 - [x] Rodar `pytest tests/` completo (194 passed, 1 skipped)
 - [x] Rodar ruff com o comando do CI (All checks passed)
-- [ ] Conferir cobertura ≥ 75% (CI roda com `--cov-fail-under=75`)
-- [x] Revisar diffs das tasks (3 verificações explorer independentes: sem mutação fora do escopo)
+- [x] Conferir cobertura ≥ 75% — **80.30%** (baseline 76.75%, +3.55pp; CI `--cov-fail-under=75` verde)
+- [x] Revisar diffs das tasks (4 verificações explorer independentes: sem mutação fora do escopo)
+
+## Resumo de créditos
+
+| Fase | Tasks | Créditos |
+|---|---|---|
+| T1 (lint, 4 tentativas + fix direto) | — | 17.33 |
+| Onda 2 (T3, T4, T7, T11) | — | 30.53 |
+| Onda 3 (T5, T6, T8, T9) + fix T6 | — | 33.80 |
+| Onda 4 (T10, T12) + fix T10 | — | 10.29 |
+| **Total** | **11 tasks** | **~91.95** |
+
+Todos os 11 tasks aprovados concluídos (T2 recusada pelo usuário). Reset mensal de 200 créditos ocorre em ~5h — sprint usou ~46%.

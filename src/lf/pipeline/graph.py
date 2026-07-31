@@ -25,8 +25,8 @@ def entry_router(state: GraphState) -> Literal["cpo", "tech_lead", "developer", 
     routing_mode = state.get("routing_mode", "full")
     task_type = state.get("task_type", "feature")
 
-    if routing_mode == "patch" or task_type in ("patch", "bugfix", "fast", "simple"):
-        print("--- ROTEAMENTO ADAPTATIVO: Modo PATCH (Developer -> QA) ---")
+    if routing_mode in ("patch", "fast") or task_type in ("patch", "bugfix", "fast", "simple"):
+        print("--- ROTEAMENTO ADAPTATIVO: Modo PATCH/FAST (Developer -> QA) ---")
         return "developer"
 
     if routing_mode == "review-only" or task_type == "review":
@@ -42,13 +42,18 @@ def entry_router(state: GraphState) -> Literal["cpo", "tech_lead", "developer", 
 
 
 def router(state: GraphState) -> str:
-    """Router único: decide próximo nó baseado no estado."""
+    """Router único: decide próximo nó baseado no estado.
+
+    Só aceita destinos que existem nos mappings do EdgeRegistry (harmonizado):
+    pm, tech_lead, developer, qa. Qualquer outro next_agent cai em END em vez de
+    disparar ValueError do LangGraph por chave ausente no mapping do nó fonte.
+    """
     next_agent = state.get("next_agent", "cpo")
 
     if next_agent in ("FINISH", "__end__", None):
         return END
 
-    if next_agent in ("cpo", "pm", "tech_lead", "developer", "qa", "appsec", "devops", "parallel_audit"):
+    if next_agent in ("pm", "tech_lead", "developer", "qa"):
         return next_agent
 
     return END

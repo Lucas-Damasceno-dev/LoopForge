@@ -37,8 +37,8 @@ class LoopForgeConfig(BaseModel):
     version: str = "6.0.0"
     ontology_path: str = "examples/the-foundry"  # Caminho para ontologia The Foundry
     stack: TechStack = Field(default_factory=TechStack)  # TechStack(language, framework, testing_harness, package_manager)
-    llm_provider: str = "google"        # "openrouter" | "google"
-    llm_model: str = "gemini-1.5-flash" # Modelo LLM (ex: inclusionai/ling-3.0-flash:free)
+    llm_provider: str = "openrouter"        # "openrouter" | "google"
+    llm_model: str = "oc/deepseek-v4-flash-free" # Modelo LLM (ex: inclusionai/ling-3.0-flash:free)
     budget_limit_usd: float = 10.0      # Limite de gasto USD (usado pelo CircuitBreaker)
     max_parallel_tasks: int = 2
     plan: PlanSchema = Field(default_factory=PlanSchema)  # PlanSchema(tasks[], graph{})

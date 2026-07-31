@@ -44,7 +44,7 @@ def test_qa_fallback_quando_llm_retorna_invalido(monkeypatch, tmp_path):
 
     result = qa_module.qa(state)
 
-    assert result["next_agent"] == "appsec"
+    assert result["next_agent"] == "parallel_audit"
     assert result["test_report"]["summary"]["status"] == "PASS"
     assert result["test_report"]["summary"]["tests_failed"] == 0
 
@@ -129,4 +129,4 @@ def test_qa_self_healing_reexecuta_harness(monkeypatch, tmp_path):
 
     result = qa_module.qa(state)
     assert calls["n"] == 2
-    assert result["next_agent"] == "appsec"
+    assert result["next_agent"] == "parallel_audit"

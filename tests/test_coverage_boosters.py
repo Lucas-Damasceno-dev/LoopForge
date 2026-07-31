@@ -128,5 +128,5 @@ def test_qa_node_mock_execution(tmp_path):
         "mock_llm": True,
     }
     res = qa(state)
-    assert res["next_agent"] == "appsec"
+    assert res["next_agent"] == "parallel_audit"
     assert "test_report" in res

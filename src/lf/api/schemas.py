@@ -1,14 +1,17 @@
 """Schemas Pydantic para validação de requests/responses da API."""
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+RoutingMode = Literal["full", "fast", "patch", "review-only", "explore"]
 
 
 class RunCreate(BaseModel):
     idea: str = Field(..., description="Descrição da funcionalidade ou ideia")
     stack: str = Field("python", description="Stack de tecnologia")
     mock_llm: bool = Field(False, description="Usar modo LLM mock")
-    routing_mode: str = Field("full", description="Modo de roteamento: full ou fast")
+    routing_mode: RoutingMode = Field("full", description="Modo de roteamento: full ou fast")
     interactive: bool = Field(False, description="Pausar após nós para aprovação humana (HITL)")
 
 

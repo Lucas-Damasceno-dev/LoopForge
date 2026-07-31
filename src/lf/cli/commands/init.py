@@ -34,8 +34,8 @@ def init_cmd(
         or "inclusionai/ling-3.0-flash:free"
     )
 
-    provider_to_use = llm_provider or ("openrouter" if openrouter_key else "google")
-    model_to_use = llm_model or (openrouter_model if openrouter_key else "gemini-1.5-flash")
+    provider_to_use = llm_provider or "openrouter"
+    model_to_use = llm_model or (openrouter_model if openrouter_key else "oc/deepseek-v4-flash-free")
 
     resolved_stack = resolve_tech_stack(stack, framework)
 

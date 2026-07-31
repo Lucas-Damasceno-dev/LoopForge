@@ -138,7 +138,7 @@ graph TD
         run_id = state.get("run_id", "run_latest")
         mem.save_lesson(run_id=run_id, stack=stack, idea=idea, lesson_text=content[:500])
     except Exception as exc:
-        print(f"--- AVISO: Falha ao persistir no MemoryManager: {exc} ---")
+        logger.warning("Falha ao persistir no MemoryManager: %s", exc)
 
     # 🧠 Integração Agentic Retro: persiste a síntese da sessão
     try:
