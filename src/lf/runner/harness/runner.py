@@ -20,9 +20,10 @@ class TestHarnessRunner:
 
     __test__ = False
 
-    def __init__(self, command: str | None = None, stack: str | None = None):
+    def __init__(self, command: str | None = None, stack: str | None = None, auto_format: bool = False):
         self.command = command
         self.stack = stack
+        self.auto_format = auto_format
 
     def _detect_command(self, cwd: str | Path) -> str:
         if self.command:
@@ -59,7 +60,8 @@ class TestHarnessRunner:
             print(f"--- AVISO: Falha na execução do auto-formatador: {exc} ---")
 
     def run(self, cwd: str | Path = ".") -> TestHarnessResult:
-        self.run_auto_formatter(cwd)
+        if self.auto_format:
+            self.run_auto_formatter(cwd)
         cmd = self._detect_command(cwd)
         try:
             res = subprocess.run(

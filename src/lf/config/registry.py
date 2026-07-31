@@ -2,6 +2,7 @@
 Desacopla a resolução de linguagens, ferramentas de teste e gerenciadores de pacote do core.
 """
 
+import configparser
 import os
 from abc import ABC, abstractmethod
 
@@ -63,9 +64,44 @@ class PythonStackHandler(BaseStackHandler):
     def default_package_manager(self) -> str:
         return "pip"
 
+    def _has_pytest_config(self, project_dir: str) -> bool:
+        pyproject_path = os.path.join(project_dir, "pyproject.toml")
+        if os.path.exists(pyproject_path):
+            with open(pyproject_path, encoding="utf-8") as pyproject_file:
+                pyproject_content = pyproject_file.read()
+            if "[tool.pytest.ini_options]" in pyproject_content:
+                return True
+
+        for ini_file in ("setup.cfg", "pytest.ini", "tox.ini"):
+            ini_path = os.path.join(project_dir, ini_file)
+            if not os.path.exists(ini_path):
+                continue
+            parser = configparser.ConfigParser()
+            parser.read(ini_path, encoding="utf-8")
+            if parser.has_section("pytest"):
+                return True
+            if ini_file == "setup.cfg" and parser.has_section("tool:pytest"):
+                return True
+
+        return False
+
+    def _has_test_files(self, project_dir: str) -> bool:
+        tests_dir = os.path.join(project_dir, "tests")
+        if not os.path.isdir(tests_dir):
+            return False
+        for root, _, files in os.walk(tests_dir):
+            for file_name in files:
+                if file_name.endswith(".py") and (
+                    file_name.startswith("test_") or file_name.endswith("_test.py")
+                ):
+                    return True
+        return False
+
     def detect_test_command(self, project_dir: str) -> str | None:
-        if os.path.exists(os.path.join(project_dir, "pyproject.toml")) or any(
-            f.endswith(".py") for f in os.listdir(project_dir) if os.path.isfile(os.path.join(project_dir, f))
+        if (
+            self._has_test_files(project_dir)
+            or os.path.exists(os.path.join(project_dir, "conftest.py"))
+            or self._has_pytest_config(project_dir)
         ):
             return "pytest"
         return None
