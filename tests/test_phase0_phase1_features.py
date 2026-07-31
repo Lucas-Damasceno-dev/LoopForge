@@ -8,12 +8,14 @@ from lf.pipeline.nodes.qa import qa
 from lf.pipeline.nodes.tech_lead import tech_lead
 
 
-def test_tech_lead_decides_stack_dynamically():
+def test_tech_lead_decides_stack_dynamically(tmp_path):
     state = {
         "idea": "CLI em Rust que lê arquivos CSV e gera relatórios em JSON",
         "user_stories": [{"id": "US-001", "title": "Ler CSV em Rust", "epic_id": "E-001"}],
         "mock_llm": True,
-        "stack": None,  # Nenhuma stack especificada na CLI
+        "stack": None,
+        "output_dir": str(tmp_path),
+        "project_dir": str(tmp_path),
     }
     res_tl = tech_lead(state)
     assert res_tl["stack"] is not None

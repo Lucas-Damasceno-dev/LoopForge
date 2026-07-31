@@ -1,5 +1,56 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "lf"
+version = "6.0.0"
+description = "LoopForge v6 - Autonomous Multi-Agent Software Development Pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "LoopForge Core Team", email = "dev@loopforge.ai" }
+]
+dependencies = [
+    "click>=8.1.0",
+    "langgraph>=0.0.1",
+    "pydantic>=2.0.0",
+    "rich>=13.0.0",
+    "httpx>=0.24.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "aiosqlite>=0.19.0",
+    "plyer>=2.1.0",
+    "jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "mypy>=1.5.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+lf = "lf.cli.main:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "SIM"]
+ignore = ["E501", "SIM117", "E402", "F401"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = ["packages/genome", "packages/registry", "packages/retro"]
+ignore_missing_imports = true
+warn_redundant_casts = false
+warn_unused_ignores = false
+ignore_errors = true

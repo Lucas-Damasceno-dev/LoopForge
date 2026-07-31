@@ -117,6 +117,20 @@ Responda com:
         truncated_stories = "\n".join(
             f"{us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:5]
         )
+        # 🧠 Injeta lições da memória no Tech Lead
+        memory_txt = ""
+        try:
+            from ...memory.manager import MemoryManager
+            mem = MemoryManager()
+            lessons = mem.search_relevant_lessons(query=idea, stack=decided_stack, limit=3)
+            memory_txt = mem.format_lessons_for_prompt(lessons)
+        except Exception:
+            pass
+
+        user_prompt_str = f"Ideia do Projeto: {idea}\nStack: {decided_stack}\n\nUser Stories:\n{truncated_stories}"
+        if memory_txt:
+            user_prompt_str += f"\n\n{memory_txt}"
+
         tech_spec = call_llm_via_opencode(
             system_prompt="""Você é um Tech Lead Sênior. Escreva uma especificação técnica (Tech Spec) completa e detalhada em Markdown.
 Use o template fornecido como guia. Seja técnico, preciso e inclua decisões de arquitetura e modelo de dados.
@@ -129,8 +143,8 @@ Especifique obrigatoriamente a estrutura de diretórios sugerida no projeto conf
 - Go: internal/domain/, internal/service/, internal/handler/, internal/repository/, pkg/
 
 Template (use como guia):
-{truncated_template}""",
-            user_prompt=f"Ideia: {idea}\nUser Stories:\n{truncated_stories}",
+""" + truncated_template,
+            user_prompt=user_prompt_str,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
         )

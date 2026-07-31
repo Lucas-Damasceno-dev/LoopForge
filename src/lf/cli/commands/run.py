@@ -1,4 +1,5 @@
 import sys
+import time
 import uuid
 
 import click
@@ -34,6 +35,21 @@ def _run_interactive_wizard() -> dict:
         "review_mode": review_mode,
         "notify": notify,
     }
+
+
+def _build_wizard_task_schema(
+    idea: str,
+    stack: str | None = None,
+    complexity: str = "standard",
+    interactive: bool = False,
+) -> TaskSchema:
+    """Constrói o objeto TaskSchema a partir dos parâmetros coletados no wizard ou CLI."""
+    return TaskSchema(
+        id=f"task-{int(time.time())}",
+        title=idea,
+        stack=stack or "python",
+        complexity_level=complexity,
+    )
 
 
 @click.command(name="run")

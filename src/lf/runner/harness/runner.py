@@ -55,8 +55,8 @@ class TestHarnessRunner:
                 subprocess.run("gofmt -w .", shell=True, cwd=cwd, capture_output=True, timeout=30)
             elif ("npm" in cmd or "npx" in cmd or "vitest" in cmd) and shutil.which("npx"):
                 subprocess.run("npx prettier --write .", shell=True, cwd=cwd, capture_output=True, timeout=30)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"--- AVISO: Falha na execução do auto-formatador: {exc} ---")
 
     def run(self, cwd: str | Path = ".") -> TestHarnessResult:
         self.run_auto_formatter(cwd)

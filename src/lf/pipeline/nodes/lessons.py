@@ -78,12 +78,24 @@ graph TD
     Logic --> Tests[QA Test Suite ({qa_status})]
 ```"""
 
+    qa_color = "brightgreen" if qa_status == "PASS" else "red"
+    sec_status = "PASS" if not vulns else "WARNING"
+    sec_color = "brightgreen" if not vulns else "orange"
+
     summary_content = f"""# 📊 Project Executive Summary: {idea}
+
+![QA Status](https://img.shields.io/badge/QA-{qa_status}-{qa_color})
+![Security Audit](https://img.shields.io/badge/AppSec-{sec_status}-{sec_color})
+![Stack](https://img.shields.io/badge/Stack-{stack.upper()}-blue)
 
 > **Stack:** `{stack}` | **Status QA:** `{qa_status}` ({tests_passed}/{total_tests}) | **Data:** {now_str}
 
 ## 🏗️ Diagrama de Arquitetura do Projeto Gerado
 {mermaid_diagram}
+
+## 🌐 Endpoints & Interface
+- **Base API URL:** `http://localhost:8000` (se aplicável para APIs)
+- **Health Check:** `GET /health` ou `GET /`
 
 ## 🛡️ Auditoria & Segurança
 {sec_warnings_txt}

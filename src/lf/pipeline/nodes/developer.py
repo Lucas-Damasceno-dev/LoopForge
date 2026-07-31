@@ -90,12 +90,13 @@ def _parse_multi_file_response(raw_text: str, default_filename: str = "main.py")
     return files
 
 
-def _check_syntax_and_types(files_map: dict[str, str], stack: str) -> list[str]:
-    """Valida sintaxe básica (AST para Python, node --check para JS/TS) antes do QA."""
+def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: str = ".") -> list[str]:
+    """Valida sintaxe básica e compilabilidade (AST/cargo check/go vet/node check) antes do QA."""
     import ast
     import shutil
     import subprocess
     errors = []
+    s = stack.lower()
 
     for rel_path, content in files_map.items():
         if rel_path.endswith(".py"):
@@ -110,6 +111,21 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str) -> list[str]:
                     errors.append(f"Node syntax check error em {rel_path}: {res.stderr.strip()}")
             except Exception:
                 pass
+
+    if "rust" in s and (Path(project_dir) / "Cargo.toml").exists() and shutil.which("cargo"):
+        try:
+            res = subprocess.run("cargo check", shell=True, cwd=project_dir, capture_output=True, text=True, timeout=15)
+            if res.returncode != 0:
+                errors.append(f"Cargo check error: {res.stderr.strip()[:300]}")
+        except Exception:
+            pass
+    elif "go" in s and (Path(project_dir) / "go.mod").exists() and shutil.which("go"):
+        try:
+            res = subprocess.run("go vet ./...", shell=True, cwd=project_dir, capture_output=True, text=True, timeout=15)
+            if res.returncode != 0:
+                errors.append(f"Go vet error: {res.stderr.strip()[:300]}")
+        except Exception:
+            pass
 
     return errors
 
@@ -168,7 +184,14 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
         genome_data = genome_scanner.scan()
         genome_prompt = render_markdown(genome_data)
         if genome_prompt:
-            prompt_parts.append(f"\n\n=== CODEBASE GENOME (DNA do Repositório) ===\n{genome_prompt}")
+            keywords = set(w.lower().strip() for w in f"{idea} {stack}".split() if len(w) > 3)
+            filtered_lines = [
+                line for line in genome_prompt.splitlines()
+                if not keywords or any(kw in line.lower() for kw in keywords) or line.startswith("#") or line.startswith("-")
+            ]
+            selective_genome = "\n".join(filtered_lines[:40])
+            if selective_genome:
+                prompt_parts.append(f"\n\n=== CODEBASE GENOME SELETIVO (DNA do Repositório) ===\n{selective_genome}")
     except Exception as exc:
         print(f"--- INFO: Genome scanner não utilizado nesta etapa: {exc} ---")
         _log_telemetry_event("hook_error", {"hook": "GenomeScanner", "error": str(exc), "node": "developer"})
@@ -249,8 +272,8 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
 
     files_map = _parse_multi_file_response(raw, default_main)
 
-    # 🔍 Gate Único de Qualidade: Validação sintática AST antes do QA
-    syntax_errors = _check_syntax_and_types(files_map, stack)
+    # 🔍 Gate Único de Qualidade: Validação sintática AST/Compiler antes do QA
+    syntax_errors = _check_syntax_and_types(files_map, stack, project_dir)
     if syntax_errors:
         print(f"--- AVISO: Sintaxe inválida detectada pelo AST Gate ({len(syntax_errors)} erros): ---")
         for err in syntax_errors:
@@ -347,16 +370,15 @@ PROTECTED_ROOT_FILES = {
 
 
 def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> None:
-    repo_root = Path(__file__).resolve().parents[3]
     for base_dir in set(target_dirs):
         if not base_dir:
             continue
         base_path = Path(base_dir).resolve()
-        is_repo_root = (base_path == repo_root)
+        is_loopforge_repo = (base_path / "AGENTS.md").exists() and (base_path / "src" / "lf").exists()
 
         for rel_path, content in files_map.items():
             norm_rel = os.path.normpath(rel_path)
-            if is_repo_root and (norm_rel in PROTECTED_ROOT_FILES or norm_rel.startswith(".github")):
+            if is_loopforge_repo and (norm_rel in PROTECTED_ROOT_FILES or norm_rel.startswith(".github")):
                 print(f"--- AVISO: Dogfooding Protection ativado: Bloqueada sobrescrita do arquivo do repositório '{rel_path}' ---")
                 continue
 

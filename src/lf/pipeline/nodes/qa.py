@@ -243,7 +243,7 @@ def _build_report_from_harness(
 
 
 def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> bool:
-    """Tenta auto-corrigir erros de incompatibilidade de versão de dependências (ex: requires rustc X)."""
+    """Tenta auto-corrigir erros de incompatibilidade de versão de dependências (Cargo.toml e package.json)."""
     import re
     import subprocess
     errors_str = " ".join(str(e) for e in harness_result.get("errors", []))
@@ -251,15 +251,38 @@ def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> 
 
     cargo_toml = Path(project_dir) / "Cargo.toml"
     if cargo_toml.exists():
+        # Cenário 1: "cargo update <crate> --precise ver"
         m = re.search(r"cargo update\s+([a-zA-Z0-9_-]+)(?:@\S+)?\s+--precise\s+(\S+)", output_str)
         if m:
             crate_name, target_ver = m.group(1), m.group(2)
-            print(f"--- INFO: Self-Healing de Dependências MVP: executando cargo update -p {crate_name} --precise {target_ver} ---")
+            print(f"--- INFO: Self-Healing Cargo: executando cargo update -p {crate_name} --precise {target_ver} ---")
             try:
                 subprocess.run(f"cargo update -p {crate_name} --precise {target_ver}", shell=True, cwd=project_dir, capture_output=True, timeout=30)
                 return True
             except Exception:
                 pass
+
+        # Cenário 2: "requires rustc X" ou "feature `edition2024` is required"
+        if "requires rustc" in output_str.lower() or "edition2024" in output_str.lower():
+            print("--- INFO: Self-Healing Cargo: ajustando edição para 2021 em Cargo.toml ---")
+            try:
+                content = cargo_toml.read_text(encoding="utf-8")
+                updated = re.sub(r'edition\s*=\s*"2024"', 'edition = "2021"', content)
+                if updated != content:
+                    cargo_toml.write_text(updated, encoding="utf-8")
+                    return True
+            except Exception:
+                pass
+
+    package_json = Path(project_dir) / "package.json"
+    if package_json.exists() and ("peer dependency" in output_str.lower() or "eresolve" in output_str.lower()):
+        print("--- INFO: Self-Healing NPM: executando npm install com --legacy-peer-deps ---")
+        try:
+            subprocess.run("npm install --legacy-peer-deps", shell=True, cwd=project_dir, capture_output=True, timeout=30)
+            return True
+        except Exception:
+            pass
+
     return False
 
 
