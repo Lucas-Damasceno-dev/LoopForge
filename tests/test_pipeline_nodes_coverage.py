@@ -58,7 +58,7 @@ def test_tech_lead_node(tmp_path):
 
     # Reuse existing spec
     res_reuse = tech_lead(res)
-    assert res_reuse["next_agent"] == "developer"
+    assert res_reuse["next_agent"] == "test_writer"
 
 
 
