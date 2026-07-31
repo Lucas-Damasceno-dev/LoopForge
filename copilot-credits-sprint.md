@@ -24,7 +24,7 @@
 
 | ID | Área | Task | Prioridade | Status |
 |---|---|---|---|---|
-| T1 | CI | Corrigir erros de lint + alinhar `--select` do CI com config do pyproject | alta | ⏳ em andamento |
+| T1 | CI | Corrigir erros de lint + alinhar `--select` do CI com config do pyproject | alta | ✅ concluída |
 | T2 | CI | Ativar gate real de mypy (remover `ignore_errors = true`, corrigir tipos) | alta | ❌ recusada pelo usuário |
 | T3 | Testes | Testes para módulos com 0% cobertura (`fail_to_eval.py`, `flake_isolator.py`) | alta | ✅ escolhida |
 | T4 | Config | Fix bug de precedência no `config/loader.py` (YAML parsing sempre) + teste de regressão | alta | ✅ escolhida |
@@ -59,7 +59,12 @@ Tasks paralelas só compartilham arquivos que **não** se sobrepõem. Ordens imp
 | 1 | 2026-07-31 ~17:00 | T1 (tentativa 1) | `gh copilot -p "T1-LINT" --yolo --no-ask-user --max-autopilot-continues 3` | Esgotou 3 continues: autofix rodou (4 erros corrigidos), 126 restantes (114 E501 + 9 SIM117 + 1 SIM105 + 1 SIM102 + 1 F841) | 6.48 |
 | 2 | 2026-07-31 ~17:10 | T1 (tentativa 2) | `... --resume=a214c265... --max-autopilot-continues 5` | **TRAVOU** — processo 0% CPU esperando input interativo; morto via pkill | 0 (retomada) |
 | 3 | 2026-07-31 ~17:20 | T1 (tentativa 3) | `... --max-autopilot-continues 5 < /dev/null` | Recusou: "126 E501 é arriscado num turno" — 0 changes, 4.87 créditos. **Re-escopo**: alinhar CI + 3 erros reais | 4.87 |
-| 4 | 2026-07-31 ~17:30 | T1 (tentativa 4/final) | `... T1-FINAL < /dev/null` | em execução | — |
+| 4 | 2026-07-31 ~17:30 | T1 (tentativa 4/final) | `... T1-FINAL < /dev/null` | ✅ Concluída: ci.yml sem `--select`; SIM105/SIM102/F841 corrigidos; ruff "All checks passed" (config) + pytest verde. Sessão resumível: `3fc41788-726a-4886-add5-17bf005b1344` | 5.98 |
+| 5 | 2026-07-31 ~17:40 | T1 (pós) | fix direto (orquestrador) | W292 residual em `tests/test_main.py` (newline final) corrigido via printf — ruff "All checks passed" + pytest test_main 1 passed | 0 |
+| 6 | 2026-07-31 ~18:00 | T3 (Onda 2) | testes p/ fail_to_eval.py + flake_isolator.py (PID 21628) | ⏳ em execução | — |
+| 7 | 2026-07-31 ~18:00 | T4 (Onda 2) | fix precedência loader.py + teste (PID 21654) | ⏳ em execução | — |
+| 8 | 2026-07-31 ~18:00 | T7 (Onda 2) | auto-formatter opt-in + teste (PID 21709) | ⏳ em execução | — |
+| 9 | 2026-07-31 ~18:00 | T11 (Onda 2) | fix detect_test_command falso positivo + teste (PID 21761) | ⏳ em execução | — |
 
 ## Checklist pós-sprint
 
