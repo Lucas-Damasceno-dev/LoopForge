@@ -152,8 +152,10 @@ Todos os 12 tasks aprovados concluídos (T2 recusada pelo usuário). Sprint usou
 
 | # | Horário | Task | Resultado | Créditos |
 |---|---|---|---|---|
-| 23 | 2026-07-31 ~19:47 | Q1 (Onda A) | despachado PID 49827 | — |
-| 24 | 2026-07-31 ~19:47 | Q3 (Onda A) | despachado PID 49829 | — |
-| 25 | 2026-07-31 ~19:47 | Q4 (Onda A) | despachado PID 49831 | — |
-| 26 | 2026-07-31 ~19:47 | Q5 (Onda A) | despachado PID 49833 | — |
-| 27 | 2026-07-31 ~19:50 | Q2 (Onda A) | despachado PID 50682 (após decisão do usuário: remover apenas a chamada LLM redundante do QA, mantendo nó + gate) | — |
+| 23 | 2026-07-31 ~19:47 | Q1 (Onda A) | developer.py: stories[:8] com acceptance_criteria completos + regra 7 'cada critério = ≥1 teste' (PID 49827) | ✅ +10 -2; 3.71cr; ruff OK; 10 passed. Sessão: `781be0f7-ba00-4c5d-ac9b-4033d2b55c7d` | 3.71 |
+| 24 | 2026-07-31 ~19:47 | Q3 (Onda A) | devops.py: Dockerfile Python genérico (COPY ., CMD generated_code.py) (PID 49829) | ✅ +4 -4; 2.87cr; ruff OK. Sessão: `a93b79bf-64f5-4fed-82e5-d99cd072a9d8` | 2.87 |
+| 25 | 2026-07-31 ~19:47 | Q4 (Onda A) | lessons.py: lesson_text rico com falhas reais do test_report (top 3, 200 chars, total 600) (PID 49831) | ✅ +30 -1; 3.76cr; ruff OK; 1 passed. Sessão: `e2928841-f893-4fa3-889d-e8a15593a7c0` | 3.76 |
+| 26 | 2026-07-31 ~19:47 | Q5 (Onda A) | llm.py: user_content sem system embutido na rota OpenRouter (llm_factory intacta) (PID 49833) | ✅ +2 -1; 3.09cr; ruff OK; 23 passed. Sessão: `d973cbbb-2f5d-45ac-94ba-de8a98c975f1` | 3.09 |
+| 27 | 2026-07-31 ~19:50 | Q2 (Onda A) | qa.py: removida classe TestExecutionReport + call LLM; report = _build_report_from_harness direto (PID 50682) | ⚠️ +1 -47; 4.67cr; produto correto (code/imports órfãos OK, gate intacto) mas QUEBROU 4 testes stale (mockavam call_llm_via_opencode). Fix pelo orquestrador: 4 testes adaptados (test_qa_relatorio_direto_do_harness; removidos mocks). Suíte final: 213 passed/1 skipped; ruff All checks passed. Sessão: `4f903390-99d3-4ee6-90a5-adb7eaa27cba` | 4.67 |
+| 28 | 2026-07-31 ~20:10 | Q6 (Onda B) | developer.py + tech_lead.py: truncamento seletivo da tech spec (preserva Arquitetura/Estrutura/Dados; corta preâmbulo) | ⏳ PID 53289 |
+| 29 | 2026-07-31 ~20:10 | Q8 (Onda B) | qa.py: harness roda no diretório do produto (output_dir), fallback project_dir — evita coletar testes do próprio repo | ⏳ PID 53291 |

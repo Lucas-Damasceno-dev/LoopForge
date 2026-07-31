@@ -14,6 +14,28 @@ from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 
 
+def _truncate_template_at_section_boundary(tech_spec_template: str, max_chars: int = 1500) -> str:
+    """Evita truncar o template no meio de seções Markdown para manter contexto coerente."""
+    if len(tech_spec_template) <= max_chars:
+        return tech_spec_template
+
+    prefix = tech_spec_template[:max_chars]
+    header_pattern = r"(?m)^\s{0,3}#{2,3}\s+"
+    headers = list(__import__("re").finditer(header_pattern, prefix))
+
+    if not headers:
+        return prefix
+
+    for header in reversed(headers):
+        if header.start() == 0:
+            continue
+        next_header = __import__("re").search(header_pattern, tech_spec_template[header.start() + 1 :])
+        section_end = len(tech_spec_template) if next_header is None else header.start() + 1 + next_header.start()
+        if section_end <= max_chars:
+            return tech_spec_template[:section_end]
+    return tech_spec_template[:headers[-1].start()]
+
+
 class ValidationResult(BaseModel):
     """Resultado da validação do Tech Lead sobre as user stories."""
     needs_feedback: bool = Field(..., description="True se user stories precisam de revisão")
@@ -113,7 +135,7 @@ Responda com:
     print(f"--- Gerando especificação técnica (Stack decidida pelo TL: {decided_stack}) ---")
 
     try:
-        truncated_template = tech_spec_template[:1500]
+        truncated_template = _truncate_template_at_section_boundary(tech_spec_template, 1500)
         truncated_stories = "\n".join(
             f"{us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:5]
         )

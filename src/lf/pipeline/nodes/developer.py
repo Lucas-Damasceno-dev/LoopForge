@@ -19,6 +19,43 @@ from ...runner.opencode import call_llm_via_opencode
 logger = logging.getLogger(__name__)
 
 
+def _truncate_tech_spec(spec: str, max_chars: int = 2000) -> str:
+    """Preserva seções arquiteturais relevantes antes de truncar para caber no prompt."""
+    if len(spec) <= max_chars:
+        return spec
+
+    header_pattern = re.compile(r"^\s{0,3}#{2,3}\s+(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
+    keywords = (
+        "arquitet",
+        "estrutur",
+        "diretóri",
+        "directory",
+        "dado",
+        "data",
+        "component",
+        "endpoint",
+        "schema",
+        "modelo",
+    )
+
+    start_idx = None
+    for match in header_pattern.finditer(spec):
+        title = match.group(1).lower()
+        if any(keyword in title for keyword in keywords):
+            start_idx = match.start()
+            break
+
+    if start_idx is None:
+        return spec[:max_chars]
+
+    selected = spec[start_idx : start_idx + max_chars]
+    if len(spec) > start_idx + max_chars:
+        line_break = selected.rfind("\n")
+        if line_break > 0:
+            selected = selected[:line_break]
+    return selected
+
+
 def _log_telemetry_event(event_type: str, details: dict) -> None:
     try:
         db_path = Path(".loopforge/telemetry.sqlite").resolve()
@@ -184,7 +221,7 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
 
     prompt_parts = [
         f"Ideia do Projeto: {idea}",
-        f"\nTech Spec:\n{tech_spec[:2000]}",
+        f"\nTech Spec:\n{_truncate_tech_spec(tech_spec)}",
         f"\nUser Stories:\n{chr(10).join(story_lines) if story_lines else 'N/A'}",
     ]
 

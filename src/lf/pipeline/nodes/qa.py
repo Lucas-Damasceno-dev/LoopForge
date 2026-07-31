@@ -22,6 +22,8 @@ def qa(state: GraphState) -> dict:
 
     code = state.get("code", "")
     project_dir = state.get("project_dir", os.getcwd())
+    # QA executa o harness no diretório do produto (output_dir) para não coletar testes do próprio repo; fallback para project_dir.
+    product_dir = state.get("output_dir") or project_dir
     now_iso = datetime.now(UTC).isoformat()
     report_id = f"EXEC-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-001"
 
@@ -54,16 +56,16 @@ def qa(state: GraphState) -> dict:
         return {**state, "test_report": report, "next_agent": "parallel_audit"}
 
     # Fase 1: Executar harness real no projeto
-    harness_result = _run_harness(project_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
+    harness_result = _run_harness(product_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
 
     # Fase 2: Gerar relatório estruturado via OpenCode (com fallback resiliente para o harness)
     user_stories = state.get("user_stories", [])
     user_story_id = user_stories[0].get("id", "US001") if user_stories else "US001"
 
     # 🩹 Self-Healing MVP de Dependências: se falhar por versão incompatível, tenta auto-fixar
-    if (harness_result.get("passed", 0) == 0 or harness_result.get("errors")) and _attempt_dependency_self_healing(project_dir, harness_result):
+    if (harness_result.get("passed", 0) == 0 or harness_result.get("errors")) and _attempt_dependency_self_healing(product_dir, harness_result):
         print("--- INFO: Re-executando Test Harness após Self-Healing de dependências ---")
-        harness_result = _run_harness(project_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
+        harness_result = _run_harness(product_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
 
     print(f"--- INFO: Harness executado (passou={harness_result.get('passed')}, erros={len(harness_result.get('errors', []))}) ---")
 
