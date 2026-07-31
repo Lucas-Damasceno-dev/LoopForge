@@ -139,6 +139,26 @@ def qa(state: GraphState) -> dict:
         err_list = harness_result.get("errors", [])
         if err_list:
             err_details = "; ".join(err_list[:3])
+            # Anexa diagnóstico estruturado por teste (test_name + erro) quando disponível
+            structured = []
+            suites = report.get("results_by_suite", [])
+            if isinstance(suites, list):
+                for suite in suites:
+                    if not isinstance(suite, dict):
+                        continue
+                    for detail in suite.get("failed_tests_details", []):
+                        if not isinstance(detail, dict):
+                            continue
+                        test_name = detail.get("test_name") or detail.get("name") or "teste"
+                        err_text = detail.get("error") or detail.get("message") or ""
+                        if isinstance(err_text, str) and err_text.strip():
+                            structured.append(f"{test_name}: {err_text.strip()[:300]}")
+                        if len(structured) >= 3:
+                            break
+                    if len(structured) >= 3:
+                        break
+            if structured:
+                err_details = f"{err_details} | " + "; ".join(structured)
         elif raw_output:
             # Pega as últimas 800 letras do stdout/stderr (onde fica a mensagem de erro do compilador)
             err_details = raw_output[-800:].replace("\n", " ").strip()

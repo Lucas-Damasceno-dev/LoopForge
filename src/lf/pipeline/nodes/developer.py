@@ -13,9 +13,10 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ...guardrails.circuit_breaker import CircuitBreaker
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
-from ...guardrails.circuit_breaker import CircuitBreaker
+from ...runner.opencode.runner import DEFAULT_OPENCODE_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -301,7 +302,7 @@ def developer(state: GraphState) -> dict:
     tech_spec = state.get("tech_spec", "")
     idea = state.get("idea", "")
     user_stories = state.get("user_stories", [])
-    model_name = os.environ.get("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash:free")
+    model_name = os.environ.get("OPENROUTER_MODEL") or DEFAULT_OPENCODE_MODEL
 
     story_lines = []
     for us in user_stories[:8]:
