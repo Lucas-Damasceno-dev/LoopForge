@@ -224,6 +224,13 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
         f"\nTech Spec:\n{_truncate_tech_spec(tech_spec)}",
         f"\nUser Stories:\n{chr(10).join(story_lines) if story_lines else 'N/A'}",
     ]
+    contract_tests = state.get("contract_tests", "")
+    if contract_tests:
+        prompt_parts.append(
+            f"\n\n=== CONTRATO DE TESTES (suíte definida pelo Test Writer independente) ===\n"
+            f"SEU CÓDIGO DEVE FAZER ESTES TESTES PASSAREM:\n{contract_tests[:2000]}\n"
+            "NÃO modifique nem sobrescreva os arquivos em tests/ já fornecidos."
+        )
 
     # 🧬 Injeta o genoma do repositório se disponível (<2s token-optimized summary)
     try:

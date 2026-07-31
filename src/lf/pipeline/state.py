@@ -17,6 +17,7 @@ class GraphState(TypedDict):
     epic: dict
     user_stories: list[dict]
     tech_spec: str
+    contract_tests: str
     code: str
     test_report: dict
     security_review: dict

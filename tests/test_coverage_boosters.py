@@ -114,7 +114,7 @@ def test_tech_lead_node_execution(tmp_path):
         "mock_llm": True,
     }
     res = tech_lead(state)
-    assert res["next_agent"] == "developer"
+    assert res["next_agent"] == "test_writer"
     assert "tech_spec" in res
     assert len(res["tech_spec"]) > 0
 

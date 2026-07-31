@@ -89,6 +89,22 @@ def qa(state: GraphState) -> dict:
     report["execution_timestamp"] = now_iso
     report.setdefault("summary", {})["duration_seconds"] = harness_result.get("duration_ms", 0) / 1000.0
 
+    # Gate determinístico de cobertura de critérios: cada acceptance criterion precisa de ao menos 1 teste passando.
+    total_criteria = sum(
+        len(us.get("acceptance_criteria") or [])
+        for us in user_stories
+        if isinstance(us.get("acceptance_criteria"), list)
+    )
+    passed = report.get("summary", {}).get("tests_passed", 0)
+    criteria_coverage_feedback = ""
+    if total_criteria > 0 and passed < total_criteria:
+        report["summary"]["status"] = "FAIL"
+        report["summary"]["tests_failed"] = max(report["summary"].get("tests_failed", 1), total_criteria - passed)
+        criteria_coverage_feedback = (
+            f"- [QA Cobertura de Critérios]: {total_criteria} acceptance criteria definidos, "
+            f"mas apenas {passed} teste(s) passaram. Cada critério deve ter pelo menos 1 teste (regra 7)."
+        )
+
     output_dir = state.get("output_dir", ".")
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
@@ -118,6 +134,8 @@ def qa(state: GraphState) -> dict:
             err_details = "Falha de compilação ou execução de testes."
 
         msg = f"FALHA NO QA (Tentativa {qa_attempt}): {failed_cnt} teste(s)/compilação falharam. Detalhes técnicos do erro:\n{err_details}"
+        if criteria_coverage_feedback:
+            msg = f"{msg}\n{criteria_coverage_feedback}"
         new_feedback = feedback_history + [{"from": "qa", "message": msg, "timestamp": now_iso}]
 
     return {

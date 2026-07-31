@@ -66,7 +66,7 @@ def tech_lead(state: GraphState) -> dict:
     if state.get("tech_spec"):
         print("--- INFO: Tech Lead reutilizando Tech Spec existente no estado ---")
         decided_stack = current_stack or _extract_stack_from_text(state["tech_spec"])
-        return {**state, "stack": decided_stack, "next_agent": "developer"}
+        return {**state, "stack": decided_stack, "next_agent": "test_writer"}
 
     now_iso = datetime.now(UTC).isoformat()
     now_date = now_iso.split("T")[0]
@@ -83,7 +83,7 @@ def tech_lead(state: GraphState) -> dict:
         print("--- INFO: Tech Lead modo MOCK ---")
         decided_stack = current_stack or _extract_stack_from_text(idea) or "python"
         tech_spec = _mock_tech_spec(user_stories, tech_spec_template, now_date, decided_stack)
-        return {**state, "stack": decided_stack, "tech_spec": tech_spec, "next_agent": "developer"}
+        return {**state, "stack": decided_stack, "tech_spec": tech_spec, "next_agent": "test_writer"}
 
     print("--- INFO: Tech Lead analisando problema e decidindo stack ---")
 
@@ -194,7 +194,7 @@ Template (use como guia):
         "stack_rationale": rationale,
         "tech_spec": tech_spec,
         "feedback_history": new_feedback,
-        "next_agent": "developer",
+        "next_agent": "test_writer",
     }
 
 

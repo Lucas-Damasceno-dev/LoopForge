@@ -53,7 +53,7 @@ def test_tech_lead_node(tmp_path):
     # Mock mode
     state = {"user_stories": user_stories, "mock_llm": True, "output_dir": str(tmp_path)}
     res = tech_lead(state)
-    assert res["next_agent"] == "developer"
+    assert res["next_agent"] == "test_writer"
     assert "tech_spec" in res
 
     # Reuse existing spec

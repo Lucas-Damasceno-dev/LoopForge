@@ -17,6 +17,7 @@ from .nodes.parallel_audit import parallel_audit
 from .nodes.pm import product_manager
 from .nodes.qa import qa
 from .nodes.tech_lead import tech_lead
+from .nodes.test_writer import test_writer
 from .state import GraphState
 
 
@@ -45,7 +46,7 @@ def router(state: GraphState) -> str:
     """Router único: decide próximo nó baseado no estado.
 
     Só aceita destinos que existem nos mappings do EdgeRegistry (harmonizado):
-    pm, tech_lead, developer, qa. Qualquer outro next_agent cai em END em vez de
+    pm, tech_lead, test_writer, developer, qa. Qualquer outro next_agent cai em END em vez de
     disparar ValueError do LangGraph por chave ausente no mapping do nó fonte.
     """
     next_agent = state.get("next_agent", "cpo")
@@ -53,7 +54,7 @@ def router(state: GraphState) -> str:
     if next_agent in ("FINISH", "__end__", None):
         return END
 
-    if next_agent in ("pm", "tech_lead", "developer", "qa"):
+    if next_agent in ("pm", "tech_lead", "test_writer", "developer", "qa"):
         return next_agent
 
     return END
@@ -85,6 +86,7 @@ class NodeRegistry:
         "cpo": cpo,
         "pm": product_manager,
         "tech_lead": tech_lead,
+        "test_writer": test_writer,
         "developer": developer,
         "qa": qa,
         "appsec": appsec,
@@ -106,7 +108,8 @@ class EdgeRegistry:
     _conditional_edges: dict[str, dict[str, str]] = {
         "cpo": {"pm": "pm", "__end__": END},
         "pm": {"tech_lead": "tech_lead", "__end__": END},
-        "tech_lead": {"developer": "developer", "__end__": END},
+        "tech_lead": {"test_writer": "test_writer", "__end__": END},
+        "test_writer": {"developer": "developer", "__end__": END},
         "developer": {"qa": "qa", "__end__": END},
         "parallel_audit": {"developer": "developer", "__end__": END},
     }
