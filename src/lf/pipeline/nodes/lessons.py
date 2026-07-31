@@ -4,10 +4,13 @@ métricas de QA, relatórios de AppSec e instruções de execução do projeto.
 """
 from __future__ import annotations
 
+import logging
 import os
 from datetime import UTC, datetime
 
 from ...pipeline.state import GraphState
+
+logger = logging.getLogger(__name__)
 
 
 def generate_lessons_md(state: GraphState) -> str:
@@ -33,8 +36,8 @@ def generate_lessons_md(state: GraphState) -> str:
         mem = MemoryManager()
         lesson_text = f"Resultado QA: {qa_status} ({tests_passed}/{total_tests} testes). Ideia: {idea}"
         mem.save_lesson(run_id=str(state.get("task_id", "run")), stack=stack, idea=idea, lesson_text=lesson_text)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Falha ao salvar lição aprendida: %s", exc)
 
     # AppSec warnings
     vulns = []

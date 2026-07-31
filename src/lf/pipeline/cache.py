@@ -1,10 +1,13 @@
 """SQLiteLLMCache — Cache semântico de chamadas LLM com SQLite desacoplado."""
 import hashlib
+import logging
 import re
 import sqlite3
 from pathlib import Path
 
 from ..config.paths import LLM_CACHE_DB_PATH
+
+logger = logging.getLogger(__name__)
 
 
 def _semantic_normalize_prompt(prompt: str) -> str:
@@ -20,8 +23,8 @@ def _connect_sqlite(db_path: str | Path) -> sqlite3.Connection:
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Falha ao acessar cache LLM: %s", exc)
     return conn
 
 

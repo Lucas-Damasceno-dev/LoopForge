@@ -5,6 +5,7 @@ Nó Developer: recebe a stack decidida pelo Tech Lead e gera um projeto MULTI-AR
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -14,6 +15,8 @@ from pathlib import Path
 
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
+
+logger = logging.getLogger(__name__)
 
 
 def _log_telemetry_event(event_type: str, details: dict) -> None:
@@ -26,8 +29,8 @@ def _log_telemetry_event(event_type: str, details: dict) -> None:
         conn.execute("INSERT INTO telemetry_events VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), event_type, json.dumps(details), datetime.now(UTC).isoformat()))
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Falha ao registrar evento de telemetria: %s", exc)
 
 
 def _clean_code(raw: str) -> str:

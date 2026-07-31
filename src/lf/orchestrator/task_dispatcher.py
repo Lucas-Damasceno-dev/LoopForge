@@ -45,7 +45,7 @@ def _send_notification(title: str, message: str, webhook_url: str | None = None)
             req = urllib.request.Request(webhook_url, data=payload, headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=3)
         except Exception as exc:
-            logger.warning("Falha ao transmitir evento WS: %s", exc)
+            logger.warning("Falha ao enviar notificação webhook: %s", exc)
 
 
 class TaskDispatcher:
@@ -140,7 +140,7 @@ class TaskDispatcher:
             except RuntimeError:
                 asyncio.run(ws_manager.broadcast(message))
         except Exception as exc:
-            logger.warning("Falha ao verificar decisão remota: %s", exc)
+            logger.warning("Falha ao transmitir evento WS: %s", exc)
 
     def _get_input_with_timeout(self, prompt_text: str, timeout: int = 300) -> str:
         """Lê input com suporte a timeout no Unix/Linux."""
@@ -199,8 +199,8 @@ class TaskDispatcher:
                 if row:
                     console.print(f"[bold green]➜ Decisão Remota via API Detectada: {row[0].upper()}[/bold green]")
                     return {"action": row[0], "category": row[1], "message": row[2]}
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Falha ao verificar decisão remota: %s", exc)
 
             remaining = int(deadline - time.monotonic())
             if remaining > 0 and remaining % 10 == 0:
