@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import time
 from datetime import UTC, datetime
@@ -162,6 +163,13 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
 
     from ...runner.harness.runner import TestHarnessRunner
     target_dir = project_dir if (project_dir and os.path.exists(project_dir)) else output_dir
+
+    if ("go" in stack.lower() or os.path.exists(os.path.join(target_dir, "go.mod"))) and shutil.which("go"):
+        try:
+            subprocess.run("go mod tidy", shell=True, cwd=target_dir, capture_output=True, timeout=60)
+        except Exception:
+            pass
+
     runner = TestHarnessRunner(stack=stack)
     res = runner.run(target_dir)
     return asdict(res) if hasattr(res, "__dataclass_fields__") else res
@@ -279,6 +287,15 @@ def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> 
         print("--- INFO: Self-Healing NPM: executando npm install com --legacy-peer-deps ---")
         try:
             subprocess.run("npm install --legacy-peer-deps", shell=True, cwd=project_dir, capture_output=True, timeout=30)
+            return True
+        except Exception:
+            pass
+
+    go_mod = Path(project_dir) / "go.mod"
+    if go_mod.exists() or "no required module" in output_str.lower() or "cannot find module" in output_str.lower():
+        print("--- INFO: Self-Healing Go: executando go mod tidy ---")
+        try:
+            subprocess.run("go mod tidy", shell=True, cwd=project_dir, capture_output=True, timeout=60)
             return True
         except Exception:
             pass
