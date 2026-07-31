@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def generate_lessons_md(state: GraphState) -> str:
     """Gera o arquivo lessons.md no diretório de saída do projeto."""
-    stack = state.get("stack", "Não especificada")
+    stack = state.get("stack") or "python"
     attempts = state.get("attempt_count", 1)
     test_report = state.get("test_report", {})
     sec_report = state.get("security_review") or state.get("security_report", {})

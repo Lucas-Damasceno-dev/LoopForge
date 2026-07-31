@@ -42,7 +42,11 @@ def test_graph_router_direct():
         "persona_id": None,
     }
 
-    assert router(state) == "cpo"
+    # "cpo" é nó de entrada (entry_router), não alvo de EdgeRegistry — router retorna END
+    assert router(state) == "__end__"
+
+    state["next_agent"] = "pm"
+    assert router(state) == "pm"
 
     state["next_agent"] = "developer"
     assert router(state) == "developer"
