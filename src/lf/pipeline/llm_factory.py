@@ -31,6 +31,7 @@ def call_openrouter_api(
 ) -> tuple[str, dict | None]:
     """Helper para chamadas OpenRouter API via httpx com retentativas automáticas e backoff."""
     import time
+
     import httpx
 
     target_model = model or os.environ.get("OPENROUTER_MODEL") or DEFAULT_OPENROUTER_MODEL

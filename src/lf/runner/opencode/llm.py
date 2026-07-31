@@ -78,8 +78,6 @@ Responda SOMENTE o objeto JSON puro."""
         call_openrouter_api,
     )
     openrouter_key = os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
-    base_url = os.environ.get("OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL)
-    is_default_or = base_url.rstrip("/") == _DEFAULT_OPENROUTER_BASE_URL
 
     raw_response_text = ""
     if openrouter_key:

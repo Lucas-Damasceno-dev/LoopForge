@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import time
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -149,7 +150,7 @@ O relatório DEVE ter:
         qa_attempt += 1
         print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
         failed_cnt = report.get("summary", {}).get("tests_failed", 1)
-        
+
         # Extrai os detalhes reais do erro do compilador/harness
         err_list = harness_result.get("errors", [])
         if err_list:
@@ -159,7 +160,7 @@ O relatório DEVE ter:
             err_details = raw_output[-800:].replace("\n", " ").strip()
         else:
             err_details = "Falha de compilação ou execução de testes."
-            
+
         msg = f"FALHA NO QA (Tentativa {qa_attempt}): {failed_cnt} teste(s)/compilação falharam. Detalhes técnicos do erro:\n{err_details}"
         new_feedback = feedback_history + [{"from": "qa", "message": msg, "timestamp": now_iso}]
 
@@ -180,10 +181,8 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
     target_dir = project_dir if (project_dir and os.path.exists(project_dir)) else output_dir
 
     if ("go" in stack.lower() or os.path.exists(os.path.join(target_dir, "go.mod"))) and shutil.which("go"):
-        try:
+        with suppress(Exception):
             subprocess.run("go mod tidy", shell=True, cwd=target_dir, capture_output=True, timeout=60)
-        except Exception:
-            pass
 
     runner = TestHarnessRunner(stack=stack)
     res = runner.run(target_dir)

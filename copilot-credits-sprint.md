@@ -1,0 +1,69 @@
+# Copilot Credits Sprint — LoopForge
+
+> Registro de coordenação do GitHub Copilot CLI (plano Pro via GitHub Education).
+> Execução via: `gh copilot -p "<task>" --yolo --no-ask-user --max-autopilot-continues 3`
+
+## Contexto
+
+- **Data**: 2026-07-31
+- **Créditos**: 0/200 usados — reset em ~5h
+- **Foco**: fundação do projeto
+- **Modelo**: GitHub Copilot CLI 1.0.77
+
+## Estado da fundação (baseline)
+
+| Verificação | Resultado | Observação |
+|---|---|---|
+| `pytest tests/` | 151 passed, 1 skipped | 20.5s |
+| Cobertura `src/lf` | 76.75% | limiar CI 75% — margem de ~1.75pp |
+| `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` | **119 erros** | 114×E501, 2×W293, 1×W292, 1×I001, 1×F841 → **CI vermelha** |
+| `mypy src/lf` | Success | **no-op** (`ignore_errors = true` no pyproject) |
+| Git | árvore limpa | — |
+
+## Tasks propostas
+
+| ID | Área | Task | Prioridade | Status |
+|---|---|---|---|---|
+| T1 | CI | Corrigir erros de lint + alinhar `--select` do CI com config do pyproject | alta | ⏳ em andamento |
+| T2 | CI | Ativar gate real de mypy (remover `ignore_errors = true`, corrigir tipos) | alta | ❌ recusada pelo usuário |
+| T3 | Testes | Testes para módulos com 0% cobertura (`fail_to_eval.py`, `flake_isolator.py`) | alta | ✅ escolhida |
+| T4 | Config | Fix bug de precedência no `config/loader.py` (YAML parsing sempre) + teste de regressão | alta | ✅ escolhida |
+| T5 | Pipeline | Tornar `parallel_audit` resiliente: `as_completed(timeout)`, capturar exceção, setar `error` | alta | ✅ escolhida |
+| T6 | Pipeline | Marcar run como falho quando retry esgota (`should_retry` + WS `completed` no dispatcher) | alta | ✅ escolhida |
+| T7 | Runner | Auto-formatter opt-in (`run_auto_formatter` muta projeto do usuário sem flag) | média | ✅ escolhida |
+| T8 | Testes | Testes para núcleo: `pipeline/nodes/qa.py` (56%) + `pipeline/llm_factory.py` (56%) | média | ✅ escolhida |
+| T9 | Config | Validação Pydantic: `Literal` p/ routing_mode/task_type/complexity, constraints em budget/parallel | média | ✅ escolhida |
+| T10 | Qualidade | Substituir `except Exception: pass` por logging (telemetria, WS, decisão humana) | média | ✅ escolhida |
+| T11 | Runner | Fix `detect_test_command` falso positivo (exigir `tests/` real, não só `.py`) | média | ✅ escolhida |
+| T12 | Config | Atualizar defaults para OpenRouter (`oc/deepseek-v4-flash-free`) | baixa | ✅ escolhida |
+
+## Notas da análise
+
+- **Descoberta importante**: `pyproject.toml` já ignora `E501` e `SIM117` (`[tool.ruff.lint].ignore`). Os 130 erros só aparecem porque o CI roda `--select` na CLI, que sobrescreve o ignore. Estratégia T1 (re-escopada após recusa do copilot em corrigir 126 E501): **alinhar CI à config** (remover `--select` do ci.yml) + corrigir os **3 erros reais** restantes (SIM105 `qa.py:183`, SIM102 `parser.py:40`, F841 `llm.py:82`). E501/SIM117 permanecem intencionalmente ignorados.
+
+## Plano de ondas (evita interferência de arquivos)
+
+Tasks paralelas só compartilham arquivos que **não** se sobrepõem. Ordens impostas por conflito: T9→T12 (schema.py), T6→T10 (task_dispatcher.py), T1 sozinha (toca tudo).
+
+| Onda | Tasks | Por quê |
+|---|---|---|
+| 1 | T1 | toca src/lf + tests inteiros — sozinha |
+| 2 | T3, T4, T7, T11 | arquivos disjuntos (testes novos; loader.py; harness/runner.py; config/registry.py) |
+| 3 | T5, T6, T8, T9 | disjuntos (parallel_audit.py; graph.py+task_dispatcher.py; testes novos; schema.py) |
+| 4 | T10, T12 | disjuntos (logging em 4 arquivos; schema.py defaults) |
+
+## Log de execução
+
+| # | Data/hora | Task | Comando | Resultado | Créditos |
+|---|---|---|---|---|---|
+| 1 | 2026-07-31 ~17:00 | T1 (tentativa 1) | `gh copilot -p "T1-LINT" --yolo --no-ask-user --max-autopilot-continues 3` | Esgotou 3 continues: autofix rodou (4 erros corrigidos), 126 restantes (114 E501 + 9 SIM117 + 1 SIM105 + 1 SIM102 + 1 F841) | 6.48 |
+| 2 | 2026-07-31 ~17:10 | T1 (tentativa 2) | `... --resume=a214c265... --max-autopilot-continues 5` | **TRAVOU** — processo 0% CPU esperando input interativo; morto via pkill | 0 (retomada) |
+| 3 | 2026-07-31 ~17:20 | T1 (tentativa 3) | `... --max-autopilot-continues 5 < /dev/null` | Recusou: "126 E501 é arriscado num turno" — 0 changes, 4.87 créditos. **Re-escopo**: alinhar CI + 3 erros reais | 4.87 |
+| 4 | 2026-07-31 ~17:30 | T1 (tentativa 4/final) | `... T1-FINAL < /dev/null` | em execução | — |
+
+## Checklist pós-sprint
+
+- [ ] Rodar `pytest tests/` completo
+- [ ] Rodar ruff + mypy com os mesmos comandos do CI
+- [ ] Conferir cobertura ≥ 75%
+- [ ] Revisar diffs das tasks (especialmente mutações fora do escopo)
