@@ -13,24 +13,7 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pydantic import BaseModel, Field
-
 from ...pipeline.state import GraphState
-from ...runner.opencode import call_llm_via_opencode
-
-
-class TestExecutionReport(BaseModel):
-    """Schema baseado em test_execution_report_schema.json do The Foundry."""
-    id: str = Field(..., description="EXEC-YYYY-MM-DD-HHMMSS-XXX")
-    user_story_id: str = Field(..., description="ID da user story testada")
-    commit_hash: str = Field("mock_hash", description="Hash do commit testado")
-    execution_timestamp: str = Field(..., description="ISO 8601")
-    executed_by: str = Field("qa.agent")
-    environment: dict = Field(..., description="name + config_hash")
-    summary: dict = Field(..., description="status, total_tests, passed, failed")
-    results_by_suite: list[dict] = Field(default_factory=list)
-    code_coverage: dict | None = None
-    artifacts: dict | None = None
 
 
 def qa(state: GraphState) -> dict:
@@ -84,36 +67,7 @@ def qa(state: GraphState) -> dict:
 
     print(f"--- INFO: Harness executado (passou={harness_result.get('passed')}, erros={len(harness_result.get('errors', []))}) ---")
 
-    try:
-        qa_prompt = f"""Resultados do Harness:
-- Passou: {harness_result.get('passed', 0)}/{harness_result.get('total', 0)} testes
-- Erros: {harness_result.get('errors', [])[:3]}
-- Tempo: {harness_result.get('duration_ms', 0)}ms
-
-Código implementado:
-```
-{code[:2000]}
-```"""
-        report = call_llm_via_opencode(
-            system_prompt="""Você é um QA Engineer. Analise o código e resultados de teste abaixo e gere um relatório de execução de testes conforme o schema esperado.
-
-O relatório DEVE ter:
-- id: EXEC-YYYY-MM-DD-HHMMSS-XXX
-- user_story_id: ID da user story principal
-- commit_hash: hash do commit
-- execution_timestamp: ISO 8601
-- executed_by: qa.agent
-- environment: {"name": "local", "config_hash": None}
-- summary: {"status": "PASS" ou "FAIL", "total_tests": N, "tests_passed": N, "tests_failed": N, "tests_skipped": N, "flaky_tests_detected": 0, "duration_seconds": N}
-- results_by_suite: lista de suites com detalhes""",
-            user_prompt=qa_prompt,
-            schema_model=TestExecutionReport,
-            mock=state.get("mock_llm", False),
-            circuit_breaker=state.get("circuit_breaker"),
-        )
-    except Exception as e:
-        print(f"--- ERRO QA (Construindo relatório direto do Harness): {e} ---")
-        report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
+    report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
 
     if not isinstance(report, dict) or "summary" not in report:
         report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)

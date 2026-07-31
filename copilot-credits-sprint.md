@@ -77,13 +77,18 @@ Tasks paralelas só compartilham arquivos que **não** se sobrepõem. Ordens imp
 | 19 | 2026-07-31 ~20:00 | Rodada 2 — Pacote 1 (edits diretos) | init.py fallback → OpenRouter; lessons.py 2º save_lesson print→logger; docs/configuration.md atualizada; test_main.py → smoke test CLI real (`CliRunner` + `main --help`) | ✅ Verificado: ruff All checks passed. **LoopForge background reescreveu test_main.py p/ placeholder (W292) — re-aplicado 2x** | 0 |
 | 20 | 2026-07-31 ~20:00 | Rodada 2 — Pacote 2 (edits diretos) | HITL: case `parallel_audit` no handler (tabela 🛡️ vulns + deployabilidade); `_get_input_with_timeout` fallback "c"→"x" (abortar); router() whitelist restrita a (pm, tech_lead, developer, qa); entry_router roteia `routing_mode="fast"` puro → Developer; qa.py next_agent "appsec"→"parallel_audit" (+4 testes atualizados); api/schemas.py `RoutingMode` Literal; runner/opencode timeout 600→300 | ⚠️ **2 regressões expostas e corrigidas**: (1) test_graph_router_direct assertava "cpo" no router — atualizado p/ contrato novo ("cpo"→__end__, novo assert "pm"); (2) fast routing deixa `stack=None` (TL não roda) → crash `stack.lower()` em lessons.py — fix `stack = state.get("stack") or "python"` | 0 |
 | 21 | 2026-07-31 ~20:10 | Rodada 2 — Pacote 4 (git) | `git push origin main` | ✅ Push `7954448..ecdf526` (25 commits de checkpoint do LoopForge, inclui rodadas 1+2) | 0 |
+| 22 | 2026-07-31 ~20:20 | T13 (Rodada 2 — copilot) | cobertura app.py/diff.py/explore.py — testes novos (PID 44559) | ⚠️ 14.5cr; criou test_api_coverage.py, test_diff_command.py, test_explore_command.py (+361 -3), mas 3 falhas + 1 hang (monkeypatch global de `asyncio.create_task` quebrava o runtime; Path patch retornava str; WS test sem `with` aninhado; mock de send_personal_message impedia pong). **Fix pelo orquestrador**: 4 edits nos testes. ✅ Verificado: 19 passed nos 3 arquivos; suíte 213 passed/1 skipped; ruff All checks passed. **Cobertura**: app.py 47→56%, diff.py 42→84%, explore.py 41→100%, total 82% (era 80.30%). Sessão: `copilot --resume=3484600e-5642-4a8d-a951-1a2dc9816208` | 14.5 |
 
 ## Checklist pós-sprint
 
-- [x] Rodar `pytest tests/` completo (194 passed, 1 skipped)
+- [x] Rodar `pytest tests/` completo (**213 passed, 1 skipped** — era 151 no baseline)
 - [x] Rodar ruff com o comando do CI (All checks passed)
-- [x] Conferir cobertura ≥ 75% — **80.30%** (baseline 76.75%, +3.55pp; CI `--cov-fail-under=75` verde)
-- [x] Revisar diffs das tasks (4 verificações explorer independentes: sem mutação fora do escopo)
+- [x] Conferir cobertura ≥ 75% — **82%** (baseline 76.75%; app.py 56%, diff.py 84%, explore.py 100%)
+- [x] Revisar diffs das tasks (verificações explorer independentes: sem mutação fora do escopo)
+
+## Rodada 2 — Follow-ups (pacotes 1, 2, 4 diretos + T13 copilot)
+
+Follow-ups do sprint 1 executados: init.py fallback → OpenRouter; lessons.py 2º save_lesson → logger; docs/configuration.md; test_main.py → smoke test CLI; HITL case `parallel_audit`; timeout HITL fallback → abortar; router() whitelist harmonizada; entry_router roteia `routing_mode="fast"` puro; qa.py next_agent → parallel_audit; api/schemas.py RoutingMode Literal; runner/opencode timeout 600→300. 2 regressões expostas e corrigidas (router test contrato novo; stack=None em fast routing → default "python"). Push `7954448..ecdf526`.
 
 ## Resumo de créditos
 
@@ -93,6 +98,62 @@ Tasks paralelas só compartilham arquivos que **não** se sobrepõem. Ordens imp
 | Onda 2 (T3, T4, T7, T11) | — | 30.53 |
 | Onda 3 (T5, T6, T8, T9) + fix T6 | — | 33.80 |
 | Onda 4 (T10, T12) + fix T10 | — | 10.29 |
-| **Total** | **11 tasks** | **~91.95** |
+| Rodada 2 (T13 cobertura) + fixes diretos | — | 14.50 |
+| **Total** | **12 tasks** | **~106.45** |
 
-Todos os 11 tasks aprovados concluídos (T2 recusada pelo usuário). Reset mensal de 200 créditos ocorre em ~5h — sprint usou ~46%.
+Todos os 12 tasks aprovados concluídos (T2 recusada pelo usuário). Sprint usou ~53% do reset mensal de 200 créditos.
+
+---
+
+# Rodada 3 — Qualidade do Produto vs Custo do Pipeline
+
+## Contexto (pedido do usuário)
+
+"agora que tratamos a fundação vamos analisar o projeto com o foco em melhorar o resultado, o output, a execução... o projeto gerencia instancias de harness com modelos para gerar um produto então ele tem um custo maior doque fazer o pedido de forma mais completa em apenas uma instancia logo meu objetivo agora é melhorar o produto realizado para que justifique o gasto a mais."
+
+## Análise (explorer exp-10 + oracle ora-1, reutilizáveis)
+
+**Veredito**: o pipeline tem 2 fontes de valor reais (spec técnica antes do código + loop de reparo com testes reais), 3 chamadas LLM que são custo puro (QA-LLM report, validação do TL, revisão contextual do AppSec) e 1 buraco estrutural: o QA valida código contra testes escritos pela MESMA instância que gerou o código (gate mede autoconsistência, não aderência a requisitos).
+
+**Perdas de contexto no handoff** (o Developer vê versão mutilada):
+- `developer.py:164`: só títulos das 3 primeiras stories (sem acceptance_criteria, sem stories 4+)
+- `developer.py:179`: `tech_spec[:2000]` — corta arquitetura no meio
+- `tech_lead.py:116`: template truncado a 1500 chars
+- `qa.py:95` / `appsec.py:80`: só `code[:2000]` — demais arquivos fora da revisão LLM
+
+**Custo puro identificado**:
+- QA LLM (`qa.py:97-113`): relatório sobrescrito pelo harness (`qa.py:121-134`) — chamada inútil
+- TL validação (`tech_lead.py:78-95`): `needs_feedback` vira feedback_history mas NÃO existe aresta TL→PM (`graph.py:109`)
+- AppSec contextual (`appsec.py:88-97`): output ignorado, gate vem só do scanner determinístico
+- Lessons (`lessons.py:37-38`): salva "Resultado QA: PASS" sem o que falhou → non-lição polui prompts futuros
+- DevOps template Docker (`devops.py:123-132`): `CMD ["python", "-m", "lf", "serve"]` + `COPY src/ ./src/` — cópia do dogfooding do próprio LoopForge, errado para o produto
+- Duplicação de system prompt na rota OpenRouter (`llm.py:36,86-88` + `llm_factory.py:48-51`)
+
+## Tasks Q (propostas ao usuário; Q1-Q10 aprovadas, Q2 SUSPENSA p/ decisão)
+
+| Task | Escopo | Status |
+|---|---|---|
+| Q1 | `developer.py:164,166-175` — stories completas c/ acceptance criteria + regra "cada critério = ≥1 teste" | ⏳ Onda A |
+| Q2 | `qa.py:97-113` — remover chamada LLM redundante do QA (não remove o nó QA!) | ⏸️ questionada pelo usuário |
+| Q3 | `devops.py:123-132` — corrigir template Dockerfile Python (genérico p/ produto) | ⏳ Onda A |
+| Q4 | `lessons.py:33-40` — lesson_text rico com erros reais (falhas do test_report) | ⏳ Onda A |
+| Q5 | `llm.py:36-95` — remover duplicação system prompt na rota OpenRouter (llm_factory intacta) | ⏳ Onda A |
+| Q6 | `developer.py:179` + `tech_lead.py:116` — truncamento seletivo da tech spec | ⏳ Onda B (após Q1 — mesmo arquivo) |
+| Q7 | `graph.py` + novo node — test-writer independente (suíte a partir das stories, sem ver código; Developer recebe como contrato) | ⏳ Onda B (isolado) |
+| Q8 | `task_dispatcher.py:98` / `qa.py:181` — QA rodar no dir do produto, não CWD do repo | ⏳ Onda B |
+| Q9 | `qa.py:144` — gate cobertura de critérios (≥80% acceptance → testes) | ⏳ Onda C (após Q8 — mesmo arquivo) |
+| Q10 | `developer.py:214-238` — retry com diff da tentativa anterior | ⏳ Onda C (após Q6 — mesmo arquivo) |
+
+**Ondas por interferência de arquivos**: Onda A = Q1+Q3+Q4+Q5 (disjuntos: developer.py, devops.py, lessons.py, llm.py). Onda B = Q6+Q7+Q8 (Q6 após Q1; Q8 toca task_dispatcher+qa). Onda C = Q9+Q10 (Q9 após Q8; Q10 após Q6).
+
+**O que NÃO mexer (oracle)**: sem novos nodes de review; sem vector DB na memória; sem e2e real no gate; não remover CPO/PM (baratos, alimentam HITL); não paralelizar Developer/QA; não mexer em SQLiteLLMCache/parser.py/self-healing.
+
+## Log de execução Rodada 3
+
+| # | Horário | Task | Resultado | Créditos |
+|---|---|---|---|---|
+| 23 | 2026-07-31 ~19:47 | Q1 (Onda A) | despachado PID 49827 | — |
+| 24 | 2026-07-31 ~19:47 | Q3 (Onda A) | despachado PID 49829 | — |
+| 25 | 2026-07-31 ~19:47 | Q4 (Onda A) | despachado PID 49831 | — |
+| 26 | 2026-07-31 ~19:47 | Q5 (Onda A) | despachado PID 49833 | — |
+| 27 | 2026-07-31 ~19:50 | Q2 (Onda A) | despachado PID 50682 (após decisão do usuário: remover apenas a chamada LLM redundante do QA, mantendo nó + gate) | — |

@@ -124,11 +124,11 @@ jobs:
 FROM python:3.12-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
-COPY pyproject.toml README.md ./
-COPY src/ ./src/
-RUN pip install --no-cache-dir .
+COPY . .
+RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || pip install --no-cache-dir . 2>/dev/null || true
 EXPOSE 8000
-CMD ["python", "-m", "lf", "serve"]
+# Ajuste o CMD para o entrypoint real do seu app
+CMD ["python", "generated_code.py"]
 """
         ci = """name: LoopForge CI Workflow
 on: [push, pull_request]

@@ -161,7 +161,14 @@ def developer(state: GraphState) -> dict:
     user_stories = state.get("user_stories", [])
     model_name = os.environ.get("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash:free")
 
-    story_lines = [f"- {us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:3]]
+    story_lines = []
+    for us in user_stories[:8]:
+        story_lines.append(f"- {us.get('id', '')}: {us.get('title', '')}")
+        acceptance_criteria = us.get("acceptance_criteria")
+        if isinstance(acceptance_criteria, list) and acceptance_criteria:
+            story_lines.append("  Critérios de aceitação:")
+            for criterion in acceptance_criteria:
+                story_lines.append(f"  - {criterion}")
 
     system_prompt = f"""Você é um Desenvolvedor Sênior.
 Stack definida pelo Tech Lead: {stack}. Gere um projeto completo nesta stack com todos os arquivos necessários (código principal, manifesto de dependências, testes).
@@ -172,7 +179,8 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
 3. Inclua a suíte de testes unitários da stack em diretório apropriado (ex: tests/).
 4. TRATAMENTO DE ERROS RIGOROSO: Proibido o uso de `unwrap()`, `expect()` ou `panic!` em Rust (use `anyhow` ou `thiserror`). Proibido `try/except` silencioso ou `pass` em Python.
 5. DOCUMENTAÇÃO OBRIGATÓRIA: Toda função, método e struct/classe pública DEVE conter docstrings estruturadas no formato nativo da linguagem ('///' em Rust, docstrings em Python, '/** */' em TypeScript).
-6. CONFIGURAÇÃO E AMBIENTE: Inclua um módulo de configuração tipado (ex: `config.py` com `pydantic-settings` ou `config.rs`) e crie o arquivo `.env.example` documentando todas as variáveis de ambiente."""
+6. CONFIGURAÇÃO E AMBIENTE: Inclua um módulo de configuração tipado (ex: `config.py` com `pydantic-settings` ou `config.rs`) e crie o arquivo `.env.example` documentando todas as variáveis de ambiente.
+7. CRITÉRIOS DE ACEITAÇÃO: Cada acceptance criterion das user stories DEVE ser coberto por pelo menos 1 teste unitário na suíte. Antes de gerar o código, derive os testes a partir dos critérios de aceitação fornecidos."""
 
     prompt_parts = [
         f"Ideia do Projeto: {idea}",

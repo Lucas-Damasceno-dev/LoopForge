@@ -34,7 +34,36 @@ def generate_lessons_md(state: GraphState) -> str:
     try:
         from ...memory.manager import MemoryManager
         mem = MemoryManager()
-        lesson_text = f"Resultado QA: {qa_status} ({tests_passed}/{total_tests} testes). Ideia: {idea}"
+        lesson_prefix = f"Resultado QA: {qa_status} ({tests_passed}/{total_tests} testes). Ideia: {idea}"
+        failures_summary: list[str] = []
+        if isinstance(test_report, dict):
+            suites = test_report.get("results_by_suite", [])
+            if isinstance(suites, list):
+                for suite in suites:
+                    if not isinstance(suite, dict):
+                        continue
+                    failed_details = suite.get("failed_tests_details", [])
+                    if not isinstance(failed_details, list):
+                        continue
+                    for failure in failed_details:
+                        if not isinstance(failure, dict):
+                            continue
+                        error = failure.get("error") or failure.get("message") or ""
+                        name = failure.get("test_name") or failure.get("name") or "teste_desconhecido"
+                        error_txt = str(error).replace("\n", " ").strip()[:200] if error else "erro não informado"
+                        failures_summary.append(f"{name}: {error_txt}")
+                        if len(failures_summary) >= 3:
+                            break
+                    if len(failures_summary) >= 3:
+                        break
+
+        if failures_summary:
+            details = " ; ".join(failures_summary[:3])
+            lesson_text = f"{lesson_prefix} | Falhas: {details}"
+        else:
+            lesson_text = f"{lesson_prefix} | Nota: stack {stack} com suítes sem falhas detalhadas."
+
+        lesson_text = lesson_text[:600]
         mem.save_lesson(run_id=str(state.get("task_id", "run")), stack=stack, idea=idea, lesson_text=lesson_text)
     except Exception as exc:
         logger.warning("Falha ao salvar lição aprendida: %s", exc)

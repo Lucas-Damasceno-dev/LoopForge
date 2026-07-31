@@ -82,9 +82,10 @@ Responda SOMENTE o objeto JSON puro."""
     raw_response_text = ""
     if openrouter_key:
         model_name = model or DEFAULT_OPENROUTER_MODEL
+        user_content = user_prompt + (format_instruction if schema_model else "")
         try:
             raw_response_text, _ = call_openrouter_api(
-                final_prompt, model=model_name, api_key=openrouter_key,
+                user_content, model=model_name, api_key=openrouter_key,
                 system_prompt=system_prompt,
             )
         except Exception as e:
