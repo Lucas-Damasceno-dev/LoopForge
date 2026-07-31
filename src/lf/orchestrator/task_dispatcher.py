@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import select
 import shutil
@@ -25,6 +26,8 @@ from lf.pipeline.graph import build_graph
 from lf.runner.git.checkpoint import GitCheckpointManager
 from lf.runner.git.pr import create_github_pr
 
+logger = logging.getLogger(__name__)
+
 
 def _send_notification(title: str, message: str, webhook_url: str | None = None):
     """Envia notificação desktop e/ou webhook para Slack/Discord."""
@@ -41,8 +44,8 @@ def _send_notification(title: str, message: str, webhook_url: str | None = None)
             payload = json.dumps({"text": f"*{title}*\n{message}"}).encode("utf-8")
             req = urllib.request.Request(webhook_url, data=payload, headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=3)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Falha ao transmitir evento WS: %s", exc)
 
 
 class TaskDispatcher:
@@ -136,8 +139,8 @@ class TaskDispatcher:
                 loop.create_task(ws_manager.broadcast(message))
             except RuntimeError:
                 asyncio.run(ws_manager.broadcast(message))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Falha ao verificar decisão remota: %s", exc)
 
     def _get_input_with_timeout(self, prompt_text: str, timeout: int = 300) -> str:
         """Lê input com suporte a timeout no Unix/Linux."""

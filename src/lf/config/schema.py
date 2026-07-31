@@ -88,8 +88,8 @@ class LoopForgeConfig(BaseModel):
     version: str = "6.0.0"
     ontology_path: str = "examples/the-foundry"
     stack: TechStack = Field(default_factory=TechStack)
-    llm_provider: str = "google"
-    llm_model: str = "gemini-1.5-flash"
+    llm_provider: str = "openrouter"
+    llm_model: str = "oc/deepseek-v4-flash-free"
     budget_limit_usd: float = Field(10.0, ge=0)
     max_parallel_tasks: int = Field(2, gt=0)
     plan: PlanSchema = Field(default_factory=PlanSchema)

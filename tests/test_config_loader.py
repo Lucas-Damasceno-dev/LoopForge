@@ -53,7 +53,7 @@ def test_load_config_json_null_retorna_default(tmp_path: pytest.TempPathFactory)
 
     config = load_config(config_path)
 
-    assert config.llm_provider == "google"
+    assert config.llm_provider == "openrouter"
     assert config.model_dump() == load_config(tmp_path / "inexistente.json").model_dump()
 
 

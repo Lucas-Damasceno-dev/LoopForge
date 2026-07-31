@@ -28,13 +28,13 @@
 | T2 | CI | Ativar gate real de mypy (remover `ignore_errors = true`, corrigir tipos) | alta | ❌ recusada pelo usuário |
 | T3 | Testes | Testes para módulos com 0% cobertura (`fail_to_eval.py`, `flake_isolator.py`) | alta | ✅ concluída |
 | T4 | Config | Fix bug de precedência no `config/loader.py` (YAML parsing sempre) + teste de regressão | alta | ✅ concluída |
-| T5 | Pipeline | Tornar `parallel_audit` resiliente: `as_completed(timeout)`, capturar exceção, setar `error` | alta | ✅ escolhida |
-| T6 | Pipeline | Marcar run como falho quando retry esgota (`should_retry` + WS `completed` no dispatcher) | alta | ✅ escolhida |
-| T7 | Runner | Auto-formatter opt-in (`run_auto_formatter` muta projeto do usuário sem flag) | média | ✅ escolhida |
-| T8 | Testes | Testes para núcleo: `pipeline/nodes/qa.py` (56%) + `pipeline/llm_factory.py` (56%) | média | ✅ escolhida |
-| T9 | Config | Validação Pydantic: `Literal` p/ routing_mode/task_type/complexity, constraints em budget/parallel | média | ✅ escolhida |
+| T5 | Pipeline | Tornar `parallel_audit` resiliente: `as_completed(timeout)`, capturar exceção, setar `error` | alta | ✅ concluída |
+| T6 | Pipeline | Marcar run como falho quando retry esgota (`should_retry` + WS `completed` no dispatcher) | alta | ✅ concluída |
+| T7 | Runner | Auto-formatter opt-in (`run_auto_formatter` muta projeto do usuário sem flag) | média | ✅ concluída |
+| T8 | Testes | Testes para núcleo: `pipeline/nodes/qa.py` (56%) + `pipeline/llm_factory.py` (56%) | média | ✅ concluída |
+| T9 | Config | Validação Pydantic: `Literal` p/ routing_mode/task_type/complexity, constraints em budget/parallel | média | ✅ concluída |
 | T10 | Qualidade | Substituir `except Exception: pass` por logging (telemetria, WS, decisão humana) | média | ✅ escolhida |
-| T11 | Runner | Fix `detect_test_command` falso positivo (exigir `tests/` real, não só `.py`) | média | ✅ escolhida |
+| T11 | Runner | Fix `detect_test_command` falso positivo (exigir `tests/` real, não só `.py`) | média | ✅ concluída |
 | T12 | Config | Atualizar defaults para OpenRouter (`oc/deepseek-v4-flash-free`) | baixa | ✅ escolhida |
 
 ## Notas da análise
@@ -66,14 +66,18 @@ Tasks paralelas só compartilham arquivos que **não** se sobrepõem. Ordens imp
 | 8 | 2026-07-31 ~18:00 | T7 (Onda 2) | auto-formatter opt-in + teste (PID 21709) | ✅ `auto_format: bool = False` no `__init__`, run() só formata se True; test_auto_formatter.py cobre opt-in (11 passed isolado). Sessão: `5e29402a-a772-4dbd-b4cb-3d5d8f7451f8` | 4.95 |
 | 9 | 2026-07-31 ~18:00 | T11 (Onda 2) | fix detect_test_command falso positivo + teste (PID 21761) | ✅ PythonStackHandler exige evidência real (tests/, conftest.py, config pytest); contrato `str\|None` consistente; 4 testes. Sessão: `4f40144e-4e32-4c16-a010-f853b305d822` | 8.36 |
 | 10 | 2026-07-31 ~18:20 | Onda 2 (verificação) | exp-2 (explorer) reutilizado | ✅ Aprovado: sem mutação fora do escopo; ajustes menores aplicados (teste T4 + W292). **Lições**: erros `sqlite3 disk I/O` nos runs paralelos eram artefato de 4 pytest concorrentes no mesmo `.sqlite` — re-rodar suíte sequencial para validar; processo LoopForge em background reescreveu test_main.py (W292 voltou) — re-aplicar fix | 0 |
-| 11 | 2026-07-31 ~18:40 | T5 (Onda 3) | parallel_audit resiliente: as_completed(timeout) + try/except (PID 27687) | ⏳ em execução | — |
-| 12 | 2026-07-31 ~18:40 | T6 (Onda 3) | retry esgotado → run falho (graph.py + task_dispatcher.py) (PID 27712) | ⏳ em execução | — |
-| 13 | 2026-07-31 ~18:40 | T8 (Onda 3) | testes qa.py + llm_factory.py (cobertura) (PID 27751) | ⏳ em execução | — |
-| 14 | 2026-07-31 ~18:40 | T9 (Onda 3) | Literal + constraints em schema.py (PID 27800) | ⏳ em execução | — |
+| 11 | 2026-07-31 ~18:40 | T5 (Onda 3) | parallel_audit resiliente: as_completed(timeout) + try/except (PID 27687) | ✅ 5.21cr; `as_completed([...], timeout=300)`, try/except por future (worker_errors, res={"error":...}), TimeoutError cancela pendentes; teste test_parallel_audit_resilience.py. Sessão: `2f6ded8c-3f55-47a8-8a8e-617903b0dcf6` | 5.21 |
+| 12 | 2026-07-31 ~18:40 | T6 (Onda 3) | retry esgotado → run falho (graph.py + task_dispatcher.py) (PID 27712) | ⚠️ 11.6cr; regressão: `state["error"]=` em should_retry (aresta condicional) NÃO propaga no LangGraph 1.2.10. **Fix pelo orquestrador**: erro setado no nó parallel_audit (retorno de nó propaga) + testes patcheiam `qa._mock_report` p/ FAIL (QA mock sobrescrevia test_report com PASS). Verificado: 194 passed/1 skipped + ruff limpo. Sessão: `5f7bcfe1-d1ba-4e49-a69e-2a7910a85e7e` | 11.6 |
+| 13 | 2026-07-31 ~18:40 | T8 (Onda 3) | testes qa.py + llm_factory.py (cobertura) (PID 27751) | ✅ 10.3cr; test_qa_coverage_extra.py (4) + test_llm_factory_extra.py (6 testes, não 4 — brief divergiu). Sessão: `27f0d9fd-a497-49a0-9386-306c9b682adf` | 10.3 |
+| 14 | 2026-07-31 ~18:40 | T9 (Onda 3) | Literal + constraints em schema.py (PID 27800) | ✅ 6.8cr; routing_mode/task_type/complexity_level → Literal; budget ge=0, max_parallel gt=0; defaults LLM PRESERVADOS (T12 não aplicado). test_schema_validation.py. Sessão: `edb71cf5-f28d-4cc2-8752-98aec414c486` | 6.8 |
+| 15 | 2026-07-31 ~19:10 | T6 (pós) | fix direto (orquestrador) | Fix do T6: removida mutação in-place em should_retry; bloco retry_error no nó parallel_audit (`tests_failed and qa_attempt >= max_retries`); 2 testes ajustados p/ patchear `_mock_report` (FAIL). Resultado: 2 testes passando + suíte 194 passed/1 skipped + ruff All checks passed | 0 |
+| 16 | 2026-07-31 ~19:15 | Onda 3 (verificação) | exp-4/exp-5/exp-6 (explorer) | ✅ T5/T6/T8/T9 aprovados; Onda 2 sem regressão (diff HEAD~6 vazio, 26/26 testes); sem mutação fora do escopo. **Notas**: QA mock não incrementa qa_attempt_count (pré-existente); timeout 300s não é hard-stop (cancel não interrompe thread); `routing_mode="fast"` puro cai no caminho full (pré-existente); W292 em test_main.py recorre (LoopForge background reescreve o arquivo) | 0 |
+| 17 | 2026-07-31 ~19:25 | T10 (Onda 4) | logging nos 5 `except Exception: pass` (task_dispatcher.py:139/199, developer.py:29-30, lessons.py:36-37, cache.py:23) (PID 37119) | ⏳ em execução | — |
+| 18 | 2026-07-31 ~19:25 | T12 (Onda 4) | defaults LLM → OpenRouter em schema.py:91-92 + ajustar testes (PID 37146) | ⏳ em execução | — |
 
 ## Checklist pós-sprint
 
-- [ ] Rodar `pytest tests/` completo
-- [ ] Rodar ruff + mypy com os mesmos comandos do CI
-- [ ] Conferir cobertura ≥ 75%
-- [ ] Revisar diffs das tasks (especialmente mutações fora do escopo)
+- [x] Rodar `pytest tests/` completo (194 passed, 1 skipped)
+- [x] Rodar ruff com o comando do CI (All checks passed)
+- [ ] Conferir cobertura ≥ 75% (CI roda com `--cov-fail-under=75`)
+- [x] Revisar diffs das tasks (3 verificações explorer independentes: sem mutação fora do escopo)
