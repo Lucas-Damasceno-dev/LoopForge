@@ -161,7 +161,10 @@ Template (use como guia):
             f.write(tech_spec)
         print(f"--- INFO: Tech spec salva em {path} ---")
 
-    rationale = validation.get("stack_rationale", f"Stack '{decided_stack}' escolhida por adequação técnica aos requisitos.") if 'validation' in locals() else f"Stack '{decided_stack}' selecionada por requisitos de arquitetura."
+    if 'validation' in locals() and isinstance(validation, dict):
+        rationale = validation.get("stack_rationale", f"Stack '{decided_stack}' escolhida por adequação técnica aos requisitos.")
+    else:
+        rationale = f"Stack '{decided_stack}' selecionada por requisitos de arquitetura."
 
     return {
         **state,

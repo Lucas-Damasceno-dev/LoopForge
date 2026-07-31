@@ -28,6 +28,6 @@ def test_appsec_retry_cycle_routing(tmp_path):
         "next_agent": "developer",
     }
 
-    with patch("lf.pipeline.nodes.appsec.appsec", return_value=mock_appsec_fail):
+    with patch("lf.pipeline.nodes.parallel_audit.appsec", return_value=mock_appsec_fail):
         result_audit = parallel_audit(initial_state)
         assert result_audit["next_agent"] == "developer"
