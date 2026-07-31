@@ -99,7 +99,7 @@ def test_qa_node_llm_execution(tmp_path):
         "mock_llm": False,
     }
 
-    mock_harness_res = {"passed": 1, "total": 1, "errors": [], "duration_ms": 100}
+    mock_harness_res = {"passed": 1, "total": 1, "failed": 0, "success": True, "errors": [], "duration_ms": 100}
     with patch("lf.pipeline.nodes.qa._run_harness", return_value=mock_harness_res):
         with patch("lf.pipeline.nodes.qa.call_llm_via_opencode") as mock_llm:
             mock_llm.return_value = _mock_report("EXEC-123", "2026-07-28")
