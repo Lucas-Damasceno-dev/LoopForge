@@ -18,7 +18,7 @@ def test_qa_sem_codigo_envia_para_developer():
     assert result["feedback_history"][-1]["from"] == "qa"
 
 
-def test_qa_fallback_quando_llm_retorna_invalido(monkeypatch, tmp_path):
+def test_qa_relatorio_direto_do_harness(monkeypatch, tmp_path):
     monkeypatch.setattr(
         qa_module,
         "_run_harness",
@@ -32,7 +32,6 @@ def test_qa_fallback_quando_llm_retorna_invalido(monkeypatch, tmp_path):
             "output": "ok",
         },
     )
-    monkeypatch.setattr(qa_module, "call_llm_via_opencode", lambda **_kwargs: "")
 
     state = {
         "code": "print('ok')",
@@ -61,14 +60,6 @@ def test_qa_harness_falha_forca_fail_e_feedback(monkeypatch, tmp_path):
             "errors": ["Falha de compilacao X"],
             "duration_ms": 10,
             "output": "compiler error details",
-        },
-    )
-    monkeypatch.setattr(
-        qa_module,
-        "call_llm_via_opencode",
-        lambda **_kwargs: {
-            "summary": {"status": "PASS", "tests_failed": 0, "tests_passed": 1},
-            "results_by_suite": [],
         },
     )
 
@@ -117,7 +108,6 @@ def test_qa_self_healing_reexecuta_harness(monkeypatch, tmp_path):
 
     monkeypatch.setattr(qa_module, "_run_harness", fake_run_harness)
     monkeypatch.setattr(qa_module, "_attempt_dependency_self_healing", lambda *_a, **_k: True)
-    monkeypatch.setattr(qa_module, "call_llm_via_opencode", lambda **_kwargs: {"summary": {"status": "PASS", "tests_failed": 0}})
 
     state = {
         "code": "code",

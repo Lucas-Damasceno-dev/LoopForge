@@ -6,7 +6,7 @@ from lf.pipeline.nodes.developer import (
     _parse_multi_file_response,
     developer,
 )
-from lf.pipeline.nodes.qa import _mock_report, qa
+from lf.pipeline.nodes.qa import qa
 from lf.runner.opencode.models import OpenCodeResult
 
 
@@ -91,7 +91,7 @@ def test_developer_node_llm_execution(tmp_path):
         assert "main" in res["code"]
 
 
-def test_qa_node_llm_execution(tmp_path):
+def test_qa_node_harness_execution(tmp_path):
     state = {
         "code": "def add(a, b):\n    return a + b",
         "output_dir": str(tmp_path),
@@ -101,11 +101,9 @@ def test_qa_node_llm_execution(tmp_path):
 
     mock_harness_res = {"passed": 1, "total": 1, "failed": 0, "success": True, "errors": [], "duration_ms": 100}
     with patch("lf.pipeline.nodes.qa._run_harness", return_value=mock_harness_res):
-        with patch("lf.pipeline.nodes.qa.call_llm_via_opencode") as mock_llm:
-            mock_llm.return_value = _mock_report("EXEC-123", "2026-07-28")
-            res = qa(state)
-            assert res["next_agent"] == "parallel_audit"
-            assert res["test_report"]["summary"]["tests_passed"] == 10
+        res = qa(state)
+        assert res["next_agent"] == "parallel_audit"
+        assert res["test_report"]["summary"]["tests_passed"] == 1
 
 
 def test_create_plan_from_epic(tmp_path):
