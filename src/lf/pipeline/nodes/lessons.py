@@ -70,6 +70,30 @@ def generate_lessons_md(state: GraphState) -> str:
 *Gerado autonomamente pelo LoopForge v6.*
 """
 
+    # Gera também o artefato executivo PROJECT_SUMMARY.md com diagrama Mermaid
+    mermaid_diagram = f"""```mermaid
+graph TD
+    Client[Client / User] --> API[API Service ({stack.upper()})]
+    API --> Logic[Business Logic Core]
+    Logic --> Tests[QA Test Suite ({qa_status})]
+```"""
+
+    summary_content = f"""# 📊 Project Executive Summary: {idea}
+
+> **Stack:** `{stack}` | **Status QA:** `{qa_status}` ({tests_passed}/{total_tests}) | **Data:** {now_str}
+
+## 🏗️ Diagrama de Arquitetura do Projeto Gerado
+{mermaid_diagram}
+
+## 🛡️ Auditoria & Segurança
+{sec_warnings_txt}
+
+## 🚀 Instruções de Execução Rápida
+```bash
+{run_cmds}
+```
+"""
+
     output_dir = state.get("output_dir", ".")
     project_dir = state.get("project_dir", output_dir)
     for d in set([output_dir, project_dir]):
@@ -78,7 +102,10 @@ def generate_lessons_md(state: GraphState) -> str:
             lessons_path = os.path.join(d, "lessons.md")
             with open(lessons_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            print(f"--- INFO: Artefato final lessons.md gerado em {lessons_path} ---")
+            summary_path = os.path.join(d, "PROJECT_SUMMARY.md")
+            with open(summary_path, "w", encoding="utf-8") as f:
+                f.write(summary_content)
+            print(f"--- INFO: Artefatos finais lessons.md e PROJECT_SUMMARY.md gerados em {d} ---")
 
     # Salva a lição aprendida no MemoryManager SQLite
     try:

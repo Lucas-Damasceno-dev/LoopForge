@@ -10,11 +10,13 @@ import sqlite3
 import time
 from pathlib import Path
 
+from ..config.paths import TELEMETRY_DB_PATH
+
 
 class MemoryManager:
     """Gerenciador de memória persistente e lições aprendidas do LoopForge."""
 
-    def __init__(self, db_path: str | Path = ".loopforge/memory.sqlite"):
+    def __init__(self, db_path: str | Path = TELEMETRY_DB_PATH):
         self.db_path = str(db_path)
         os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
         self._init_db()

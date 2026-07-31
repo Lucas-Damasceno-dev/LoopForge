@@ -118,9 +118,15 @@ Responda com:
             f"{us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:5]
         )
         tech_spec = call_llm_via_opencode(
-            system_prompt=f"""Você é um Tech Lead. Crie uma especificação técnica detalhada.
+            system_prompt="""Você é um Tech Lead Sênior. Escreva uma especificação técnica (Tech Spec) completa e detalhada em Markdown.
+Use o template fornecido como guia. Seja técnico, preciso e inclua decisões de arquitetura e modelo de dados.
 
-Stack decidida pelo Tech Lead: {decided_stack}
+DIRETRIZES ARQUITETURAIS LIMPAS (CLEAN ARCHITECTURE POR STACK):
+Especifique obrigatoriamente a estrutura de diretórios sugerida no projeto conforme a stack:
+- Rust: src/domain/, src/adapters/, src/ports/, src/entrypoints/, tests/
+- Python (FastAPI): src/core/, src/services/, src/api/, src/repositories/, tests/
+- TypeScript/Node: src/domain/, src/usecases/, src/infrastructure/, src/http/, tests/
+- Go: internal/domain/, internal/service/, internal/handler/, internal/repository/, pkg/
 
 Template (use como guia):
 {truncated_template}""",

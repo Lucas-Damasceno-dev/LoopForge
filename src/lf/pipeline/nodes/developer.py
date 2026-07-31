@@ -90,6 +90,30 @@ def _parse_multi_file_response(raw_text: str, default_filename: str = "main.py")
     return files
 
 
+def _check_syntax_and_types(files_map: dict[str, str], stack: str) -> list[str]:
+    """Valida sintaxe básica (AST para Python, node --check para JS/TS) antes do QA."""
+    import ast
+    import shutil
+    import subprocess
+    errors = []
+
+    for rel_path, content in files_map.items():
+        if rel_path.endswith(".py"):
+            try:
+                ast.parse(content)
+            except SyntaxError as e:
+                errors.append(f"SyntaxError em {rel_path} linha {e.lineno}: {e.msg}")
+        elif rel_path.endswith((".js", ".ts")) and shutil.which("node"):
+            try:
+                res = subprocess.run(["node", "--check", "-"], input=content, text=True, capture_output=True, timeout=5)
+                if res.returncode != 0:
+                    errors.append(f"Node syntax check error em {rel_path}: {res.stderr.strip()}")
+            except Exception:
+                pass
+
+    return errors
+
+
 def developer(state: GraphState) -> dict:
     """Gera projeto completo multi-arquivo na stack decidida pelo Tech Lead."""
     print("---EXECUTANDO NÓ: Developer---")
@@ -123,10 +147,13 @@ def developer(state: GraphState) -> dict:
     system_prompt = f"""Você é um Desenvolvedor Sênior.
 Stack definida pelo Tech Lead: {stack}. Gere um projeto completo nesta stack com todos os arquivos necessários (código principal, manifesto de dependências, testes).
 
-REGRAS:
+REGRAS OBRIGATÓRIAS DE QUALIDADE:
 1. Responda no formato multi-arquivos com o cabeçalho '### FILE: caminho/do/arquivo' seguido por bloco de código markdown.
-2. Inclua o manifesto de dependências relevante (ex: pyproject.toml, package.json, pom.xml, Cargo.toml, go.mod).
-3. Inclua a suíte de testes unitários da stack."""
+2. Inclua o manifesto de dependências relevante (ex: pyproject.toml, package.json, Cargo.toml, go.mod).
+3. Inclua a suíte de testes unitários da stack em diretório apropriado (ex: tests/).
+4. TRATAMENTO DE ERROS RIGOROSO: Proibido o uso de `unwrap()`, `expect()` ou `panic!` em Rust (use `anyhow` ou `thiserror`). Proibido `try/except` silencioso ou `pass` em Python.
+5. DOCUMENTAÇÃO OBRIGATÓRIA: Toda função, método e struct/classe pública DEVE conter docstrings estruturadas no formato nativo da linguagem ('///' em Rust, docstrings em Python, '/** */' em TypeScript).
+6. CONFIGURAÇÃO E AMBIENTE: Inclua um módulo de configuração tipado (ex: `config.py` com `pydantic-settings` ou `config.rs`) e crie o arquivo `.env.example` documentando todas as variáveis de ambiente."""
 
     prompt_parts = [
         f"Ideia do Projeto: {idea}",
@@ -221,6 +248,13 @@ REGRAS:
         }
 
     files_map = _parse_multi_file_response(raw, default_main)
+
+    # 🔍 Gate Único de Qualidade: Validação sintática AST antes do QA
+    syntax_errors = _check_syntax_and_types(files_map, stack)
+    if syntax_errors:
+        print(f"--- AVISO: Sintaxe inválida detectada pelo AST Gate ({len(syntax_errors)} erros): ---")
+        for err in syntax_errors:
+            print(f"  - {err}")
 
     # Verifica se há manifesto ou arquivo de teste gerado
     has_manifest = any(

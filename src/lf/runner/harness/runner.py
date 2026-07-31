@@ -42,7 +42,24 @@ class TestHarnessRunner:
 
         return "pytest"
 
+    def run_auto_formatter(self, cwd: str | Path = ".") -> None:
+        """Executa auto-formatador nativo da linguagem (cargo fmt, ruff format, gofmt) antes dos testes."""
+        import shutil
+        cmd = self._detect_command(cwd)
+        try:
+            if "cargo" in cmd and shutil.which("cargo"):
+                subprocess.run("cargo fmt", shell=True, cwd=cwd, capture_output=True, timeout=30)
+            elif "pytest" in cmd and shutil.which("ruff"):
+                subprocess.run("ruff format .", shell=True, cwd=cwd, capture_output=True, timeout=30)
+            elif "go" in cmd and shutil.which("gofmt"):
+                subprocess.run("gofmt -w .", shell=True, cwd=cwd, capture_output=True, timeout=30)
+            elif ("npm" in cmd or "npx" in cmd or "vitest" in cmd) and shutil.which("npx"):
+                subprocess.run("npx prettier --write .", shell=True, cwd=cwd, capture_output=True, timeout=30)
+        except Exception:
+            pass
+
     def run(self, cwd: str | Path = ".") -> TestHarnessResult:
+        self.run_auto_formatter(cwd)
         cmd = self._detect_command(cwd)
         try:
             res = subprocess.run(

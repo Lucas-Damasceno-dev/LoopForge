@@ -9,6 +9,7 @@ import os
 import subprocess
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -73,6 +74,13 @@ def qa(state: GraphState) -> dict:
     # Fase 2: Gerar relatório estruturado via OpenCode (com fallback resiliente para o harness)
     user_stories = state.get("user_stories", [])
     user_story_id = user_stories[0].get("id", "US001") if user_stories else "US001"
+
+    # 🩹 Self-Healing MVP de Dependências: se falhar por versão incompatível, tenta auto-fixar
+    if (harness_result.get("passed", 0) == 0 or harness_result.get("errors")) and _attempt_dependency_self_healing(project_dir, harness_result):
+        print("--- INFO: Re-executando Test Harness após Self-Healing de dependências ---")
+        harness_result = _run_harness(project_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
+
+    print(f"--- INFO: Harness executado (passou={harness_result.get('passed')}, erros={len(harness_result.get('errors', []))}) ---")
 
     try:
         qa_prompt = f"""Resultados do Harness:
@@ -232,6 +240,27 @@ def _build_report_from_harness(
         "code_coverage": None,
         "artifacts": None,
     }
+
+
+def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> bool:
+    """Tenta auto-corrigir erros de incompatibilidade de versão de dependências (ex: requires rustc X)."""
+    import re
+    import subprocess
+    errors_str = " ".join(str(e) for e in harness_result.get("errors", []))
+    output_str = str(harness_result.get("output", "")) + " " + errors_str
+
+    cargo_toml = Path(project_dir) / "Cargo.toml"
+    if cargo_toml.exists():
+        m = re.search(r"cargo update\s+([a-zA-Z0-9_-]+)(?:@\S+)?\s+--precise\s+(\S+)", output_str)
+        if m:
+            crate_name, target_ver = m.group(1), m.group(2)
+            print(f"--- INFO: Self-Healing de Dependências MVP: executando cargo update -p {crate_name} --precise {target_ver} ---")
+            try:
+                subprocess.run(f"cargo update -p {crate_name} --precise {target_ver}", shell=True, cwd=project_dir, capture_output=True, timeout=30)
+                return True
+            except Exception:
+                pass
+    return False
 
 
 def _mock_report(report_id: str, timestamp: str) -> dict:
