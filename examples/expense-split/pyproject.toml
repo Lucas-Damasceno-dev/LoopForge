@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "expense-splitter"
+version = "0.1.0"
+description = "Divisor de despesas entre amigos com liquidação otimizada por saldos."
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "fastapi>=0.104",
+    "uvicorn[standard]>=0.24",
+    "sqlalchemy>=2.0",
+    "alembic>=1.12",
+    "psycopg[binary]>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=4",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

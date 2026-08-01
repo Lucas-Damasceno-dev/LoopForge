@@ -1,0 +1,4992 @@
+{
+  "version": "1.0.0",
+  "interfaces": [
+    {
+      "id": "migrations/env.py:run_migrations_offline",
+      "kind": "function",
+      "name": "run_migrations_offline",
+      "module": "migrations/env.py",
+      "signature": "()",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "()",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "migrations/env.py:run_migrations_online",
+      "kind": "function",
+      "name": "run_migrations_online",
+      "module": "migrations/env.py",
+      "signature": "()",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "()",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "migrations/versions/0001_initial.py:upgrade",
+      "kind": "function",
+      "name": "upgrade",
+      "module": "migrations/versions/0001_initial.py",
+      "signature": "()",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "()",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "migrations/versions/0001_initial.py:downgrade",
+      "kind": "function",
+      "name": "downgrade",
+      "module": "migrations/versions/0001_initial.py",
+      "signature": "()",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "()",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/main.py:health",
+      "kind": "function",
+      "name": "health",
+      "module": "app/main.py",
+      "signature": "()",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "()",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/utils.py:round_money",
+      "kind": "function",
+      "name": "round_money",
+      "module": "app/utils.py",
+      "signature": "(value: Any)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/payments.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/payments.py",
+          "line": 55,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 28,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 39,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 60,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 91,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 187,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 132,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 135,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 51,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 75,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 81,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(value: Any)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/utils.py:money_to_cents",
+      "kind": "function",
+      "name": "money_to_cents",
+      "module": "app/utils.py",
+      "signature": "(value: Any)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/expense.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 64,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(value: Any)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/utils.py:cents_to_money",
+      "kind": "function",
+      "name": "cents_to_money",
+      "module": "app/utils.py",
+      "signature": "(cents: int)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/expense.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 74,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(cents: int)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/utils.py:sum_money",
+      "kind": "function",
+      "name": "sum_money",
+      "module": "app/utils.py",
+      "signature": "(values)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 48,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 102,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 158,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 163,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 164,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(values)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/utils.py:first_not_none",
+      "kind": "function",
+      "name": "first_not_none",
+      "module": "app/utils.py",
+      "signature": "(*values: Any)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 11,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 29,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 164,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 7,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 16,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 38,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 44,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 64,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 88,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 93,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 95,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 100,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(*values: Any)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/utils.py:is_mock",
+      "kind": "function",
+      "name": "is_mock",
+      "module": "app/utils.py",
+      "signature": "(obj: Any)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/payments.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/payments.py",
+          "line": 69,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 9,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 194,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 196,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(obj: Any)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/db/session.py:get_db",
+      "kind": "function",
+      "name": "get_db",
+      "module": "app/db/session.py",
+      "signature": "()",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/api/routes.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 59,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 79,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 109,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "()",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:add_group",
+      "kind": "function",
+      "name": "add_group",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, group: Group)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group: Group)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:get_group",
+      "kind": "function",
+      "name": "get_group",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, group_id: str | int)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/api/routes.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 106,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: str | int)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:get",
+      "kind": "function",
+      "name": "get",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, group_id: str | int)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "migrations/env.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/main.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 15,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 13,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 14,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 15,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 16,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 51,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 52,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 68,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 83,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 117,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 122,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 123,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 152,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 161,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 162,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 11,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 25,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 165,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 166,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 170,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 25,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 39,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 40,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 59,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 60,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 66,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 67,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 72,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 74,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 89,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 90,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 91,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 93,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 96,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 97,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 98,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 102,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 132,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 136,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 59,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 79,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 100,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 106,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 109,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: str | int)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:list_groups",
+      "kind": "function",
+      "name": "list_groups",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:add_participant",
+      "kind": "function",
+      "name": "add_participant",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, group_id: str | int, participant: Participant)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/base.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 69,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 66,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 51,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: str | int, participant: Participant)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:add_expense",
+      "kind": "function",
+      "name": "add_expense",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, expense: Expense)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, expense: Expense)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:get_expense",
+      "kind": "function",
+      "name": "get_expense",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, expense_id: str)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, expense_id: str)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:list_expenses",
+      "kind": "function",
+      "name": "list_expenses",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, group_id: str | int | None = None)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/export.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 192,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 122,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: str | int | None = None)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:add_payment",
+      "kind": "function",
+      "name": "add_payment",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, payment: Payment)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, payment: Payment)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/in_memory.py:list_payments",
+      "kind": "function",
+      "name": "list_payments",
+      "module": "app/repositories/in_memory.py",
+      "signature": "(self, group_id: str | int | None = None)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/payments.py",
+          "line": 91,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/payments.py",
+          "line": 95,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: str | int | None = None)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/base.py:create",
+      "kind": "function",
+      "name": "create",
+      "module": "app/repositories/base.py",
+      "signature": "(self, group: Group)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 4,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 36,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 62,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 95,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 104,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 134,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/payments.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 162,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 164,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 167,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 37,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 201,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 38,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 74,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 78,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group: Group)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/base.py:get",
+      "kind": "function",
+      "name": "get",
+      "module": "app/repositories/base.py",
+      "signature": "(self, group_id: Any)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "migrations/env.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/main.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 15,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 28,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 40,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 50,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 68,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 83,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 13,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 14,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 15,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 16,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 51,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 52,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 68,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 83,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 117,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 122,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 123,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 152,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 161,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 162,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 11,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 25,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 165,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 166,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 170,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 25,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 39,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 40,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 59,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 60,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 66,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 67,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 72,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 74,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 89,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 90,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 91,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 93,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 96,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 97,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 98,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 102,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 132,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 136,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 59,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 79,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 100,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 106,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 109,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: Any)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/base.py:add_participant",
+      "kind": "function",
+      "name": "add_participant",
+      "module": "app/repositories/base.py",
+      "signature": "(self, group_id: Any, participant: Participant)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 48,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 69,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 66,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 51,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: Any, participant: Participant)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/base.py:create",
+      "kind": "function",
+      "name": "create",
+      "module": "app/repositories/base.py",
+      "signature": "(self, expense: Expense)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 4,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 36,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 62,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 95,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 104,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 134,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/payments.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 162,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 164,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 167,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 37,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 201,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 38,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 74,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 78,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, expense: Expense)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/base.py:list_by_group",
+      "kind": "function",
+      "name": "list_by_group",
+      "module": "app/repositories/base.py",
+      "signature": "(self, group_id: Any)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 118,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id: Any)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/sqlalchemy.py:create",
+      "kind": "function",
+      "name": "create",
+      "module": "app/repositories/sqlalchemy.py",
+      "signature": "(self, group: Group)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 4,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/payments.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 162,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 164,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 167,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 37,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 201,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 38,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 74,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 78,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group: Group)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/sqlalchemy.py:get",
+      "kind": "function",
+      "name": "get",
+      "module": "app/repositories/sqlalchemy.py",
+      "signature": "(self, group_id)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "migrations/env.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/env.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/main.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 15,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 28,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 40,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 50,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 68,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 83,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 13,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 14,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 15,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 16,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 51,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 52,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 68,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 83,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 117,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 122,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 123,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 152,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 161,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 162,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 11,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 25,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 165,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 166,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 170,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 25,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 39,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 40,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 59,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 60,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 66,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 67,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 72,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 74,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 89,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 90,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 91,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 93,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 96,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 97,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 98,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 102,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 132,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 136,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 59,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 79,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 100,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 101,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 106,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 109,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/sqlalchemy.py:add_participant",
+      "kind": "function",
+      "name": "add_participant",
+      "module": "app/repositories/sqlalchemy.py",
+      "signature": "(self, group_id, participant: Participant)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 48,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 66,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 51,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id, participant: Participant)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/sqlalchemy.py:create",
+      "kind": "function",
+      "name": "create",
+      "module": "app/repositories/sqlalchemy.py",
+      "signature": "(self, expense: Expense)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 4,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/payments.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 162,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 164,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 167,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 37,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 201,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 38,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 74,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 78,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, expense: Expense)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/repositories/sqlalchemy.py:list_by_group",
+      "kind": "function",
+      "name": "list_by_group",
+      "module": "app/repositories/sqlalchemy.py",
+      "signature": "(self, group_id)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/base.py",
+          "line": 35,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/payments.py:list_payments",
+      "kind": "function",
+      "name": "list_payments",
+      "module": "app/services/payments.py",
+      "signature": "(self, group_id)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 90,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/dashboard.py:build_dashboard",
+      "kind": "function",
+      "name": "build_dashboard",
+      "module": "app/services/dashboard.py",
+      "signature": "(group=None, expenses=None)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(group=None, expenses=None)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/dashboard.py:build",
+      "kind": "function",
+      "name": "build",
+      "module": "app/services/dashboard.py",
+      "signature": "(self, group, expenses=None)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group, expenses=None)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/dashboard.py:get_dashboard",
+      "kind": "function",
+      "name": "get_dashboard",
+      "module": "app/services/dashboard.py",
+      "signature": "(self, group, expenses=None)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group, expenses=None)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/group.py:create_group",
+      "kind": "function",
+      "name": "create_group",
+      "module": "app/services/group.py",
+      "signature": "(self, name: str, emails: Sequence[str])",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, name: str, emails: Sequence[str])",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/group.py:view_group",
+      "kind": "function",
+      "name": "view_group",
+      "module": "app/services/group.py",
+      "signature": "(self, group_id)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/api/routes.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 38,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/group.py:add_participant",
+      "kind": "function",
+      "name": "add_participant",
+      "module": "app/services/group.py",
+      "signature": "(self, group_id, email)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 48,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 69,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 51,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id, email)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/group.py:accept_invite",
+      "kind": "function",
+      "name": "accept_invite",
+      "module": "app/services/group.py",
+      "signature": "(self, group_id, email)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id, email)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/group.py:expire_invites",
+      "kind": "function",
+      "name": "expire_invites",
+      "module": "app/services/group.py",
+      "signature": "(self, group_id, days: int = 7)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id, days: int = 7)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/group.py:expire_pending_invites",
+      "kind": "function",
+      "name": "expire_pending_invites",
+      "module": "app/services/group.py",
+      "signature": "(self, group_id, days: int = 7)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id, days: int = 7)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/balance.py:calculate_balances",
+      "kind": "function",
+      "name": "calculate_balances",
+      "module": "app/services/balance.py",
+      "signature": "(expenses)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 116,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 182,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 193,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 123,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(expenses)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/export.py:export_expenses_csv",
+      "kind": "function",
+      "name": "export_expenses_csv",
+      "module": "app/services/export.py",
+      "signature": "(expenses)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(expenses)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/export.py:export_expenses",
+      "kind": "function",
+      "name": "export_expenses",
+      "module": "app/services/export.py",
+      "signature": "(self, expenses)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, expenses)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/export.py:export_group",
+      "kind": "function",
+      "name": "export_group",
+      "module": "app/services/export.py",
+      "signature": "(self, group_id)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/expense.py:calculate_equal_split",
+      "kind": "function",
+      "name": "calculate_equal_split",
+      "module": "app/services/expense.py",
+      "signature": "(total, participants: Sequence[str])",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/balances.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 77,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(total, participants: Sequence[str])",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/expense.py:validate_custom_split",
+      "kind": "function",
+      "name": "validate_custom_split",
+      "module": "app/services/expense.py",
+      "signature": "(total, values)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(total, values)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/expense.py:calculate_custom_split",
+      "kind": "function",
+      "name": "calculate_custom_split",
+      "module": "app/services/expense.py",
+      "signature": "(total, values)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(total, values)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/balances.py:calculate_balances",
+      "kind": "function",
+      "name": "calculate_balances",
+      "module": "app/services/balances.py",
+      "signature": "(expenses)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balance.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 123,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(expenses)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/balances.py:validate_balances",
+      "kind": "function",
+      "name": "validate_balances",
+      "module": "app/services/balances.py",
+      "signature": "(balances)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/settlement.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 49,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(balances)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/balances.py:calculate",
+      "kind": "function",
+      "name": "calculate",
+      "module": "app/services/balances.py",
+      "signature": "(self, expenses)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balance.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 43,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 110,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 178,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 180,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 123,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, expenses)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/balances.py:validate",
+      "kind": "function",
+      "name": "validate",
+      "module": "app/services/balances.py",
+      "signature": "(self, balances)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/expense.py",
+          "line": 78,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 124,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 6,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/settlement.py",
+          "line": 49,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, balances)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/balances.py:for_group",
+      "kind": "function",
+      "name": "for_group",
+      "module": "app/services/balances.py",
+      "signature": "(self, group_id)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/settlement.py",
+          "line": 108,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/notifications.py:send_invite",
+      "kind": "function",
+      "name": "send_invite",
+      "module": "app/services/notifications.py",
+      "signature": "(self, email: str, group_id=None, invite_url: str | None = None)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/group.py",
+          "line": 96,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 97,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, email: str, group_id=None, invite_url: str | None = None)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/notifications.py:send_settlement_notification",
+      "kind": "function",
+      "name": "send_settlement_notification",
+      "module": "app/services/notifications.py",
+      "signature": "(self, recipient: str, message: str)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, recipient: str, message: str)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/settlement.py:generate_settlement_plan",
+      "kind": "function",
+      "name": "generate_settlement_plan",
+      "module": "app/services/settlement.py",
+      "signature": "(balances)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(balances)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/settlement.py:generate_plan",
+      "kind": "function",
+      "name": "generate_plan",
+      "module": "app/services/settlement.py",
+      "signature": "(self, balances)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, balances)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/services/settlement.py:generate_plan_for_group",
+      "kind": "function",
+      "name": "generate_plan_for_group",
+      "module": "app/services/settlement.py",
+      "signature": "(self, group_id)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self, group_id)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/models/entities.py:total_amount",
+      "kind": "function",
+      "name": "total_amount",
+      "module": "app/models/entities.py",
+      "signature": "(self)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 13,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 155,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 165,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 24,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/models/entities.py:total",
+      "kind": "function",
+      "name": "total",
+      "module": "app/models/entities.py",
+      "signature": "(self)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 13,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 15,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 20,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 38,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 48,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balance.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balance.py",
+          "line": 25,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balance.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/export.py",
+          "line": 35,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 43,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 60,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 64,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 65,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 66,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 78,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 79,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 82,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 91,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 92,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 103,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 105,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 110,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 114,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 124,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 138,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 150,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 155,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 163,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 164,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 165,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 172,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 173,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 178,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 180,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/expense.py",
+          "line": 187,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 13,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 14,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 17,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 19,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 24,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 77,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 128,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 132,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 158,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 160,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/balances.py",
+          "line": 161,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(self)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/api/routes.py:create_group",
+      "kind": "function",
+      "name": "create_group",
+      "module": "app/api/routes.py",
+      "signature": "(payload: GroupCreate, db: Session = Depends(get_db)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/services/group.py",
+          "line": 19,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(payload: GroupCreate, db: Session = Depends(get_db)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/api/routes.py:get_group",
+      "kind": "function",
+      "name": "get_group",
+      "module": "app/api/routes.py",
+      "signature": "(group_id: UUID, db: Session = Depends(get_db)",
+      "exported": true,
+      "tags": [],
+      "consumers": [
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 33,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 41,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 42,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 50,
+          "agent": "developer"
+        }
+      ],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(group_id: UUID, db: Session = Depends(get_db)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/api/routes.py:get_group_balances",
+      "kind": "function",
+      "name": "get_group_balances",
+      "module": "app/api/routes.py",
+      "signature": "(group_id: UUID, db: Session = Depends(get_db)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(group_id: UUID, db: Session = Depends(get_db)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    },
+    {
+      "id": "app/api/routes.py:settle_group",
+      "kind": "function",
+      "name": "settle_group",
+      "module": "app/api/routes.py",
+      "signature": "(group_id: UUID, db: Session = Depends(get_db)",
+      "exported": true,
+      "tags": [],
+      "consumers": [],
+      "history": [
+        {
+          "version": "1.0.0",
+          "signature": "(group_id: UUID, db: Session = Depends(get_db)",
+          "agent": "developer",
+          "commit": "HEAD"
+        }
+      ],
+      "last_modified": "2026-08-01T06:55:16.731725+00:00",
+      "last_agent": "developer"
+    }
+  ],
+  "breaking_changes": [
+    {
+      "interface_id": "app/repositories/base.py:create",
+      "interface_name": "create",
+      "module": "app/repositories/base.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, expense: Expense)' para '(self, group: Group)'",
+      "impacted_consumers": [
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 37,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 39,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 49,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 51,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 3,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 21,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 36,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 62,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 95,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 104,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 134,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 29,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 49,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 78,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/repositories/sqlalchemy.py:create",
+      "interface_name": "create",
+      "module": "app/repositories/sqlalchemy.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, expense: Expense)' para '(self, group: Group)'",
+      "impacted_consumers": [
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 18,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 26,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 34,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 37,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 39,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 46,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 49,
+          "agent": "developer"
+        },
+        {
+          "file": "migrations/versions/0001_initial.py",
+          "line": 51,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 3,
+          "agent": "developer"
+        },
+        {
+          "file": "app/db/session.py",
+          "line": 8,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 12,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 30,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 54,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 23,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/orm.py",
+          "line": 71,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 29,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 49,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 61,
+          "agent": "developer"
+        },
+        {
+          "file": "app/models/entities.py",
+          "line": 80,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 58,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 78,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/payments.py:list_payments",
+      "interface_name": "list_payments",
+      "module": "app/services/payments.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, group_id=None)' para '(self, group_id)'",
+      "impacted_consumers": [
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 90,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/group.py:create_group",
+      "interface_name": "create_group",
+      "module": "app/services/group.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, name: str, participant_emails: list[str])' para '(self, name: str, emails: Sequence[str])'",
+      "impacted_consumers": [
+        {
+          "file": "app/api/routes.py",
+          "line": 27,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 31,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/group.py:add_participant",
+      "interface_name": "add_participant",
+      "module": "app/services/group.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, group_id, email: str)' para '(self, group_id, email)'",
+      "impacted_consumers": [
+        {
+          "file": "app/repositories/in_memory.py",
+          "line": 48,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/base.py",
+          "line": 22,
+          "agent": "developer"
+        },
+        {
+          "file": "app/repositories/sqlalchemy.py",
+          "line": 69,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/api/routes.py",
+          "line": 51,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/group.py:accept_invite",
+      "interface_name": "accept_invite",
+      "module": "app/services/group.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, group_id, email: str)' para '(self, group_id, email)'",
+      "impacted_consumers": [],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/expense.py:calculate_equal_split",
+      "interface_name": "calculate_equal_split",
+      "module": "app/services/expense.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(total: Any, participants: Sequence[Any] | int)' para '(total, participants: Sequence[str])'",
+      "impacted_consumers": [
+        {
+          "file": "app/services/__init__.py",
+          "line": 5,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/__init__.py",
+          "line": 22,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/expense.py:validate_custom_split",
+      "interface_name": "validate_custom_split",
+      "module": "app/services/expense.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(total: Any, splits: Any = None)' para '(total, values)'",
+      "impacted_consumers": [
+        {
+          "file": "app/services/__init__.py",
+          "line": 5,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/__init__.py",
+          "line": 25,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/expense.py:calculate_custom_split",
+      "interface_name": "calculate_custom_split",
+      "module": "app/services/expense.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(total: Any, splits: Any)' para '(total, values)'",
+      "impacted_consumers": [],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/notifications.py:send_invite",
+      "interface_name": "send_invite",
+      "module": "app/services/notifications.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, email: str, group_name: str, invite_link: str | None = None)' para '(self, email: str, group_id=None, invite_url: str | None = None)'",
+      "impacted_consumers": [
+        {
+          "file": "app/services/group.py",
+          "line": 39,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 45,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 47,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 85,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/group.py",
+          "line": 134,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/settlement.py:generate_settlement_plan",
+      "interface_name": "generate_settlement_plan",
+      "module": "app/services/settlement.py",
+      "change_type": "parameter_removed",
+      "details": "Parâmetro(s) removido(s): 2 -> 1",
+      "impacted_consumers": [
+        {
+          "file": "app/services/dashboard.py",
+          "line": 9,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/dashboard.py",
+          "line": 63,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/__init__.py",
+          "line": 10,
+          "agent": "developer"
+        },
+        {
+          "file": "app/services/__init__.py",
+          "line": 23,
+          "agent": "developer"
+        }
+      ],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    },
+    {
+      "interface_id": "app/services/settlement.py:generate_plan",
+      "interface_name": "generate_plan",
+      "module": "app/services/settlement.py",
+      "change_type": "signature_changed",
+      "details": "Assinatura alterada de '(self, group_id)' para '(self, balances)'",
+      "impacted_consumers": [],
+      "detected_at": "2026-08-01T06:55:16.767003+00:00"
+    }
+  ]
+}

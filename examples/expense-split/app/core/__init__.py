@@ -1,0 +1,1 @@
+"""Núcleo de exceções e regras gerais de domínio."""

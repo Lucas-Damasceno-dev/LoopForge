@@ -1,0 +1,1 @@
+"""Aplicação de divisão de despesas entre amigos."""

@@ -1,0 +1,1 @@
+"""Schemas Pydantic para entrada e saída da API."""

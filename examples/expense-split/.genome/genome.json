@@ -1,0 +1,1195 @@
+{
+  "version": "1.0.0",
+  "repo": {
+    "root": "/home/lucasd/Documents/03_Desenvolvimento/code/projects/personal/portfolio/agentes/LoopForge/examples/expense-split",
+    "langs": {
+      "python": {
+        "files": 32,
+        "lines": 1745
+      }
+    },
+    "total_files": 32,
+    "total_lines": 1745
+  },
+  "conventions": {
+    "error_handling": {
+      "pattern": "standard-exceptions",
+      "lib": null,
+      "usage_rate": 0.9
+    },
+    "testing": null,
+    "custom": {}
+  },
+  "modules": [
+    {
+      "path": "migrations/env.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "config",
+          "kind": "variable",
+          "line": 11,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "target_metadata",
+          "kind": "variable",
+          "line": 17,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "run_migrations_offline",
+          "kind": "function",
+          "line": 19,
+          "exported": true,
+          "signature": "def run_migrations_offline()"
+        },
+        {
+          "name": "run_migrations_online",
+          "kind": "function",
+          "line": 30,
+          "exported": true,
+          "signature": "def run_migrations_online()"
+        }
+      ],
+      "imports": [
+        "logging.config.fileConfig",
+        "alembic.context",
+        "sqlalchemy.engine_from_config",
+        "sqlalchemy.pool",
+        "app.config.settings",
+        "app.db.session.Base"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 45
+    },
+    {
+      "path": "migrations/versions/0001_initial.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "revision",
+          "kind": "variable",
+          "line": 11,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "down_revision",
+          "kind": "variable",
+          "line": 12,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "branch_labels",
+          "kind": "variable",
+          "line": 13,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "depends_on",
+          "kind": "variable",
+          "line": 14,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "upgrade",
+          "kind": "function",
+          "line": 16,
+          "exported": true,
+          "signature": "def upgrade()"
+        },
+        {
+          "name": "downgrade",
+          "kind": "function",
+          "line": 60,
+          "exported": true,
+          "signature": "def downgrade()"
+        }
+      ],
+      "imports": [
+        "alembic.op",
+        "sqlalchemy"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 67
+    },
+    {
+      "path": "app/main.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "app",
+          "kind": "variable",
+          "line": 7,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "health",
+          "kind": "function",
+          "line": 10,
+          "exported": true,
+          "signature": "def health()"
+        }
+      ],
+      "imports": [
+        "fastapi.FastAPI",
+        "app.config.settings"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 12
+    },
+    {
+      "path": "app/config.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "Settings",
+          "kind": "class",
+          "line": 7,
+          "exported": true,
+          "signature": "class Settings"
+        },
+        {
+          "name": "get_settings",
+          "kind": "function",
+          "line": 28,
+          "exported": true,
+          "signature": "def get_settings()"
+        },
+        {
+          "name": "settings",
+          "kind": "variable",
+          "line": 32,
+          "exported": true,
+          "signature": null
+        }
+      ],
+      "imports": [
+        "functools.lru_cache",
+        "pydantic_settings.BaseSettings",
+        "pydantic_settings.SettingsConfigDict"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 32
+    },
+    {
+      "path": "app/utils.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "to_decimal",
+          "kind": "function",
+          "line": 8,
+          "exported": true,
+          "signature": "def to_decimal(value)"
+        },
+        {
+          "name": "get_attr",
+          "kind": "function",
+          "line": 19,
+          "exported": true,
+          "signature": "def get_attr(obj)"
+        },
+        {
+          "name": "participant_key",
+          "kind": "function",
+          "line": 31,
+          "exported": true,
+          "signature": "def participant_key(value)"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "decimal.Decimal",
+        "decimal.InvalidOperation",
+        "typing.Any"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 40
+    },
+    {
+      "path": "app/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 1
+    },
+    {
+      "path": "app/db/session.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "engine",
+          "kind": "variable",
+          "line": 8,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "SessionLocal",
+          "kind": "variable",
+          "line": 9,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "Base",
+          "kind": "variable",
+          "line": 10,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "get_db",
+          "kind": "function",
+          "line": 12,
+          "exported": true,
+          "signature": "def get_db()"
+        }
+      ],
+      "imports": [
+        "sqlalchemy.create_engine",
+        "sqlalchemy.orm.declarative_base",
+        "sqlalchemy.orm.sessionmaker",
+        "app.config.settings"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 22
+    },
+    {
+      "path": "app/db/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 1
+    },
+    {
+      "path": "app/core/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 1
+    },
+    {
+      "path": "app/core/exceptions.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "AppError",
+          "kind": "class",
+          "line": 8,
+          "exported": true,
+          "signature": "class AppError"
+        },
+        {
+          "name": "GroupNotFoundError",
+          "kind": "class",
+          "line": 11,
+          "exported": true,
+          "signature": "class GroupNotFoundError"
+        },
+        {
+          "name": "ParticipantNotFoundError",
+          "kind": "class",
+          "line": 14,
+          "exported": true,
+          "signature": "class ParticipantNotFoundError"
+        },
+        {
+          "name": "DuplicateParticipantError",
+          "kind": "class",
+          "line": 17,
+          "exported": true,
+          "signature": "class DuplicateParticipantError"
+        },
+        {
+          "name": "InviteExpiredError",
+          "kind": "class",
+          "line": 20,
+          "exported": true,
+          "signature": "class InviteExpiredError"
+        },
+        {
+          "name": "ExpenseValidationError",
+          "kind": "class",
+          "line": 23,
+          "exported": true,
+          "signature": "class ExpenseValidationError"
+        },
+        {
+          "name": "BalanceConsistencyError",
+          "kind": "class",
+          "line": 26,
+          "exported": true,
+          "signature": "class BalanceConsistencyError"
+        },
+        {
+          "name": "SettlementError",
+          "kind": "class",
+          "line": 29,
+          "exported": true,
+          "signature": "class SettlementError"
+        },
+        {
+          "name": "PaymentError",
+          "kind": "class",
+          "line": 32,
+          "exported": true,
+          "signature": "class PaymentError"
+        },
+        {
+          "name": "NotificationError",
+          "kind": "class",
+          "line": 35,
+          "exported": true,
+          "signature": "class NotificationError"
+        },
+        {
+          "name": "ExportError",
+          "kind": "class",
+          "line": 38,
+          "exported": true,
+          "signature": "class ExportError"
+        }
+      ],
+      "imports": [
+        "__future__.annotations"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 39
+    },
+    {
+      "path": "app/repositories/in_memory.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "InMemoryRepository",
+          "kind": "class",
+          "line": 8,
+          "exported": true,
+          "signature": "class InMemoryRepository"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "app.core.exceptions.GroupNotFoundError",
+        "app.models.entities.Expense",
+        "app.models.entities.Group",
+        "app.models.entities.Payment",
+        "app.models.entities.Participant"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 94
+    },
+    {
+      "path": "app/repositories/base.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "GroupRepository",
+          "kind": "class",
+          "line": 8,
+          "exported": true,
+          "signature": "class GroupRepository"
+        },
+        {
+          "name": "ExpenseRepository",
+          "kind": "class",
+          "line": 26,
+          "exported": true,
+          "signature": "class ExpenseRepository"
+        }
+      ],
+      "imports": [
+        "abc.ABC",
+        "abc.abstractmethod",
+        "typing.Any",
+        "app.models.entities.Expense",
+        "app.models.entities.Group",
+        "app.models.entities.Participant"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 37
+    },
+    {
+      "path": "app/repositories/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 1
+    },
+    {
+      "path": "app/repositories/sqlalchemy.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "SQLAlchemyGroupRepository",
+          "kind": "class",
+          "line": 14,
+          "exported": true,
+          "signature": "class SQLAlchemyGroupRepository"
+        },
+        {
+          "name": "SQLAlchemyExpenseRepository",
+          "kind": "class",
+          "line": 88,
+          "exported": true,
+          "signature": "class SQLAlchemyExpenseRepository"
+        }
+      ],
+      "imports": [
+        "decimal.Decimal",
+        "sqlalchemy.select",
+        "sqlalchemy.orm.Session",
+        "sqlalchemy.orm.selectinload",
+        "app.core.exceptions.NotFoundError",
+        "app.models.entities.Expense",
+        "app.models.entities.Group",
+        "app.models.entities.Participant",
+        "app.models.entities.Split",
+        "app.models.orm.ExpenseORM",
+        "app.models.orm.ExpenseSplitORM",
+        "app.models.orm.GroupORM",
+        "app.models.orm.ParticipantORM",
+        "app.repositories.base.ExpenseRepository",
+        "app.repositories.base.GroupRepository"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 145
+    },
+    {
+      "path": "app/services/payments.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "PaymentService",
+          "kind": "class",
+          "line": 9,
+          "exported": true,
+          "signature": "class PaymentService"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "app.core.exceptions.PaymentError",
+        "app.models.entities.Payment",
+        "app.utils.to_decimal"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 79
+    },
+    {
+      "path": "app/services/dashboard.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "DashboardParticipant",
+          "kind": "class",
+          "line": 12,
+          "exported": true,
+          "signature": "class DashboardParticipant"
+        },
+        {
+          "name": "GroupDashboard",
+          "kind": "class",
+          "line": 23,
+          "exported": true,
+          "signature": "class GroupDashboard"
+        },
+        {
+          "name": "DashboardService",
+          "kind": "class",
+          "line": 42,
+          "exported": true,
+          "signature": "class DashboardService"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "decimal.Decimal",
+        "app.core.exceptions.GroupNotFoundError",
+        "app.services.balances.BalanceService",
+        "app.services.settlement.SettlementService",
+        "app.services.settlement.generate_settlement_plan",
+        "app.utils.get_attr",
+        "app.utils.participant_key",
+        "app.utils.to_decimal"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 85
+    },
+    {
+      "path": "app/services/group.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "_ensure_aware",
+          "kind": "function",
+          "line": 17,
+          "exported": false,
+          "signature": "def _ensure_aware(dt)"
+        },
+        {
+          "name": "GroupService",
+          "kind": "class",
+          "line": 23,
+          "exported": true,
+          "signature": "class GroupService"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "datetime.datetime",
+        "datetime.timedelta",
+        "datetime.timezone",
+        "app.config.settings",
+        "app.core.exceptions.DuplicateParticipantError",
+        "app.core.exceptions.GroupNotFoundError",
+        "app.core.exceptions.InviteExpiredError",
+        "app.core.exceptions.ParticipantNotFoundError",
+        "app.models.entities.Group",
+        "app.models.entities.Participant",
+        "app.utils.participant_key"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 149
+    },
+    {
+      "path": "app/services/balance.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "calculate_balances",
+          "kind": "function",
+          "line": 8,
+          "exported": true,
+          "signature": "def calculate_balances(expenses)"
+        }
+      ],
+      "imports": [
+        "collections.defaultdict",
+        "decimal.Decimal",
+        "app.core.exceptions.InconsistentBalanceError"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 30
+    },
+    {
+      "path": "app/services/export.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "ExportService",
+          "kind": "class",
+          "line": 14,
+          "exported": true,
+          "signature": "class ExportService"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "csv",
+        "json",
+        "decimal.Decimal",
+        "io.StringIO",
+        "app.core.exceptions.GroupNotFoundError",
+        "app.services.balances.BalanceService",
+        "app.utils.get_attr",
+        "app.utils.participant_key",
+        "app.utils.to_decimal"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 81
+    },
+    {
+      "path": "app/services/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [
+        "app.services.balances.BalanceService",
+        "app.services.balances.calculate_balances",
+        "app.services.balances.validate_balances",
+        "app.services.dashboard.DashboardService",
+        "app.services.expense.ExpenseService",
+        "app.services.expense.calculate_equal_split",
+        "app.services.expense.validate_custom_split",
+        "app.services.export.ExportService",
+        "app.services.group.GroupService",
+        "app.services.notifications.NotificationService",
+        "app.services.payments.PaymentService",
+        "app.services.settlement.SettlementService",
+        "app.services.settlement.generate_settlement_plan"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 26
+    },
+    {
+      "path": "app/services/expense.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "_normalize_custom_splits",
+          "kind": "function",
+          "line": 12,
+          "exported": false,
+          "signature": "def _normalize_custom_splits(total, splits)"
+        },
+        {
+          "name": "calculate_equal_split",
+          "kind": "function",
+          "line": 65,
+          "exported": true,
+          "signature": "def calculate_equal_split(total, participants)"
+        },
+        {
+          "name": "validate_custom_split",
+          "kind": "function",
+          "line": 98,
+          "exported": true,
+          "signature": "def validate_custom_split(total, splits)"
+        },
+        {
+          "name": "calculate_custom_split",
+          "kind": "function",
+          "line": 115,
+          "exported": true,
+          "signature": "def calculate_custom_split(total, splits)"
+        },
+        {
+          "name": "ExpenseService",
+          "kind": "class",
+          "line": 119,
+          "exported": true,
+          "signature": "class ExpenseService"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "decimal.Decimal",
+        "decimal.ROUND_DOWN",
+        "decimal.ROUND_HALF_UP",
+        "typing.Any",
+        "typing.Sequence",
+        "app.core.exceptions.ExpenseValidationError",
+        "app.core.exceptions.GroupNotFoundError",
+        "app.models.entities.Expense",
+        "app.utils.get_attr",
+        "app.utils.participant_key",
+        "app.utils.to_decimal"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 198
+    },
+    {
+      "path": "app/services/notifications.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "NotificationService",
+          "kind": "class",
+          "line": 7,
+          "exported": true,
+          "signature": "class NotificationService"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "app.core.exceptions.NotificationError"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 37
+    },
+    {
+      "path": "app/services/settlement.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "Transfer",
+          "kind": "class",
+          "line": 12,
+          "exported": true,
+          "signature": "class Transfer"
+        },
+        {
+          "name": "_insert_sorted",
+          "kind": "function",
+          "line": 33,
+          "exported": false,
+          "signature": "def _insert_sorted(entries, amount, name)"
+        },
+        {
+          "name": "generate_settlement_plan",
+          "kind": "function",
+          "line": 38,
+          "exported": true,
+          "signature": "def generate_settlement_plan(balances)"
+        },
+        {
+          "name": "SettlementService",
+          "kind": "class",
+          "line": 95,
+          "exported": true,
+          "signature": "class SettlementService"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "decimal.Decimal",
+        "typing.Any",
+        "app.core.exceptions.BalanceConsistencyError",
+        "app.core.exceptions.SettlementError",
+        "app.services.balances.BalanceService",
+        "app.services.balances.validate_balances",
+        "app.utils.participant_key",
+        "app.utils.to_decimal"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 125
+    },
+    {
+      "path": "app/schemas/group.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "ParticipantRead",
+          "kind": "class",
+          "line": 9,
+          "exported": true,
+          "signature": "class ParticipantRead"
+        },
+        {
+          "name": "GroupCreate",
+          "kind": "class",
+          "line": 19,
+          "exported": true,
+          "signature": "class GroupCreate"
+        },
+        {
+          "name": "GroupRead",
+          "kind": "class",
+          "line": 25,
+          "exported": true,
+          "signature": "class GroupRead"
+        },
+        {
+          "name": "ParticipantCreate",
+          "kind": "class",
+          "line": 35,
+          "exported": true,
+          "signature": "class ParticipantCreate"
+        }
+      ],
+      "imports": [
+        "datetime.datetime",
+        "decimal.Decimal",
+        "uuid.UUID",
+        "pydantic.BaseModel",
+        "pydantic.ConfigDict",
+        "pydantic.EmailStr",
+        "pydantic.Field"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 38
+    },
+    {
+      "path": "app/schemas/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 1
+    },
+    {
+      "path": "app/schemas/expense.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "SplitRead",
+          "kind": "class",
+          "line": 8,
+          "exported": true,
+          "signature": "class SplitRead"
+        },
+        {
+          "name": "ExpenseRead",
+          "kind": "class",
+          "line": 17,
+          "exported": true,
+          "signature": "class ExpenseRead"
+        },
+        {
+          "name": "SplitIn",
+          "kind": "class",
+          "line": 30,
+          "exported": true,
+          "signature": "class SplitIn"
+        },
+        {
+          "name": "EqualExpenseCreate",
+          "kind": "class",
+          "line": 37,
+          "exported": true,
+          "signature": "class EqualExpenseCreate"
+        },
+        {
+          "name": "CustomExpenseCreate",
+          "kind": "class",
+          "line": 46,
+          "exported": true,
+          "signature": "class CustomExpenseCreate"
+        }
+      ],
+      "imports": [
+        "decimal.Decimal",
+        "uuid.UUID",
+        "pydantic.BaseModel",
+        "pydantic.ConfigDict",
+        "pydantic.Field"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 53
+    },
+    {
+      "path": "app/schemas/settlement.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "TransferRead",
+          "kind": "class",
+          "line": 7,
+          "exported": true,
+          "signature": "class TransferRead"
+        }
+      ],
+      "imports": [
+        "decimal.Decimal",
+        "pydantic.BaseModel"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 13
+    },
+    {
+      "path": "app/models/orm.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "Base",
+          "kind": "class",
+          "line": 12,
+          "exported": true,
+          "signature": "class Base"
+        },
+        {
+          "name": "GroupORM",
+          "kind": "class",
+          "line": 15,
+          "exported": true,
+          "signature": "class GroupORM"
+        },
+        {
+          "name": "ParticipantORM",
+          "kind": "class",
+          "line": 34,
+          "exported": true,
+          "signature": "class ParticipantORM"
+        },
+        {
+          "name": "ExpenseORM",
+          "kind": "class",
+          "line": 56,
+          "exported": true,
+          "signature": "class ExpenseORM"
+        },
+        {
+          "name": "ExpenseSplitORM",
+          "kind": "class",
+          "line": 80,
+          "exported": true,
+          "signature": "class ExpenseSplitORM"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "datetime.datetime",
+        "decimal.Decimal",
+        "uuid.UUID",
+        "uuid.uuid4",
+        "sqlalchemy.DateTime",
+        "sqlalchemy.ForeignKey",
+        "sqlalchemy.Index",
+        "sqlalchemy.Numeric",
+        "sqlalchemy.String",
+        "sqlalchemy.Uuid",
+        "sqlalchemy.func",
+        "sqlalchemy.orm.DeclarativeBase",
+        "sqlalchemy.orm.Mapped",
+        "sqlalchemy.orm.mapped_column",
+        "sqlalchemy.orm.relationship"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 95
+    },
+    {
+      "path": "app/models/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 1
+    },
+    {
+      "path": "app/models/entities.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "_new_id",
+          "kind": "function",
+          "line": 10,
+          "exported": false,
+          "signature": "def _new_id()"
+        },
+        {
+          "name": "_now",
+          "kind": "function",
+          "line": 14,
+          "exported": false,
+          "signature": "def _now()"
+        },
+        {
+          "name": "Participant",
+          "kind": "class",
+          "line": 19,
+          "exported": true,
+          "signature": "class Participant"
+        },
+        {
+          "name": "ExpenseSplit",
+          "kind": "class",
+          "line": 32,
+          "exported": true,
+          "signature": "class ExpenseSplit"
+        },
+        {
+          "name": "Expense",
+          "kind": "class",
+          "line": 40,
+          "exported": true,
+          "signature": "class Expense"
+        },
+        {
+          "name": "Payment",
+          "kind": "class",
+          "line": 52,
+          "exported": true,
+          "signature": "class Payment"
+        },
+        {
+          "name": "Invite",
+          "kind": "class",
+          "line": 64,
+          "exported": true,
+          "signature": "class Invite"
+        },
+        {
+          "name": "Group",
+          "kind": "class",
+          "line": 74,
+          "exported": true,
+          "signature": "class Group"
+        }
+      ],
+      "imports": [
+        "__future__.annotations",
+        "dataclasses.dataclass",
+        "dataclasses.field",
+        "datetime.datetime",
+        "datetime.timezone",
+        "decimal.Decimal",
+        "uuid.uuid4"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 83
+    },
+    {
+      "path": "app/api/__init__.py",
+      "language": "python",
+      "exports": [],
+      "imports": [],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 1
+    },
+    {
+      "path": "app/api/routes.py",
+      "language": "python",
+      "exports": [
+        {
+          "name": "router",
+          "kind": "variable",
+          "line": 24,
+          "exported": true,
+          "signature": null
+        },
+        {
+          "name": "create_group",
+          "kind": "function",
+          "line": 27,
+          "exported": true,
+          "signature": "def create_group(payload, db)"
+        },
+        {
+          "name": "get_group",
+          "kind": "function",
+          "line": 34,
+          "exported": true,
+          "signature": "def get_group(group_id, db)"
+        },
+        {
+          "name": "add_participant",
+          "kind": "function",
+          "line": 45,
+          "exported": true,
+          "signature": "def add_participant(group_id, payload, db)"
+        },
+        {
+          "name": "create_equal_expense",
+          "kind": "function",
+          "line": 58,
+          "exported": true,
+          "signature": "def create_equal_expense(payload, db)"
+        },
+        {
+          "name": "create_custom_expense",
+          "kind": "function",
+          "line": 78,
+          "exported": true,
+          "signature": "def create_custom_expense(payload, db)"
+        },
+        {
+          "name": "get_group_balances",
+          "kind": "function",
+          "line": 101,
+          "exported": true,
+          "signature": "def get_group_balances(group_id, db)"
+        },
+        {
+          "name": "settle_group",
+          "kind": "function",
+          "line": 109,
+          "exported": true,
+          "signature": "def settle_group(group_id, db)"
+        }
+      ],
+      "imports": [
+        "uuid.UUID",
+        "fastapi.APIRouter",
+        "fastapi.Depends",
+        "fastapi.status",
+        "sqlalchemy.orm.Session",
+        "app.db.session.get_db",
+        "app.repositories.sqlalchemy.SQLAlchemyExpenseRepository",
+        "app.repositories.sqlalchemy.SQLAlchemyGroupRepository",
+        "app.schemas.expense.CustomExpenseCreate",
+        "app.schemas.expense.EqualExpenseCreate",
+        "app.schemas.expense.ExpenseRead",
+        "app.schemas.group.GroupCreate",
+        "app.schemas.group.GroupRead",
+        "app.schemas.group.ParticipantCreate",
+        "app.schemas.group.ParticipantRead",
+        "app.schemas.settlement.TransferRead",
+        "app.services.expense.ExpenseService",
+        "app.services.group.GroupService",
+        "app.services.settlement.SettlementService"
+      ],
+      "dependencies": [],
+      "dependents": [],
+      "instability": 0.0,
+      "lines_count": 113
+    }
+  ],
+  "architecture": {
+    "pattern": "custom",
+    "source": "auto-detected",
+    "layers": [],
+    "layer_violations": [],
+    "circular_deps": [],
+    "bus_factor": {
+      "score": 1.0,
+      "high_risk_files": []
+    }
+  },
+  "generated_at": "2026-08-01T06:44:53.557809+00:00",
+  "ttl_seconds": 86400
+}
