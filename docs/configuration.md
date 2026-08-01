@@ -38,7 +38,7 @@ class LoopForgeConfig(BaseModel):
     ontology_path: str = "examples/the-foundry"  # Caminho para ontologia The Foundry
     stack: TechStack = Field(default_factory=TechStack)  # TechStack(language, framework, testing_harness, package_manager)
     llm_provider: str = "openrouter"        # "openrouter" | "google"
-    llm_model: str = "oc/deepseek-v4-flash-free" # Modelo LLM (ex: inclusionai/ling-3.0-flash:free)
+    llm_model: str = "oc/deepseek-v4-flash-free" # Modelo LLM (ex: auto/best-free)
     budget_limit_usd: float = 10.0      # Limite de gasto USD (usado pelo CircuitBreaker)
     max_parallel_tasks: int = 2
     plan: PlanSchema = Field(default_factory=PlanSchema)  # PlanSchema(tasks[], graph{})
@@ -57,7 +57,7 @@ class LoopForgeConfig(BaseModel):
   "budget_limit_usd": 10.0,
   "max_parallel_tasks": 2,
   "llm_provider": "openrouter",
-  "llm_model": "inclusionai/ling-3.0-flash:free",
+  "llm_model": "oc/deepseek-v4-flash-free",
   "plan": {
     "tasks": [
       {
@@ -87,7 +87,7 @@ ontology_path: examples/the-foundry
 budget_limit_usd: 10.0
 max_parallel_tasks: 2
 llm_provider: openrouter
-llm_model: inclusionai/ling-3.0-flash:free
+llm_model: oc/deepseek-v4-flash-free
 plan:
   tasks:
     - id: T-001
@@ -106,11 +106,26 @@ plan:
 | Variável | Default | Descrição |
 |---|---|---|
 | `OPENROUTER_API_KEY` | — | API Key do OpenRouter (provedor primário) |
-| `OPENROUTER_MODEL` | `inclusionai/ling-3.0-flash:free` | Modelo OpenRouter |
+| `OPENROUTER_MODEL` | `auto/best-free` | Modelo OpenRouter |
 | `OPENROUTER_BASE_URL` | — | URL base customizada para OmniRoute |
+| `OPENROUTER_TIMEOUT` | `120` | Segundos antes do timeout da chamada LLM HTTP; aumente p/ `300` com modelos de reasoning |
 | `GEMINI_API_KEY` | — | API Key Google GenAI (fallback) |
-| `OPENCODE_MODEL` | `openrouter/inclusionai/ling-3.0-flash:free` | Modelo para subprocesso OpenCode |
+| `OPENCODE_MODEL` | `auto/best-free` | Modelo para subprocesso OpenCode |
 | `OPENCODE_MOCK` | `0` | `=1` ativa modo mock (sem subprocesso) |
+
+### OmniRoute (proxy local)
+
+OmniRoute expõe uma API compatível com OpenRouter em localhost. Configure as variáveis para apontar o LoopForge ao proxy local:
+
+```bash
+export OPENROUTER_BASE_URL=http://localhost:20128/v1
+export OPENROUTER_API_KEY=sk-omniroute-local
+export OPENROUTER_MODEL=oc/deepseek-v4-flash-free
+export OPENCODE_MODEL=oc/deepseek-v4-flash-free
+export OPENROUTER_TIMEOUT=300
+```
+
+> **Nota**: modelos de reasoning podem estourar o timeout default de `120s` em prompts grandes (o backoff em `src/lf/pipeline/llm_factory.py:64` eleva o timeout a cada tentativa, mas o valor base ainda é limitante). Use `OPENROUTER_TIMEOUT=300` para runs full, ou `OPENROUTER_MODEL=auto/best-fast` se preferir latência menor.
 
 ### `.env.example`
 
@@ -119,11 +134,15 @@ plan:
 
 # Provedor primário (OpenRouter)
 OPENROUTER_API_KEY=sk-or-v1-xxxxxxxx
-OPENROUTER_MODEL=inclusionai/ling-3.0-flash:free
+OPENROUTER_MODEL=auto/best-free
 # OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+# OPENROUTER_TIMEOUT=300
 
 # Fallback Google GenAI
 GEMINI_API_KEY=AIza-xxxxx
+
+# Modelo para subprocesso OpenCode
+OPENCODE_MODEL=auto/best-free
 
 # Modo mock (sem chamadas LLM reais)
 # OPENCODE_MOCK=1

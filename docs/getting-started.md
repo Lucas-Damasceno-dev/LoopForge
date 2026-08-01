@@ -79,6 +79,35 @@ lf completion bash > /etc/bash_completion.d/loopforge
 
 ---
 
+## Execução real (LLM não-mock)
+
+Para rodar o pipeline com chamadas LLM reais (em vez de `--mock`), siga os passos abaixo. Runs reais são lentos e dependem de integração externa.
+
+1. **Pré-requisito: `opencode` no PATH.** Sem o binário, o runner entra em **mock silencioso** (`src/lf/runner/opencode/runner.py:39` verifica `shutil.which("opencode")`) — o run "funciona" mas nenhum LLM é chamado.
+
+2. **Configure o ambiente** (OmniRoute local ou OpenRouter):
+
+   ```bash
+   # OmniRoute local
+   export OPENROUTER_BASE_URL=http://localhost:20128/v1
+   export OPENROUTER_API_KEY=sk-omniroute-local
+   export OPENROUTER_MODEL=oc/deepseek-v4-flash-free
+   export OPENCODE_MODEL=oc/deepseek-v4-flash-free
+   export OPENROUTER_TIMEOUT=300
+   ```
+
+3. **Rode dentro de um diretório de projeto exemplo**, declarando a stack explicitamente:
+
+   ```bash
+   lf run --idea "API REST de tarefas" --stack python --advanced
+   ```
+
+4. **Use `-i` no primeiro run real** para ativar o HITL (human-in-the-loop) e acompanhar as decisões entre os nós.
+
+5. **Atenção à latência**: runs full `--advanced` com modelos de reasoning podem levar **minutos por nó**. Não mate o processo. Se houver timeouts de LLM, aumente `OPENROUTER_TIMEOUT` (default `120s`) — ver `src/lf/pipeline/llm_factory.py:59`.
+
+---
+
 ## Implantação via Docker
 
 ```bash
