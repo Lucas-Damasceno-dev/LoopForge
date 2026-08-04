@@ -8,7 +8,9 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import termios
 import time
+import tty
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -168,6 +170,42 @@ class TaskDispatcher:
             except Exception:
                 # Fallback consistente com o timeout Unix (aborta em vez de aprovar)
                 return "x"
+
+    def _get_single_key_with_timeout(self, prompt_text: str, timeout: float = 0.5) -> str:
+        """Lê uma única tecla sem exigir Enter (modo cbreak), com timeout.
+
+        Usa termios/tty para desligar ICANON e ECHO no TTY (tty.setcbreak
+        mantém ISIG ligado, então ^C continua levantando KeyboardInterrupt —
+        comportamento de aborto preservado). Retorna a tecla pressionada
+        (1 char) ou '' no timeout, sem imprimir mensagem de timeout (evita spam).
+        Em ambiente não-TTY (ex: pytest), faz fallback para
+        _get_input_with_timeout para preservar o comportamento dos testes.
+        """
+        if prompt_text:
+            print(prompt_text, end="", flush=True)
+        if not sys.stdin.isatty():
+            return self._get_input_with_timeout("", timeout)
+
+        fd = sys.stdin.fileno()
+        old_settings = None
+        try:
+            old_settings = termios.tcgetattr(fd)
+            tty.setcbreak(fd)
+            rlist, _, _ = select.select([sys.stdin], [], [], timeout)
+            if rlist:
+                raw = os.read(fd, 3).decode(errors="ignore")
+                return raw[:1]
+            return ""
+        except Exception:
+            try:
+                return input()[:1]
+            except Exception:
+                # Fallback consistente com o timeout Unix (aborta em vez de aprovar)
+                return "x"
+        finally:
+            if old_settings is not None:
+                with contextlib.suppress(Exception):
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 
@@ -404,20 +442,24 @@ class TaskDispatcher:
 
         console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: ABORTAR)[/dim]")
 
-        # Intercala leitura de stdin com poll remoto curto para não congelar o
-        # gate: (a) verifica input local a cada 0.5s; (b) se houver, processa
-        # imediatamente; (c) senão, faz um poll remoto curto e repete; (d) sai
-        # no deadline global (hitl_timeout_seconds) ou quando houver decisão.
+        # Lê tecla única (sem Enter) com poll remoto curto intercalado para
+        # não congelar o gate: (a) chama _get_single_key_with_timeout a cada
+        # 0.5s; (b) se retornar tecla válida (c/r/a/x), processa; teclas
+        # inválidas (\r, \n, '') são ignoradas e a espera continua; (c) entre
+        # leituras faz poll remoto curto; (d) sai no deadline global
+        # (hitl_timeout_seconds) ou quando houver decisão (local ou remota).
         choice: str | None = None
         remote_decision: dict | None = None
         deadline = time.monotonic() + self.hitl_timeout_seconds
+        poll_interval = 0.5
+        valid_choices = ("c", "r", "a", "x")
         prompt_text = "➜ Escolha [c/r/a/x] (default: x): "
         while time.monotonic() < deadline:
-            raw_choice = self._get_input_with_timeout(prompt_text, timeout=0.5)
-            if raw_choice:
-                choice = raw_choice.strip().lower()
-                break
+            raw_choice = self._get_single_key_with_timeout(prompt_text, poll_interval)
             prompt_text = ""
+            if raw_choice in valid_choices:
+                choice = raw_choice
+                break
             remote_decision = self._poll_remote_decision_once(run_id)
             if remote_decision:
                 break

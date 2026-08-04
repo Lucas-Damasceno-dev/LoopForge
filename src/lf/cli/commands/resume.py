@@ -14,7 +14,9 @@ console = Console()
 @click.option("--list", "list_flag", is_flag=True, help="Lista todos os checkpoints gravados disponíveis")
 def resume_cmd(project_id: str, task_id: str, list_flag: bool):
     """Retoma uma pipeline falhada ou pausada a partir do último nó bem-sucedido."""
-    dispatcher = TaskDispatcher(mock_llm=True)
+    # mock_llm=False: o estado do checkpoint já carrega o mock_llm original da
+    # execução; forçar True aqui rodaria QA/audit em modo mock numa run real.
+    dispatcher = TaskDispatcher(mock_llm=False)
 
     if list_flag:
         checkpoints = dispatcher.list_checkpoints()

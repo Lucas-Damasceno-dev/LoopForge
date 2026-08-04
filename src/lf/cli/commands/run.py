@@ -84,9 +84,11 @@ def run_cmd(
     complexity_level = "mvp" if mvp else ("advanced" if advanced else "standard")
 
     if resume_id:
+        cfg = load_config()
+        project_id = getattr(cfg, "project_id", None) or "project"
         dispatcher = TaskDispatcher(mock_llm=mock, interactive=interactive, notify=notify, webhook_url=webhook_url)
         console.print(f"[bold cyan]⚡ Retomando pipeline do checkpoint '{resume_id}'...[/bold cyan]")
-        dispatcher.resume(project_id="project", task_id=resume_id)
+        dispatcher.resume(project_id=project_id, task_id=resume_id)
         return
 
     if wizard or (not idea and sys.stdin.isatty() and not load_config().plan.tasks):
