@@ -5,6 +5,7 @@ de forma paralela e simultânea via ThreadPoolExecutor e gera o artefato final l
 from __future__ import annotations
 
 import concurrent.futures
+import os
 
 from ...pipeline.state import GraphState
 from .appsec import appsec
@@ -16,7 +17,16 @@ def parallel_audit(state: GraphState) -> dict:
     """Executa AppSec e DevOps simultaneamente em paralelo e gera o lessons.md."""
     print("--- EXECUTANDO EM PARALELO: AppSec + DevOps Audit ---")
 
-    timeout_seconds = 300
+    # Timeout configurável via LF_AUDIT_TIMEOUT (segundos). Vazio/0/negativo = sem timeout.
+    timeout_seconds: int | None = None
+    raw_timeout = os.environ.get("LF_AUDIT_TIMEOUT")
+    if raw_timeout:
+        try:
+            parsed = int(raw_timeout)
+            if parsed > 0:
+                timeout_seconds = parsed
+        except ValueError:
+            pass
     res_appsec: dict = {}
     res_devops: dict = {}
     worker_errors: list[str] = []
@@ -30,10 +40,12 @@ def parallel_audit(state: GraphState) -> dict:
         }
 
         try:
-            for future in concurrent.futures.as_completed(
-                [future_appsec, future_devops],
-                timeout=timeout_seconds,
-            ):
+            futures = [future_appsec, future_devops]
+            if timeout_seconds is not None:
+                completed = concurrent.futures.as_completed(futures, timeout=timeout_seconds)
+            else:
+                completed = concurrent.futures.as_completed(futures)
+            for future in completed:
                 worker = future_to_worker[future]
                 try:
                     result = future.result()

@@ -1,5 +1,6 @@
 """LoopForge CLI Interface — Centraliza os comandos essenciais do ecossistema."""
 import click
+from dotenv import load_dotenv
 
 from lf.cli.commands.audit import audit_cmd
 from lf.cli.commands.benchmark import benchmark_cmd
@@ -23,6 +24,8 @@ from lf.cli.commands.studio import studio_cmd
 @click.version_option(version="6.0.0", prog_name="loopforge")
 def main():
     """LoopForge v6 - Autonomous Agent Governance and Pipeline Orchestrator"""
+    # Carrega .env (chave de API, base URL e modelo do LLM) como configuração padrão
+    load_dotenv()
 
 
 # Comandos Core

@@ -2,8 +2,12 @@ import json
 import os
 from datetime import UTC
 
+from rich.console import Console
+
 from ...pipeline.cache import SQLiteLLMCache
 from .runner import DEFAULT_OPENCODE_MODEL, OpenCodeRunner
+
+_console = Console()
 
 
 def call_llm_via_opencode(
@@ -79,28 +83,36 @@ Responda SOMENTE o objeto JSON puro."""
     )
     openrouter_key = os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
 
+    display_model = (
+        model
+        or os.environ.get("OPENROUTER_MODEL")
+        or os.environ.get("OPENCODE_MODEL")
+        or DEFAULT_OPENCODE_MODEL
+    )
+
     raw_response_text = ""
-    if openrouter_key:
-        model_name = model or DEFAULT_OPENROUTER_MODEL
-        user_content = user_prompt + (format_instruction if schema_model else "")
-        try:
-            raw_response_text, _ = call_openrouter_api(
-                user_content, model=model_name, api_key=openrouter_key,
-                system_prompt=system_prompt,
-            )
-        except Exception as e:
-            print(f"--- AVISO: LLM API ({model_name}) falhou após retentativas ({e}). Executando OpenCodeRunner fallback ---")
-            runner = OpenCodeRunner(timeout_seconds=300)
+    with _console.status(f"⏳ Consultando LLM ({display_model})...", spinner="dots"):
+        if openrouter_key:
+            model_name = model or DEFAULT_OPENROUTER_MODEL
+            user_content = user_prompt + (format_instruction if schema_model else "")
+            try:
+                raw_response_text, _ = call_openrouter_api(
+                    user_content, model=model_name, api_key=openrouter_key,
+                    system_prompt=system_prompt,
+                )
+            except Exception as e:
+                print(f"--- AVISO: LLM API ({model_name}) falhou após retentativas ({e}). Executando OpenCodeRunner fallback ---")
+                runner = OpenCodeRunner()
+                result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
+                if not result.success:
+                    raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
+                raw_response_text = result.clean_stdout
+        else:
+            runner = OpenCodeRunner()
             result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
             if not result.success:
                 raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
             raw_response_text = result.clean_stdout
-    else:
-        runner = OpenCodeRunner(timeout_seconds=300)
-        result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
-        if not result.success:
-            raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
-        raw_response_text = result.clean_stdout
 
     # Tenta extrair JSON
     if schema_model:

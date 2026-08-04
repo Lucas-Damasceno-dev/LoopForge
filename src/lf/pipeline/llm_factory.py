@@ -56,12 +56,21 @@ def call_openrouter_api(
         "stream": False,
     }
 
-    base_timeout = float(os.environ.get("OPENROUTER_TIMEOUT", "120"))
+    # Timeout configurável via OPENROUTER_TIMEOUT (segundos). Vazio/0/negativo = sem timeout.
+    base_timeout: float | None = None
+    raw_timeout = os.environ.get("OPENROUTER_TIMEOUT")
+    if raw_timeout:
+        try:
+            parsed = float(raw_timeout)
+            if parsed > 0:
+                base_timeout = parsed
+        except ValueError:
+            base_timeout = None
     last_error: Exception | None = None
 
     for attempt in range(max_retries + 1):
         try:
-            timeout_val = base_timeout * (1.0 + attempt * 0.5)
+            timeout_val = None if base_timeout is None else base_timeout * (1.0 + attempt * 0.5)
             resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_val)
             if resp.status_code == 200:
                 raw_text = resp.text if hasattr(resp, "text") and isinstance(resp.text, str) else ""

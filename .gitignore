@@ -22,6 +22,11 @@ examples/.loopforge/
 .slim/worktrees/
 .slim/worktrees.json
 
+# Environment (secrets)
+.env
+.env.*
+!.env.example
+
 # OS files
 .DS_Store
 *.log

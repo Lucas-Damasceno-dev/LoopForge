@@ -12,7 +12,23 @@ DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL") or os.environ.get("OPE
 class OpenCodeRunner:
     """Gerencia execução de instâncias OpenCode via subprocesso."""
 
-    def __init__(self, timeout_seconds: int = 300):
+    def __init__(self, timeout_seconds: int | None = None):
+        """Inicializa o runner.
+
+        Args:
+            timeout_seconds: Timeout do subprocesso opencode em segundos.
+                None (padrão) = sem timeout. Se não informado, honra a env
+                OPENCODE_TIMEOUT (se definida e > 0).
+        """
+        if timeout_seconds is None:
+            env_timeout = os.environ.get("OPENCODE_TIMEOUT")
+            if env_timeout:
+                try:
+                    parsed = int(env_timeout)
+                    if parsed > 0:
+                        timeout_seconds = parsed
+                except ValueError:
+                    pass
         self.timeout = timeout_seconds
 
     def run(

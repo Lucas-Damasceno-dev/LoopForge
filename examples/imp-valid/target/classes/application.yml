@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: csv-import-validator
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/csvimport}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:10MB}
+
+csvimport:
+  encoding: ${CSV_ENCODING:UTF-8}
+  date-format: ${CSV_DATE_FORMAT:yyyy-MM-dd}
+  max-file-size-bytes: ${MAX_FILE_SIZE_BYTES:10485760}
+
+server:
+  port: ${SERVER_PORT:8080}
