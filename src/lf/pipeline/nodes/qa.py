@@ -133,39 +133,51 @@ def qa(state: GraphState) -> dict:
     if not is_pass:
         qa_attempt += 1
         print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
+        no_tests_found = report.get("summary", {}).get("no_tests_found", False)
         failed_cnt = report.get("summary", {}).get("tests_failed", 1)
+        stack = state.get("stack", "python")
 
-        # Extrai os detalhes reais do erro do compilador/harness
-        err_list = harness_result.get("errors", [])
-        if err_list:
-            err_details = "; ".join(err_list[:3])
-            # Anexa diagnóstico estruturado por teste (test_name + erro) quando disponível
-            structured = []
-            suites = report.get("results_by_suite", [])
-            if isinstance(suites, list):
-                for suite in suites:
-                    if not isinstance(suite, dict):
-                        continue
-                    for detail in suite.get("failed_tests_details", []):
-                        if not isinstance(detail, dict):
+        if no_tests_found:
+            # Nenhum teste coletado: feedback preciso para o developer criar/ajustar tests/
+            harness_cmd = harness_result.get("command") or "(comando não detectado)"
+            msg = (
+                f"FALHA NO QA (Tentativa {qa_attempt}): NENHUM TESTE COLETADO — "
+                f"crie/ajuste tests/ para a stack {stack}; verifique imports e estrutura. "
+                f"Comando do harness: {harness_cmd}"
+            )
+        else:
+            # Extrai os detalhes reais do erro do compilador/harness
+            err_list = harness_result.get("errors", [])
+            if err_list:
+                err_details = "; ".join(err_list[:3])
+                # Anexa diagnóstico estruturado por teste (test_name + erro) quando disponível
+                structured = []
+                suites = report.get("results_by_suite", [])
+                if isinstance(suites, list):
+                    for suite in suites:
+                        if not isinstance(suite, dict):
                             continue
-                        test_name = detail.get("test_name") or detail.get("name") or "teste"
-                        err_text = detail.get("error") or detail.get("message") or ""
-                        if isinstance(err_text, str) and err_text.strip():
-                            structured.append(f"{test_name}: {err_text.strip()[:300]}")
+                        for detail in suite.get("failed_tests_details", []):
+                            if not isinstance(detail, dict):
+                                continue
+                            test_name = detail.get("test_name") or detail.get("name") or "teste"
+                            err_text = detail.get("error") or detail.get("message") or ""
+                            if isinstance(err_text, str) and err_text.strip():
+                                structured.append(f"{test_name}: {err_text.strip()[:300]}")
+                            if len(structured) >= 3:
+                                break
                         if len(structured) >= 3:
                             break
-                    if len(structured) >= 3:
-                        break
-            if structured:
-                err_details = f"{err_details} | " + "; ".join(structured)
-        elif raw_output:
-            # Pega as últimas 800 letras do stdout/stderr (onde fica a mensagem de erro do compilador)
-            err_details = raw_output[-800:].replace("\n", " ").strip()
-        else:
-            err_details = "Falha de compilação ou execução de testes."
+                if structured:
+                    err_details = f"{err_details} | " + "; ".join(structured)
+            elif raw_output:
+                # Pega as últimas 800 letras do stdout/stderr (onde fica a mensagem de erro do compilador)
+                err_details = raw_output[-800:].replace("\n", " ").strip()
+            else:
+                err_details = "Falha de compilação ou execução de testes."
 
-        msg = f"FALHA NO QA (Tentativa {qa_attempt}): {failed_cnt} teste(s)/compilação falharam. Detalhes técnicos do erro:\n{err_details}"
+            harness_cmd = harness_result.get("command") or "(comando não detectado)"
+            msg = f"FALHA NO QA (Tentativa {qa_attempt}): {failed_cnt} teste(s)/compilação falharam. Detalhes técnicos do erro:\n{err_details}\nComando do harness: {harness_cmd}"
         if criteria_coverage_feedback:
             msg = f"{msg}\n{criteria_coverage_feedback}"
         if contract_tests_feedback:
@@ -188,7 +200,9 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
     from ...runner.harness.runner import TestHarnessRunner
     target_dir = project_dir if (project_dir and os.path.exists(project_dir)) else output_dir
 
-    if ("go" in stack.lower() or os.path.exists(os.path.join(target_dir, "go.mod"))) and shutil.which("go"):
+    # Self-healing Go apenas quando a stack DECIDIDA é Go (evita rodar
+    # 'go mod tidy' por causa de go.mod obsoleto de uma run anterior).
+    if "go" in stack.lower() and os.path.exists(os.path.join(target_dir, "go.mod")) and shutil.which("go"):
         with suppress(Exception):
             subprocess.run("go mod tidy", shell=True, cwd=target_dir, capture_output=True, timeout=60)
 
@@ -232,16 +246,28 @@ def _build_report_from_harness(
     total = harness_result.get("total", 0)
     passed = harness_result.get("passed", 0)
     duration_s = harness_result.get("duration_ms", 0) / 1000.0
+    command_used = harness_result.get("command", "")
 
+    no_tests_found = False
     if total == 0:
-        errors.append("Nenhum teste foi executado ou nenhum harness/compilador foi encontrado.")
+        if not errors:
+            # Nenhum teste coletado pelo harness sem erros reais de execução:
+            # sinaliza explicitamente para o developer ajustar tests/ da stack.
+            no_tests_found = True
+            command_display = command_used or "(comando não detectado)"
+            errors.append(
+                f"Nenhum teste foi coletado pelo harness (comando {command_display}). "
+                "Verifique se tests/ existe, importa corretamente e contém testes da stack decidida."
+            )
+        else:
+            errors.append("Nenhum teste foi executado ou nenhum harness/compilador foi encontrado.")
         failed = len(errors)
         status = "FAIL"
     else:
         failed = len(errors)
         status = "PASS" if failed == 0 and passed > 0 else "FAIL"
 
-    return {
+    report = {
         "id": report_id,
         "user_story_id": user_story_id,
         "commit_hash": "local_head",
@@ -270,6 +296,9 @@ def _build_report_from_harness(
         "code_coverage": None,
         "artifacts": None,
     }
+    if no_tests_found:
+        report["summary"]["no_tests_found"] = True
+    return report
 
 
 def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> bool:

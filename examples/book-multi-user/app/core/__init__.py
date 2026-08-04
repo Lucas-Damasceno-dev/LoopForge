@@ -1,0 +1,1 @@
+"""Pacote de segurança e utilidades centrais."""

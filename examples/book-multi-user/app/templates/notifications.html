@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Notificações{% endblock %}
+{% block content %}
+<h2>Notificações</h2>
+<div hx-get="/notifications" hx-trigger="load">
+    Carregando notificações...
+</div>
+{% endblock %}

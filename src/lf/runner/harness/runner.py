@@ -14,6 +14,7 @@ class TestHarnessResult:
     failed: int
     output: str
     success: bool
+    command: str = ""
 
 
 class TestHarnessRunner:
@@ -91,6 +92,7 @@ class TestHarnessRunner:
                 failed=parsed["failed"],
                 output=res.stdout + "\n" + res.stderr,
                 success=success,
+                command=cmd,
             )
         except Exception as exc:
             return TestHarnessResult(
@@ -99,4 +101,5 @@ class TestHarnessRunner:
                 failed=1,
                 output=str(exc),
                 success=False,
+                command=cmd,
             )

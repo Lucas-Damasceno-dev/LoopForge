@@ -4,6 +4,7 @@ métricas de QA, relatórios de AppSec e instruções de execução do projeto.
 """
 from __future__ import annotations
 
+import importlib.util
 import logging
 import os
 from datetime import UTC, datetime
@@ -170,18 +171,20 @@ graph TD
         logger.warning("Falha ao persistir no MemoryManager: %s", exc)
 
     # 🧠 Integração Agentic Retro: persiste a síntese da sessão
-    try:
-        from retro import AgDRParser, RetroStore
-        retro_parser = AgDRParser()
-        session_rec = retro_parser.parse_events([])
-        session_rec.session_id = state.get("run_id", "run_latest")
-        session_rec.goal = idea
-        session_rec.status = qa_status
-        session_rec.attempts = attempts
-        retro_store = RetroStore(project_dir or ".")
-        retro_store.save_session(session_rec)
-    except Exception as exc:
-        print(f"--- INFO: Agentic Retro hook ignorado: {exc} ---")
+    # Hook opcional: se o módulo 'retro' não existir, pula silenciosamente.
+    if importlib.util.find_spec("retro") is not None:
+        try:
+            from retro import AgDRParser, RetroStore
+            retro_parser = AgDRParser()
+            session_rec = retro_parser.parse_events([])
+            session_rec.session_id = state.get("run_id", "run_latest")
+            session_rec.goal = idea
+            session_rec.status = qa_status
+            session_rec.attempts = attempts
+            retro_store = RetroStore(project_dir or ".")
+            retro_store.save_session(session_rec)
+        except Exception as exc:
+            print(f"--- INFO: Agentic Retro hook ignorado: {exc} ---")
 
     return content
 

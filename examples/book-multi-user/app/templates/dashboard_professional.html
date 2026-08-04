@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Profissional</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <h2>Meus Agendamentos</h2>
+    <div hx-get="/appointments?as_professional=true" hx-trigger="load">
+        Loading...
+    </div>
+</body>
+</html>

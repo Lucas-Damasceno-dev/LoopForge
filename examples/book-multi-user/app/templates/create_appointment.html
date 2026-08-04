@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Novo Agendamento</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <h2>Novo Agendamento</h2>
+    <form hx-post="/appointments" hx-target="#response">
+        <select name="professional_id" required>
+            <!-- populated via HTMX -->
+        </select>
+        <select name="service_id" required>
+            <!-- populated via HTMX -->
+        </select>
+        <input type="datetime-local" name="start_time" required>
+        <button type="submit">Agendar</button>
+    </form>
+    <div id="response"></div>
+</body>
+</html>

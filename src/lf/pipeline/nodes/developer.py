@@ -4,6 +4,7 @@ Nó Developer: recebe a stack decidida pelo Tech Lead e gera um projeto MULTI-AR
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import os
@@ -339,23 +340,25 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
         )
 
     # 🧬 Injeta o genoma do repositório se disponível (<2s token-optimized summary)
-    try:
-        from genome import GenomeScanner, render_markdown
-        genome_scanner = GenomeScanner(project_dir or ".")
-        genome_data = genome_scanner.scan()
-        genome_prompt = render_markdown(genome_data)
-        if genome_prompt:
-            keywords = set(w.lower().strip() for w in f"{idea} {stack}".split() if len(w) > 3)
-            filtered_lines = [
-                line for line in genome_prompt.splitlines()
-                if not keywords or any(kw in line.lower() for kw in keywords) or line.startswith("#") or line.startswith("-")
-            ]
-            selective_genome = "\n".join(filtered_lines[:40])
-            if selective_genome:
-                prompt_parts.append(f"\n\n=== CODEBASE GENOME SELETIVO (DNA do Repositório) ===\n{selective_genome}")
-    except Exception as exc:
-        print(f"--- INFO: Genome scanner não utilizado nesta etapa: {exc} ---")
-        _log_telemetry_event("hook_error", {"hook": "GenomeScanner", "error": str(exc), "node": "developer"})
+    # Hook opcional: se o módulo 'genome' não existir, pula silenciosamente.
+    if importlib.util.find_spec("genome") is not None:
+        try:
+            from genome import GenomeScanner, render_markdown
+            genome_scanner = GenomeScanner(project_dir or ".")
+            genome_data = genome_scanner.scan()
+            genome_prompt = render_markdown(genome_data)
+            if genome_prompt:
+                keywords = set(w.lower().strip() for w in f"{idea} {stack}".split() if len(w) > 3)
+                filtered_lines = [
+                    line for line in genome_prompt.splitlines()
+                    if not keywords or any(kw in line.lower() for kw in keywords) or line.startswith("#") or line.startswith("-")
+                ]
+                selective_genome = "\n".join(filtered_lines[:40])
+                if selective_genome:
+                    prompt_parts.append(f"\n\n=== CODEBASE GENOME SELETIVO (DNA do Repositório) ===\n{selective_genome}")
+        except Exception as exc:
+            print(f"--- INFO: Genome scanner não utilizado nesta etapa: {exc} ---")
+            _log_telemetry_event("hook_error", {"hook": "GenomeScanner", "error": str(exc), "node": "developer"})
 
     # 🧠 Consulta MemoryManager para obter lições aprendidas passadas relevantes
     try:
@@ -458,7 +461,7 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     # Limpa subdiretórios antigos do projeto se for um retry para evitar acúmulo de arquiteturas conflitantes
     qa_attempts = state.get("qa_attempt_count", 0)
     if qa_attempts > 0 and not state.get("read_only", False):
-        _cleanup_stale_project_dirs([output_dir, project_dir])
+        _cleanup_stale_project_dirs([output_dir, project_dir], stack=stack)
 
     if not state.get("read_only", False):
         _write_project_files(files_map, [output_dir, project_dir])
@@ -471,14 +474,16 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
             print(f"  - {err}")
 
     # 🔗 Hook do Agentic Interface Registry: rastreia mudanças e verifica quebras de contrato
-    try:
-        from registry import RegistryChecker
-        reg_checker = RegistryChecker(project_dir or ".")
-        breaking_changes = reg_checker.check(agent="developer")
-        if breaking_changes:
-            print(f"--- AVISO: Agentic Registry detectou {len(breaking_changes)} quebras de contrato no nó Developer! ---")
-    except Exception as exc:
-        print(f"--- INFO: Agentic Registry hook ignorado: {exc} ---")
+    # Hook opcional: se o módulo 'registry' não existir, pula silenciosamente.
+    if importlib.util.find_spec("registry") is not None:
+        try:
+            from registry import RegistryChecker
+            reg_checker = RegistryChecker(project_dir or ".")
+            breaking_changes = reg_checker.check(agent="developer")
+            if breaking_changes:
+                print(f"--- AVISO: Agentic Registry detectou {len(breaking_changes)} quebras de contrato no nó Developer! ---")
+        except Exception as exc:
+            print(f"--- INFO: Agentic Registry hook ignorado: {exc} ---")
 
     primary_code = files_map.get(default_main) or list(files_map.values())[0]
 
@@ -547,14 +552,75 @@ PROTECTED_ROOT_FILES = {
 }
 
 
-def _cleanup_stale_project_dirs(target_dirs: list[str]) -> None:
+def _find_loopforge_repo_root(path: Path) -> Path | None:
+    """Sobe o path procurando um ancestral que seja o repo LoopForge (AGENTS.md + src/lf)."""
+    current = Path(path).resolve()
+    for candidate in [current, *current.parents]:
+        if (candidate / "AGENTS.md").exists() and (candidate / "src" / "lf").exists():
+            return candidate
+    return None
+
+
+# Manifests de dependência que PERTENCEM a cada linguagem
+# (os de OUTRAS stacks são removidos como estrangeiros)
+_OWN_MANIFESTS = {
+    "python": {"pyproject.toml", "requirements.txt", "setup.py", "setup.cfg", "pytest.ini"},
+    "go": {"go.mod", "go.sum"},
+    "rust": {"Cargo.toml", "Cargo.lock"},
+    "java": {"pom.xml", "build.gradle"},
+    "javascript": {"package.json", "package-lock.json", "yarn.lock", "tsconfig.json"},
+}
+
+# Extensões de código-fonte ESTRANGEIRAS a cada stack (removidas em qualquer nível)
+_FOREIGN_SOURCE_EXTS = {
+    "python": {".go"},
+    "go": {".py"},
+    "rust": {".py", ".go", ".java", ".js", ".ts", ".jsx", ".tsx"},
+    "java": {".py", ".go", ".rs", ".js", ".ts", ".jsx", ".tsx"},
+    "javascript": {".py", ".go", ".rs", ".java"},
+}
+
+# Testes estrangeiros dentro de tests/ por linguagem
+_FOREIGN_TESTS = {
+    "python": {".go", ".rs", ".java", ".js", ".ts"},
+    "go": {".py", ".rs", ".java", ".js", ".ts"},
+    "rust": {".py", ".go", ".java", ".js", ".ts"},
+    "java": {".py", ".go", ".rs", ".js", ".ts"},
+    "javascript": {".py", ".go", ".rs", ".java"},
+}
+
+
+def _is_foreign_file(rel_path: Path, stack: str) -> bool:
+    """True se o arquivo (relativo a base_path) é estrangeiro à stack decidida."""
+    s = stack.lower()
+    own_manifests = _OWN_MANIFESTS.get(s, set())
+    name = rel_path.name
+    suffix = rel_path.suffix
+
+    # Manifesto de outra stack (ex: go.mod presente numa run de stack python)
+    is_foreign_manifest = (
+        name in {m for m_list in _OWN_MANIFESTS.values() for m in m_list}
+        and name not in own_manifests
+    )
+    # Fonte de outra linguagem em qualquer nível sob o target
+    is_foreign_source = suffix in _FOREIGN_SOURCE_EXTS.get(s, set())
+    # Teste estrangeiro dentro de tests/
+    is_foreign_test = (
+        "tests" in rel_path.parts
+        and suffix in _FOREIGN_TESTS.get(s, set())
+    )
+    return is_foreign_manifest or is_foreign_source or is_foreign_test
+
+
+def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "") -> None:
     """Limpa diretórios de código de tentativas anteriores para evitar colisões entre arquiteturas diferentes."""
     import shutil
     stale_dirs = {"cmd", "internal", "src", "pkg", "migrations"}
     unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
     for base_dir in unique_dirs:
         base_path = Path(base_dir).resolve()
-        if (base_path / "AGENTS.md").exists() and (base_path / "src" / "lf").exists():
+        # Proteção dogfooding: nunca limpar o repo LoopForge ou diretórios dentro dele
+        if _find_loopforge_repo_root(base_path) is not None:
             continue
         for s_dir in stale_dirs:
             target = base_path / s_dir
@@ -565,15 +631,39 @@ def _cleanup_stale_project_dirs(target_dirs: list[str]) -> None:
                 except Exception as exc:
                     print(f"--- AVISO: Não foi possível remover subdiretório antigo '{target}': {exc} ---")
 
+        # Remove manifestos e fontes estrangeiras à stack decidida (ex: artefatos
+        # Go obsoletos de uma run anterior com stack diferente).
+        for file_path in base_path.rglob("*"):
+            if not file_path.is_file():
+                continue
+            try:
+                rel = file_path.relative_to(base_path)  # proteção contra path traversal
+            except ValueError:
+                continue
+            if _is_foreign_file(rel, stack):
+                try:
+                    file_path.unlink()
+                    print(f"--- INFO: Removendo artefato estrangeiro à stack '{stack}': {file_path} ---")
+                except Exception as exc:
+                    print(f"--- AVISO: Não foi possível remover '{file_path}': {exc} ---")
+
 
 def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> None:
     unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
     for base_dir in unique_dirs:
         base_path = Path(base_dir).resolve()
-        is_loopforge_repo = (base_path / "AGENTS.md").exists() and (base_path / "src" / "lf").exists()
+        # Proteção dogfooding: detecta se o alvo é o repo LoopForge ou está DENTRO
+        # dele (sobe o path até achar ancestral com AGENTS.md + src/lf). Se for o
+        # caso, pula a escrita inteira — o projeto só deve ser gravado em output_dir.
+        is_loopforge_repo = _find_loopforge_repo_root(base_path) is not None
+        if is_loopforge_repo:
+            print(f"--- INFO: Diretório dentro do repo LoopForge protegido: {base_dir} (escrita apenas em output_dir) ---")
+            continue
 
         for rel_path, content in files_map.items():
             norm_rel = os.path.normpath(rel_path)
+            # Defesa extra (PROTECTED_ROOT_FILES): nunca sobrescrever arquivos
+            # críticos do repo, mesmo se a detecção de raiz falhar por estrutura.
             if is_loopforge_repo and (norm_rel in PROTECTED_ROOT_FILES or norm_rel.startswith(".github")):
                 print(f"--- AVISO: Dogfooding Protection ativado: Bloqueada sobrescrita do arquivo do repositório '{rel_path}' ---")
                 continue
