@@ -171,12 +171,39 @@ class TaskDispatcher:
 
 
 
-    def _check_remote_decision(self, run_id: str, timeout: int = 300) -> dict | None:
-        """Poll por decisão remota via API com timeout.
+    def _ensure_human_decisions_table(self, db_path: Path) -> None:
+        """Garante que a tabela human_decisions exista no SQLite de telemetria.
 
-        Verifica a cada 2s se há decisão gravada na tabela human_decisions
-        (escrita pelo endpoint POST /api/runs/{run_id}/decide).
-        Retorna a decisão assim que disponível, ou None se o timeout expirar.
+        Evita o erro 'no such table: human_decisions' quando o SELECT de
+        decisão remota roda antes de qualquer INSERT (a tabela era criada
+        apenas de forma lazy em _record_decision).
+        """
+        try:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS human_decisions (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    gate_node TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    feedback_category TEXT,
+                    feedback_message TEXT,
+                    user TEXT DEFAULT 'human_operator',
+                    timestamp TEXT NOT NULL
+                )
+            """)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"--- AVISO: Falha ao garantir tabela human_decisions: {e} ---")
+
+    def _poll_remote_decision_once(self, run_id: str) -> dict | None:
+        """Consulta única à tabela human_decisions por decisão remota.
+
+        Retorna {"action", "category", "message"} se houver decisão pendente
+        para o run_id, ou None caso contrário. Não bloqueia.
         """
         if not run_id or run_id in ("default-run", "test", "test-run", "test-thread"):
             return None
@@ -185,6 +212,30 @@ class TaskDispatcher:
         if not db_path.exists():
             return None
 
+        self._ensure_human_decisions_table(db_path)
+
+        try:
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT action, feedback_category, feedback_message FROM human_decisions WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1",
+                (run_id,),
+            )
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {"action": row[0], "category": row[1], "message": row[2]}
+        except Exception as exc:
+            logger.warning("Falha ao verificar decisão remota: %s", exc)
+        return None
+
+    def _check_remote_decision(self, run_id: str, timeout: int = 300) -> dict | None:
+        """Poll por decisão remota via API com timeout.
+
+        Verifica a cada 2s se há decisão gravada na tabela human_decisions
+        (escrita pelo endpoint POST /api/runs/{run_id}/decide).
+        Retorna a decisão assim que disponível, ou None se o timeout expirar.
+        """
         console = Console()
         deadline = time.monotonic() + timeout
         last_checked: float = 0.0
@@ -198,20 +249,10 @@ class TaskDispatcher:
                 continue
             last_checked = now
 
-            try:
-                conn = sqlite3.connect(str(db_path))
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT action, feedback_category, feedback_message FROM human_decisions WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1",
-                    (run_id,),
-                )
-                row = cursor.fetchone()
-                conn.close()
-                if row:
-                    console.print(f"[bold green]➜ Decisão Remota via API Detectada: {row[0].upper()}[/bold green]")
-                    return {"action": row[0], "category": row[1], "message": row[2]}
-            except Exception as exc:
-                logger.warning("Falha ao verificar decisão remota: %s", exc)
+            decision = self._poll_remote_decision_once(run_id)
+            if decision:
+                console.print(f"[bold green]➜ Decisão Remota via API Detectada: {decision['action'].upper()}[/bold green]")
+                return decision
 
             remaining = int(deadline - time.monotonic())
             if remaining > 0 and remaining % 10 == 0:
@@ -231,21 +272,9 @@ class TaskDispatcher:
         """Salva histórico de decisões humanas no SQLite."""
         try:
             db_path = Path(".loopforge/telemetry.sqlite").resolve()
-            db_path.parent.mkdir(parents=True, exist_ok=True)
+            self._ensure_human_decisions_table(db_path)
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS human_decisions (
-                    id TEXT PRIMARY KEY,
-                    run_id TEXT NOT NULL,
-                    gate_node TEXT NOT NULL,
-                    action TEXT NOT NULL,
-                    feedback_category TEXT,
-                    feedback_message TEXT,
-                    user TEXT DEFAULT 'human_operator',
-                    timestamp TEXT NOT NULL
-                )
-            """)
             decision_id = str(uuid.uuid4())
             now_iso = datetime.now(UTC).isoformat()
             cursor.execute(
@@ -374,14 +403,33 @@ class TaskDispatcher:
         console.print("  [red]x[/red] — Abortar pipeline")
 
         console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: ABORTAR)[/dim]")
-        remote_decision = self._check_remote_decision(run_id, timeout=self.hitl_timeout_seconds)
-        if remote_decision:
-            choice_map = {"approve": "c", "retry": "r", "adjust_prompt": "a", "abort": "x"}
-            choice = choice_map.get(remote_decision["action"], "c")
-            console.print(f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]")
-        else:
-            raw_choice = self._get_input_with_timeout("➜ Escolha [c/r/a/x] (default: x): ", timeout=self.hitl_timeout_seconds)
-            choice = raw_choice.strip().lower() if raw_choice else "x"
+
+        # Intercala leitura de stdin com poll remoto curto para não congelar o
+        # gate: (a) verifica input local a cada 0.5s; (b) se houver, processa
+        # imediatamente; (c) senão, faz um poll remoto curto e repete; (d) sai
+        # no deadline global (hitl_timeout_seconds) ou quando houver decisão.
+        choice: str | None = None
+        remote_decision: dict | None = None
+        deadline = time.monotonic() + self.hitl_timeout_seconds
+        prompt_text = "➜ Escolha [c/r/a/x] (default: x): "
+        while time.monotonic() < deadline:
+            raw_choice = self._get_input_with_timeout(prompt_text, timeout=0.5)
+            if raw_choice:
+                choice = raw_choice.strip().lower()
+                break
+            prompt_text = ""
+            remote_decision = self._poll_remote_decision_once(run_id)
+            if remote_decision:
+                break
+
+        if choice is None:
+            if remote_decision:
+                choice_map = {"approve": "c", "retry": "r", "adjust_prompt": "a", "abort": "x"}
+                choice = choice_map.get(remote_decision["action"], "c")
+                console.print(f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]")
+            else:
+                console.print("\n[red]⏰ Tempo limite de resposta esgotado. Abortando pipeline (default: x).[/red]")
+                choice = "x"
 
         action = "approve"
         cat = None

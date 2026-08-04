@@ -67,6 +67,7 @@ def call_openrouter_api(
         except ValueError:
             base_timeout = None
     last_error: Exception | None = None
+    empty_content = False
 
     for attempt in range(max_retries + 1):
         try:
@@ -93,13 +94,20 @@ def call_openrouter_api(
                                     usage = cdata["usage"]
                             except Exception:
                                 pass
-                    return "".join(chunks), usage
+                    text = "".join(chunks)
+                    if not text:
+                        empty_content = True
+                        raise RuntimeError("OpenRouter API retornou content vazio (streaming)")
+                    return text, usage
                 else:
                     data = resp.json()
                     choice = data["choices"][0]
                     msg = choice.get("message", {})
                     text = msg.get("content") or choice.get("delta", {}).get("content", "")
                     usage = data.get("usage")
+                    if not text:
+                        empty_content = True
+                        raise RuntimeError("OpenRouter API retornou content vazio")
                     return text, usage
             else:
                 last_error = RuntimeError(f"OpenRouter API request failed with status {resp.status_code}: {resp.text[:200]}")
@@ -109,6 +117,10 @@ def call_openrouter_api(
                 print(f"--- AVISO: Chamada LLM API (tentativa {attempt + 1}/{max_retries + 1}) falhou ({err}). Retentando em {(attempt + 1) * 2}s... ---")
                 time.sleep((attempt + 1) * 2)
 
+    # Esgotou as retentativas: se o motivo foi content vazio, retorna '' (não
+    # lança exceção prematura); caso contrário propaga o último erro real.
+    if empty_content:
+        return "", None
     raise last_error or RuntimeError("OpenRouter API request failed after retries")
 
 

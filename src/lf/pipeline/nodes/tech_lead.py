@@ -47,9 +47,28 @@ class ValidationResult(BaseModel):
 
 def _extract_stack_from_text(text: str) -> str:
     """Extrai a linguagem/stack principal recomendada no texto da tech spec."""
+    import re
     text_lower = text.lower()
+
+    # 1. Detecção de framework/stack específico primeiro (mais preciso).
+    #    'typescript' antes do grupo JS para priorizá-lo quando presente.
+    framework_map = [
+        ("typescript", "typescript"),
+        ("fastapi", "python"), ("django", "python"), ("flask", "python"),
+        ("pandas", "python"), ("pytest", "python"),
+        ("spring", "java"), ("junit", "java"),
+        ("actix", "rust"),
+        ("gin", "go"),
+        ("express", "javascript"), ("react", "javascript"),
+        ("next.js", "javascript"), ("node", "javascript"),
+    ]
+    for marker, stack in framework_map:
+        if marker in text_lower:
+            return stack
+
+    # 2. Linguagens com match de palavra inteira (evita 'go' dentro de 'logout').
     for lang in ("rust", "python", "java", "javascript", "typescript", "go", "csharp", "ruby", "php"):
-        if lang in text_lower:
+        if re.search(rf"\b{lang}\b", text_lower):
             return lang
     return "python"
 
