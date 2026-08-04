@@ -1,15 +1,15 @@
-# 📊 Project Executive Summary: Two Sum & Array Manipulation
+# 📊 Project Executive Summary: String Anagram & Palindrome Validator
 
 ![QA Status](https://img.shields.io/badge/QA-PASS-brightgreen)
 ![Security Audit](https://img.shields.io/badge/AppSec-PASS-brightgreen)
-![Stack](https://img.shields.io/badge/Stack-PYTHON-blue)
+![Stack](https://img.shields.io/badge/Stack-JAVASCRIPT-blue)
 
-> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-04 05:08:29 UTC
+> **Stack:** `javascript` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-04 05:08:30 UTC
 
 ## 🏗️ Diagrama de Arquitetura do Projeto Gerado
 ```mermaid
 graph TD
-    Client[Client / User] --> API[API Service (PYTHON)]
+    Client[Client / User] --> API[API Service (JAVASCRIPT)]
     API --> Logic[Business Logic Core]
     Logic --> Tests[QA Test Suite (PASS)]
 ```
@@ -23,6 +23,6 @@ graph TD
 
 ## 🚀 Instruções de Execução Rápida
 ```bash
-pytest
-python3 generated_code.py
+mvn clean test
+mvn compile
 ```
