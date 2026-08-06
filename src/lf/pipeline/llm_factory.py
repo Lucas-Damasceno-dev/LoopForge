@@ -4,7 +4,7 @@ import re
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from pydantic import BaseModel
 
@@ -335,6 +335,139 @@ class MockLLMProvider(BaseLLMProvider):
         return mock_text
 
 
+class NativeLLMProvider(BaseLLMProvider):
+    """Provider LLM nativo via HTTP (OpenRouter/Zen), streaming token a token.
+
+    Cadeia de fallback: nativo -> OpenCode CLI -> Mock. O cache SQLiteLLMCache
+    guarda apenas o payload final consolidado; deltas intermediários nunca são
+    persistidos (requisito de streaming).
+    """
+
+    @property
+    def provider_name(self) -> str:
+        return "native"
+
+    def __init__(self, api_key: str | None = None, base_url: str | None = None, timeout: float = 60.0):
+        import httpx
+
+        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        self.base_url = base_url or _DEFAULT_OPENROUTER_BASE_URL
+        self.timeout = timeout
+        self._client = httpx.Client(timeout=self.timeout)
+        self._async_client = httpx.AsyncClient(timeout=self.timeout)
+
+    def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+
+    def _parse_sse(self, body: str) -> str:
+        text = []
+        for line in body.splitlines():
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == "[DONE]":
+                break
+            try:
+                delta = json.loads(payload).get("choices", [{}])[0].get("delta", {}).get("content", "")
+            except Exception:
+                delta = ""
+            text.append(delta)
+        return "".join(text)
+
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str = DEFAULT_OPENROUTER_MODEL,
+        temperature: float = 0.2,
+        schema_model: type[BaseModel] | None = None,
+        mock: bool = False,
+        cache: bool = True,
+        circuit_breaker: Any = None,
+    ) -> Any:
+        from lf.pipeline.cache import SQLiteLLMCache
+
+        if mock:
+            return MockLLMProvider().generate(
+                system_prompt, user_prompt, model=model, schema_model=schema_model, mock=True
+            )
+        if circuit_breaker is not None and not circuit_breaker.can_proceed():
+            return self._fallback_generate(system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker)
+        full_prompt = f"{system_prompt}\n{user_prompt}"
+        llm_cache = SQLiteLLMCache()
+        if cache:
+            hit = llm_cache.get(full_prompt)
+            if hit is not None:
+                return hit
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            "temperature": temperature,
+            "stream": False,
+        }
+        try:
+            resp = self._client.post(f"{self.base_url}/chat/completions", json=payload, headers=self._headers())
+            resp.raise_for_status()
+            text = self._parse_sse(resp.text)
+        except Exception:
+            return self._fallback_generate(system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker)
+        # Payload final consolidado -> cache (requisito: nunca deltas)
+        if cache:
+            llm_cache.set(full_prompt, text)
+        try:
+            CostTracker().track(model, full_prompt, text)
+        except Exception:
+            pass
+        return text
+
+    def _fallback_generate(self, system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker):
+        try:
+            return OpenCodeCLIProvider().generate(
+                system_prompt,
+                user_prompt,
+                model=model,
+                schema_model=schema_model,
+                mock=mock,
+                cache=cache,
+                circuit_breaker=circuit_breaker,
+            )
+        except Exception:
+            return MockLLMProvider().generate(
+                system_prompt, user_prompt, model=model, schema_model=schema_model, mock=True
+            )
+
+    async def stream(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str = DEFAULT_OPENROUTER_MODEL,
+        temperature: float = 0.2,
+        circuit_breaker: Any = None,
+    ) -> AsyncIterator[str]:
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            "temperature": temperature,
+            "stream": True,
+        }
+        async with self._async_client.stream(
+            "POST", f"{self.base_url}/chat/completions", json=payload, headers=self._headers()
+        ) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                chunk = line[5:].strip()
+                if chunk == "[DONE]":
+                    break
+                try:
+                    delta = json.loads(chunk).get("choices", [{}])[0].get("delta", {}).get("content", "")
+                except Exception:
+                    delta = ""
+                if delta:
+                    yield delta
+
+
 class LLMProviderRegistry:
     """Registro desacoplado de provedores de LLM para orquestração heterogênea."""
     _providers: dict[str, BaseLLMProvider] = {}
@@ -353,6 +486,7 @@ class LLMProviderRegistry:
 LLMProviderRegistry.register(OpenCodeCLIProvider())
 LLMProviderRegistry.register(OpenRouterProvider())
 LLMProviderRegistry.register(MockLLMProvider())
+LLMProviderRegistry.register(NativeLLMProvider())
 
 
 def execute_llm(
