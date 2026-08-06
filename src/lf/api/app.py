@@ -435,6 +435,11 @@ def create_app() -> FastAPI:
 
     app.include_router(trajectories_router)
 
+    # ─── MCP (ADE Fase 1) ────────────────────────────────────────────
+    from lf.api.mcp import mcp_router
+
+    app.include_router(mcp_router)
+
     return app
 
 
