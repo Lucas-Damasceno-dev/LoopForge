@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
-from lf.config.schema import LoopForgeConfig
+from lf.config.schema import AdeConfig, LoopForgeConfig
 
 
 def load_config(config_path: str | Path = ".loopforge.json") -> LoopForgeConfig:
@@ -28,5 +28,31 @@ def save_config(config: LoopForgeConfig, config_path: str | Path = ".loopforge.j
     if path.suffix in [".yaml", ".yml"]:
         path.write_text(yaml.dump(data, sort_keys=False), encoding="utf-8")
     else:
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return path
+
+
+def load_ade_config(config_path: str | Path = ".loopforge/ade.yaml") -> AdeConfig:
+    path = Path(config_path)
+    if not path.exists():
+        return AdeConfig()
+    if path.suffix in (".yaml", ".yml"):
+        import yaml
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    else:
+        import json
+        data = json.loads(path.read_text(encoding="utf-8"))
+    return AdeConfig(**data)
+
+
+def save_ade_config(config: AdeConfig, config_path: str | Path = ".loopforge/ade.yaml") -> Path:
+    path = Path(config_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = config.model_dump(mode="json")
+    if path.suffix in (".yaml", ".yml"):
+        import yaml
+        path.write_text(yaml.dump(data, sort_keys=False), encoding="utf-8")
+    else:
+        import json
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path

@@ -93,3 +93,31 @@ class LoopForgeConfig(BaseModel):
     budget_limit_usd: float = Field(10.0, ge=0)
     max_parallel_tasks: int = Field(2, gt=0)
     plan: PlanSchema = Field(default_factory=PlanSchema)
+
+
+class AdeMcpServer(BaseModel):
+    name: str
+    command: str
+    args: list[str] = []
+    tools_allowlist: list[str] = []
+    enabled: bool = True
+
+
+class AdeBudget(BaseModel):
+    max_usd: float = 10.0
+
+
+class AdeProviders(BaseModel):
+    primary: str = "native"
+    ollama_base_url: str = "http://localhost:11434"
+
+
+class AdeHITL(BaseModel):
+    timeout_seconds: int = 300
+
+
+class AdeConfig(BaseModel):
+    budget: AdeBudget = Field(default_factory=AdeBudget)
+    mcp_servers: list[AdeMcpServer] = Field(default_factory=list)
+    providers: AdeProviders = Field(default_factory=AdeProviders)
+    hitl: AdeHITL = Field(default_factory=AdeHITL)
