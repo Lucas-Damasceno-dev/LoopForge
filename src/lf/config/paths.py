@@ -2,7 +2,7 @@
 from pathlib import Path
 
 LOOPFORGE_DIR = Path(".loopforge")
-CHECKPOINTS_DB_PATH = LOOPFORGE_DIR / "checkpoints.sqlite"
+TRAJECTORIES_DB_PATH = LOOPFORGE_DIR / "trajectories.db"
 LLM_CACHE_DB_PATH = LOOPFORGE_DIR / "llm_cache.sqlite"
 TELEMETRY_DB_PATH = LOOPFORGE_DIR / "telemetry.sqlite"
 LESSONS_PATH = LOOPFORGE_DIR / "lessons.md"

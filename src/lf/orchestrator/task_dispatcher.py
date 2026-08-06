@@ -629,14 +629,15 @@ class TaskDispatcher:
         """Dispatcher assíncrono: astream + AsyncSqliteSaver em trajectories.db."""
         from lf.pipeline.checkpointer import create_async_checkpointer
         checkpointer = create_async_checkpointer(self._trajectories_db())
-        await checkpointer.setup()
-        graph = self._get_graph(checkpointer=checkpointer)
-        config = {"configurable": {"thread_id": thread_id}}
         task_id = task.id
 
-        self._broadcast_ws("pipeline_started", task_id, {"idea": initial_state.get("title"), "node": initial_state.get("next_agent")})
-
         try:
+            await checkpointer.setup()
+            graph = self._get_graph(checkpointer=checkpointer)
+            config = {"configurable": {"thread_id": thread_id}}
+
+            self._broadcast_ws("pipeline_started", task_id, {"idea": initial_state.get("idea"), "node": initial_state.get("next_agent")})
+
             async for event in graph.astream(initial_state, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
