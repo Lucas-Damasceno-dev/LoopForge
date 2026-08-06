@@ -4,9 +4,7 @@ Centraliza toda a lógica de roteamento e suporte a auditoria simultânea (AppSe
 """
 from __future__ import annotations
 
-from typing import Literal
-
-from langgraph.checkpoint.memory import InMemorySaver
+from typing import Any, Literal
 from langgraph.graph import END, StateGraph
 
 from .nodes.appsec import appsec
@@ -126,7 +124,7 @@ class EdgeRegistry:
 
 
 def build_graph(
-    checkpointer: InMemorySaver | None = None,
+    checkpointer: Any | None = None,  # InMemorySaver | SqliteSaver | AsyncSqliteSaver
     interrupt_after: list[str] | None = None,
     human_gate_enabled: bool = False,
 ):

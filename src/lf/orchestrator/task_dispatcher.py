@@ -15,7 +15,6 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from langgraph.checkpoint.sqlite import SqliteSaver
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
@@ -567,47 +566,138 @@ class TaskDispatcher:
         except Exception as e:
             print(f"--- AVISO: Falha ao criar checkpoint/PR: {e} ---")
 
-    def list_checkpoints(self) -> list[str]:
-        """Lista todos os thread_ids com checkpoints gravados em .loopforge/checkpoints.sqlite."""
-        checkpoint_path = str(Path(".loopforge/checkpoints.sqlite").resolve())
-        if not Path(checkpoint_path).exists():
-            return []
+    def _trajectories_db(self) -> Path:
+        """Caminho do banco de trajetórias resolvido no momento da chamada.
 
-        conn = sqlite3.connect(checkpoint_path, check_same_thread=False)
+        Resolve em call-time (não em import-time) para respeitar os.chdir()
+        usado pelos testes e pela CLI em diretórios de trabalho arbitrários.
+        """
+        return Path(".loopforge/trajectories.db").resolve()
+
+    def _safe_output(self, output: dict) -> dict:
+        """Extrai campos seguros de um output de nó para broadcast via WebSocket."""
+        return {
+            "next_agent": output.get("next_agent"),
+            "attempt_count": output.get("attempt_count", 0),
+        }
+
+    def list_checkpoints(self) -> list[str]:
+        """Lista todos os thread_ids com trajetórias gravadas em .loopforge/trajectories.db."""
+        if not self._trajectories_db().exists():
+            return []
+        import asyncio
+        return asyncio.run(self._list_checkpoints_async())
+
+    async def _list_checkpoints_async(self) -> list[str]:
+        """Lê os thread_ids únicos do banco de trajetórias via AsyncSqliteSaver.alist."""
+        from lf.pipeline.checkpointer import create_async_checkpointer
+        checkpointer = create_async_checkpointer(self._trajectories_db())
         try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT thread_id FROM checkpoints")
-            rows = cursor.fetchall()
-            return [row[0] for row in rows]
+            await checkpointer.setup()
+            thread_ids: set[str] = set()
+            async for item in checkpointer.alist(None):
+                cfg = item.config or {}
+                thread_id = (cfg.get("configurable") or {}).get("thread_id")
+                if thread_id:
+                    thread_ids.add(thread_id)
+            return sorted(thread_ids)
         except Exception as e:
             print(f"--- AVISO: Falha ao listar checkpoints: {e} ---")
             return []
         finally:
-            conn.close()
+            await checkpointer.conn.close()
 
     def dispatch(self, task: TaskSchema, project_id: str = "project", shared_state: dict | None = None) -> dict:
-        initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
+        """Executa a pipeline e persiste a trajetória em .loopforge/trajectories.db.
 
-        checkpoint_path = Path(".loopforge/checkpoints.sqlite").resolve()
-        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(checkpoint_path), check_same_thread=False)
-        checkpointer = SqliteSaver(conn)
+        Caminho padrão (não-interativo): roda o grafo via ``astream`` com
+        AsyncSqliteSaver dentro de ``asyncio.run``. Caminho HITL (interactive):
+        mantém o fluxo síncrono com ``_human_interrupt_handler`` via
+        create_sync_checkpointer (regressão: testes HITL existentes passam sem
+        refatoração do gate humano nesta migração).
+        """
+        initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
         thread_id = f"{project_id}-{task.id}"
 
+        if self.interactive:
+            return self._dispatch_sync(initial_state, thread_id, task, project_id)
+
+        import asyncio
+        return asyncio.run(self._dispatch_async(initial_state, thread_id, task, project_id))
+
+    async def _dispatch_async(self, initial_state: dict, thread_id: str, task: TaskSchema, project_id: str) -> dict:
+        """Dispatcher assíncrono: astream + AsyncSqliteSaver em trajectories.db."""
+        from lf.pipeline.checkpointer import create_async_checkpointer
+        checkpointer = create_async_checkpointer(self._trajectories_db())
+        await checkpointer.setup()
         graph = self._get_graph(checkpointer=checkpointer)
         config = {"configurable": {"thread_id": thread_id}}
+        task_id = task.id
 
-        self._broadcast_ws("pipeline_started", task.id, {"idea": task.title, "node": initial_state.get("next_agent")})
+        self._broadcast_ws("pipeline_started", task_id, {"idea": initial_state.get("title"), "node": initial_state.get("next_agent")})
+
+        try:
+            async for event in graph.astream(initial_state, config):
+                for node_name, output in event.items():
+                    if isinstance(output, dict):
+                        self._broadcast_ws("node_execution", task_id, {
+                            "node": node_name,
+                            "status": "completed",
+                            **self._safe_output(output),
+                        })
+
+            state_snapshot = await graph.aget_state(config)
+            result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
+
+            if self.review_mode:
+                approved = self._review_mode_approval_gate(result)
+                if not approved:
+                    result["error"] = "Review mode rejected by user"
+
+            final_status = "completed" if not result.get("error") else "failed"
+            final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
+            self._broadcast_ws(final_event, task_id, {
+                "status": final_status,
+                "error": result.get("error"),
+            })
+
+            if self.notify:
+                status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
+                _send_notification("🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url)
+
+            self._create_pr_with_labels(task, result, project_id)
+            return result
+
+        except Exception as e:
+            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)})
+            return {**initial_state, "error": str(e), "status": "failed"}
+
+        finally:
+            await checkpointer.conn.close()
+
+    def _dispatch_sync(self, initial_state: dict, thread_id: str, task: TaskSchema, project_id: str) -> dict:
+        """Dispatcher síncrono (caminho HITL): mantém _human_interrupt_handler e graph.stream.
+
+        Usa create_sync_checkpointer no mesmo trajectories.db para compat com a
+        Task 2; a refatoração do gate humano para o caminho async fica para uma
+        task futura (regressão dos testes HITL tem prioridade nesta migração).
+        """
+        from lf.pipeline.checkpointer import create_sync_checkpointer
+        checkpointer = create_sync_checkpointer(self._trajectories_db())
+        graph = self._get_graph(checkpointer=checkpointer)
+        config = {"configurable": {"thread_id": thread_id}}
+        task_id = task.id
+
+        self._broadcast_ws("pipeline_started", task_id, {"idea": task.title, "node": initial_state.get("next_agent")})
 
         try:
             for event in graph.stream(initial_state, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
-                        next_agent = output.get("next_agent")
-                        self._broadcast_ws("node_execution", task.id, {
+                        self._broadcast_ws("node_execution", task_id, {
                             "node": node_name,
-                            "next_agent": next_agent,
-                            "attempt_count": output.get("attempt_count", 0),
+                            "status": "completed",
+                            **self._safe_output(output),
                         })
 
             if self.interactive:
@@ -619,9 +709,10 @@ class TaskDispatcher:
                     for event in graph.stream(None, config):
                         for node_name, output in event.items():
                             if isinstance(output, dict):
-                                self._broadcast_ws("node_execution", task.id, {
+                                self._broadcast_ws("node_execution", task_id, {
                                     "node": node_name,
-                                    "next_agent": output.get("next_agent"),
+                                    "status": "completed",
+                                    **self._safe_output(output),
                                 })
                     snapshot = graph.get_state(config)
 
@@ -635,61 +726,70 @@ class TaskDispatcher:
 
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
-            self._broadcast_ws(final_event, task.id, {
+            self._broadcast_ws(final_event, task_id, {
                 "status": final_status,
                 "error": result.get("error"),
             })
 
             if self.notify:
                 status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
-                _send_notification("🚀 Pipeline Finalizado", f"Task {task.id}: {status_label}", webhook_url=self.webhook_url)
+                _send_notification("🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url)
 
             self._create_pr_with_labels(task, result, project_id)
             return result
 
         except Exception as e:
-            self._broadcast_ws("pipeline_error", task.id, {"error": str(e)})
+            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)})
             return {**initial_state, "error": str(e), "status": "failed"}
 
-    def resume(self, project_id: str = "project", task_id: str = "task-1") -> dict:
-        """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via SqliteSaver checkpoint."""
-        checkpoint_path = Path(".loopforge/checkpoints.sqlite").resolve()
-        if not checkpoint_path.exists():
-            raise RuntimeError(f"Nenhum banco de checkpoints encontrado em {checkpoint_path}")
+        finally:
+            checkpointer.conn.close()
 
-        conn = sqlite3.connect(str(checkpoint_path), check_same_thread=False)
-        checkpointer = SqliteSaver(conn)
+    def resume(self, project_id: str = "project", task_id: str = "task-1") -> dict:
+        """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via trajectories.db."""
+        if not self._trajectories_db().exists():
+            raise RuntimeError(f"Nenhum banco de trajetórias encontrado em {self._trajectories_db()}")
+        import asyncio
+        return asyncio.run(self._resume_async(project_id, task_id))
+
+    async def _resume_async(self, project_id: str, task_id: str) -> dict:
+        """Resume assíncrono: aget_state/aupdate_state/astream sobre AsyncSqliteSaver."""
+        from lf.pipeline.checkpointer import create_async_checkpointer
+        checkpointer = create_async_checkpointer(self._trajectories_db())
+        await checkpointer.setup()
+        graph = self._get_graph(checkpointer=checkpointer)
         thread_id = f"{project_id}-{task_id}"
         config = {"configurable": {"thread_id": thread_id}}
 
-        graph = self._get_graph(checkpointer=checkpointer)
-        snapshot = graph.get_state(config)
-
-        if not snapshot or not snapshot.values:
-            raise RuntimeError(f"Nenhum checkpoint encontrado para o thread '{thread_id}'.")
-
-        last_values = snapshot.values
-        resuming_node = snapshot.next[0] if snapshot.next else last_values.get("next_agent", "cpo")
-
-        print(f"--- CHECKPOINT RECOVERY: Retomando pipeline (thread: {thread_id}) a partir do nó '{resuming_node}' ---")
-
-        graph.update_state(config, {"error": None})
-
-        self._broadcast_ws("pipeline_resumed", task_id, {
-            "thread_id": thread_id,
-            "resuming_from_node": resuming_node,
-        })
-
+        last_values: dict = {}
         try:
-            for event in graph.stream(None, config):
+            snapshot = await graph.aget_state(config)
+
+            if not snapshot or not snapshot.values:
+                raise RuntimeError(f"Nenhum checkpoint encontrado para o thread '{thread_id}'.")
+
+            last_values = snapshot.values
+            resuming_node = snapshot.next[0] if snapshot.next else last_values.get("next_agent", "cpo")
+
+            print(f"--- CHECKPOINT RECOVERY: Retomando pipeline (thread: {thread_id}) a partir do nó '{resuming_node}' ---")
+
+            await graph.aupdate_state(config, {"error": None})
+
+            self._broadcast_ws("pipeline_resumed", task_id, {
+                "thread_id": thread_id,
+                "resuming_from_node": resuming_node,
+            })
+
+            async for event in graph.astream(None, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
                         self._broadcast_ws("node_execution", task_id, {
                             "node": node_name,
-                            "next_agent": output.get("next_agent"),
+                            "status": "completed",
+                            **self._safe_output(output),
                         })
 
-            state_snapshot = graph.get_state(config)
+            state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
             final_status = "completed" if not result.get("error") else "failed"
@@ -704,3 +804,6 @@ class TaskDispatcher:
         except Exception as e:
             self._broadcast_ws("pipeline_error", task_id, {"error": str(e)})
             return {**last_values, "error": str(e), "status": "failed"}
+
+        finally:
+            await checkpointer.conn.close()
