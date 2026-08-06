@@ -5,7 +5,7 @@ para ler/gravar checkpoints em ``.loopforge/trajectories.db``. O envelope
 versionado produzido aqui é consumido pela Fase 3 (time-travel).
 """
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +45,7 @@ def _trajectories_db() -> Path:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _list_thread_ids() -> list[str]:
@@ -120,5 +120,5 @@ def fork_trajectory(thread_id: str):
     """Deriva uma nova thread com sufixo ``-fork-<ts>`` (sem copiar checkpoints no V1)."""
     if thread_id not in _list_thread_ids():
         raise HTTPException(status_code=404, detail=f"Thread {thread_id} não encontrada")
-    fork_id = f"{thread_id}-fork-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+    fork_id = f"{thread_id}-fork-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S')}"
     return {"fork_thread_id": fork_id, "source_thread_id": thread_id}
