@@ -1,10 +1,12 @@
+import contextlib
 import json
 import os
 import re
 import sqlite3
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -414,10 +416,8 @@ class NativeLLMProvider(BaseLLMProvider):
         # Payload final consolidado -> cache (requisito: nunca deltas)
         if cache:
             llm_cache.set(full_prompt, text)
-        try:
+        with contextlib.suppress(Exception):
             CostTracker().track(model, full_prompt, text)
-        except Exception:
-            pass
         return text
 
     def _fallback_generate(self, system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker):
