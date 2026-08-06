@@ -430,6 +430,11 @@ def create_app() -> FastAPI:
         except Exception as e:
             return {"error": str(e), "learnings": []}
 
+    # ─── Trajectories (ADE Fase 1) ───────────────────────────────────
+    from lf.api.trajectories import trajectories_router
+
+    app.include_router(trajectories_router)
+
     return app
 
 
