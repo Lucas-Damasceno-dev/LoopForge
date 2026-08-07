@@ -1,10 +1,10 @@
-# 📊 Project Executive Summary: Smoke test ADE
+# 📊 Project Executive Summary: Corrigir bug na função de cálculo de impostos
 
 ![QA Status](https://img.shields.io/badge/QA-PASS-brightgreen)
 ![Security Audit](https://img.shields.io/badge/AppSec-PASS-brightgreen)
 ![Stack](https://img.shields.io/badge/Stack-PYTHON-blue)
 
-> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-07 00:54:12 UTC
+> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-07 01:04:48 UTC
 
 ## 🏗️ Diagrama de Arquitetura do Projeto Gerado
 ```mermaid
