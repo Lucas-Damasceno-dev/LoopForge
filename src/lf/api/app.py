@@ -452,6 +452,11 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     app.include_router(providers_router)
 
+    # ─── Config API (ADE Fase 1) ─────────────────────────────────────
+    from lf.api.config import config_router
+
+    app.include_router(config_router)
+
     return app
 
 

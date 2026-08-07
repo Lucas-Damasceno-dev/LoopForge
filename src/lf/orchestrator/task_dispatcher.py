@@ -59,7 +59,7 @@ class TaskDispatcher:
         review_mode: bool = False,
         notify: bool = False,
         webhook_url: str | None = None,
-        hitl_timeout_seconds: int = 300,
+        hitl_timeout_seconds: int | None = None,
     ):
         self.mock_llm = mock_llm
         self.interactive = interactive
@@ -67,6 +67,9 @@ class TaskDispatcher:
         self.review_mode = review_mode
         self.notify = notify
         self.webhook_url = webhook_url
+        if hitl_timeout_seconds is None:
+            from lf.config.loader import load_ade_config
+            hitl_timeout_seconds = load_ade_config().hitl.timeout_seconds
         self.hitl_timeout_seconds = hitl_timeout_seconds
         self._last_graph = None
         if self.circuit_breaker is None:
@@ -439,7 +442,7 @@ class TaskDispatcher:
         console.print("  [blue]a[/blue] — Solicitar alterações / Ajustar Prompt (Request Changes)")
         console.print("  [red]x[/red] — Abortar pipeline")
 
-        console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: ABORTAR)[/dim]")
+        console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: CONTINUAR)[/dim]")
 
         # Lê tecla única (sem Enter) com poll remoto curto intercalado para
         # não congelar o gate: (a) chama _get_single_key_with_timeout a cada
@@ -469,8 +472,17 @@ class TaskDispatcher:
                 choice = choice_map.get(remote_decision["action"], "c")
                 console.print(f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]")
             else:
-                console.print("\n[red]⏰ Tempo limite de resposta esgotado. Abortando pipeline (default: x).[/red]")
-                choice = "x"
+                # Timeout expirado sem decisão -> transição GRACIOSA (E10/F1-13):
+                # NÃO aborta; continua a pipeline e marca a run como decision_expired.
+                # Decisão tardia via POST /api/runs/{run_id}/decide continua aceita.
+                console.print("\n[yellow]⏰ Tempo limite de resposta esgotado. Continuando pipeline (default: c).[/yellow]")
+                run_status = "decision_expired"
+                self._broadcast_ws("human_decision_expired", run_id, {
+                    "node": next_node,
+                    "timeout_seconds": self.hitl_timeout_seconds,
+                    "run_status": run_status,
+                })
+                choice = "c"
 
         action = "approve"
         cat = None

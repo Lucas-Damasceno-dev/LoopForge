@@ -1,5 +1,50 @@
 """Configuração oficial da API REST e Web UI do LoopForge."""
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException
+from pydantic import ValidationError
 from pydantic_settings import BaseSettings
+
+from lf.config.loader import load_ade_config, save_ade_config
+from lf.config.schema import AdeConfig
+
+config_router = APIRouter(prefix="/api/v1/config", tags=["Config"])
+
+
+def _ade_yaml() -> Path:
+    """Caminho do ade.yaml resolvido em call-time (não import-time).
+
+    Respeita os.chdir()/monkeypatch.chdir usado pelos testes e pela CLI em
+    diretórios de trabalho arbitrários (mesmo padrão de _trajectories_db).
+    """
+    return Path(".loopforge/ade.yaml").resolve()
+
+
+@config_router.get("")
+async def get_config() -> AdeConfig:
+    return load_ade_config(_ade_yaml())
+
+
+@config_router.patch("")
+async def patch_config(payload: dict):
+    current = load_ade_config(_ade_yaml())
+    merged = current.model_copy(deep=True)
+    try:
+        for key, value in payload.items():
+            if not hasattr(merged, key):
+                continue
+            annotation = merged.__class__.__annotations__.get(key)
+            if isinstance(value, dict) and annotation is not None:
+                # Sub-modelos aninhados (AdeHITL, AdeProviders, etc.) são
+                # reconstruídos com validação pydantic (422 se inválido).
+                setattr(merged, key, annotation(**value))
+            else:
+                setattr(merged, key, value)
+        validated = AdeConfig(**merged.model_dump())
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+    save_ade_config(validated, _ade_yaml())
+    return validated
 
 
 class APISettings(BaseSettings):
