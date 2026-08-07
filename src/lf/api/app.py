@@ -440,6 +440,11 @@ def create_app() -> FastAPI:
 
     app.include_router(mcp_router)
 
+    # ─── Providers (ADE Fase 1) ──────────────────────────────────────
+    from lf.api.providers import providers_router
+
+    app.include_router(providers_router)
+
     return app
 
 

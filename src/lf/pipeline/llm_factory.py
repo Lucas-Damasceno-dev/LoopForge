@@ -10,6 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from lf.pipeline.providers.ollama import OllamaProvider
+
 from .cache import SQLiteLLMCache, _connect_sqlite, _semantic_normalize_prompt
 
 __all__ = ["SQLiteLLMCache", "_semantic_normalize_prompt"]
@@ -487,6 +489,7 @@ LLMProviderRegistry.register(OpenCodeCLIProvider())
 LLMProviderRegistry.register(OpenRouterProvider())
 LLMProviderRegistry.register(MockLLMProvider())
 LLMProviderRegistry.register(NativeLLMProvider())
+LLMProviderRegistry.register(OllamaProvider())
 
 
 def execute_llm(
