@@ -455,7 +455,7 @@ class TaskDispatcher:
         deadline = time.monotonic() + self.hitl_timeout_seconds
         poll_interval = 0.5
         valid_choices = ("c", "r", "a", "x")
-        prompt_text = "➜ Escolha [c/r/a/x] (default: x): "
+        prompt_text = "➜ Escolha [c/r/a/x] (default: c): "
         while time.monotonic() < deadline:
             raw_choice = self._get_single_key_with_timeout(prompt_text, poll_interval)
             prompt_text = ""
@@ -474,7 +474,9 @@ class TaskDispatcher:
             else:
                 # Timeout expirado sem decisão -> transição GRACIOSA (E10/F1-13):
                 # NÃO aborta; continua a pipeline e marca a run como decision_expired.
-                # Decisão tardia via POST /api/runs/{run_id}/decide continua aceita.
+                # NÃO grava em human_decisions (nenhuma decisão humana real foi
+                # tomada) — decisão tardia via POST /api/runs/{run_id}/decide
+                # continua aceita (poll ordena timestamp DESC, sem linha falsa).
                 console.print("\n[yellow]⏰ Tempo limite de resposta esgotado. Continuando pipeline (default: c).[/yellow]")
                 run_status = "decision_expired"
                 self._broadcast_ws("human_decision_expired", run_id, {
@@ -482,7 +484,7 @@ class TaskDispatcher:
                     "timeout_seconds": self.hitl_timeout_seconds,
                     "run_status": run_status,
                 })
-                choice = "c"
+                choice = "continue"
 
         action = "approve"
         cat = None
@@ -524,6 +526,12 @@ class TaskDispatcher:
                 ],
             })
             self._record_decision(run_id, node_name, action, cat, msg)
+            return True
+
+        elif choice == "continue":
+            # Timeout expirado (E10/F1-13): pipeline continua, mas NENHUMA
+            # decisão humana é registrada — o audit trail fica intacto.
+            console.print("[bold yellow]⏭️  Continuando após timeout — nenhuma decisão humana registrada.[/bold yellow]")
             return True
 
         else:

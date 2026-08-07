@@ -1,5 +1,7 @@
 """Testes do HITL timeout gracioso: transição decision_expired + broadcast human_decision_expired."""
 import asyncio
+import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -28,3 +30,21 @@ async def test_hitl_expiry_broadcasts_decision_expired(tmp_path, monkeypatch):
     assert payload.get("node")
     # Transição graciosa: pipeline NÃO aborta (segue em frente, sem erro)
     assert not result.get("error")
+    # Prova (fix round 1): o timeout NÃO grava decisão humana falsa em
+    # human_decisions — nenhuma linha "approve" fabricada para o run.
+    run_id = f"proj-expiry-{task.id}"
+    db_path = tmp_path / ".loopforge" / "telemetry.sqlite"
+    rows = []
+    if db_path.exists():
+        conn = sqlite3.connect(db_path)
+        try:
+            has_table = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='human_decisions'"
+            ).fetchone()
+            if has_table:
+                rows = conn.execute(
+                    "SELECT action FROM human_decisions WHERE run_id = ?", (run_id,)
+                ).fetchall()
+        finally:
+            conn.close()
+    assert rows == [], f"human_decisions não deve conter decisões falsas no timeout: {rows}"
