@@ -2,6 +2,7 @@
 
 Expõe endpoints REST, WebSockets autenticados para streaming e Web Dashboard UI.
 """
+import os
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -47,9 +48,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
-def create_app() -> FastAPI:
-    """Factory da aplicação FastAPI oficial do LoopForge."""
+def create_app(ui_enabled: bool | None = None) -> FastAPI:
+    """Factory da aplicação FastAPI oficial do LoopForge.
+
+    Se ui_enabled for None, lê a env LF_UI_ENABLED ("0" desliga o dashboard/SPA).
+    """
     settings = get_api_settings()
+    if ui_enabled is None:
+        ui_enabled = os.environ.get("LF_UI_ENABLED", "1") != "0"
     app = FastAPI(
         title="LoopForge API",
         description="API REST, WebSockets e Dashboard Web para gerenciamento de pipelines do LoopForge v6",
@@ -76,11 +82,12 @@ def create_app() -> FastAPI:
         return response
 
     # ─── Dashboard Web UI ───────────────────────────────────────────
-    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
-    async def render_dashboard():
-        """Serves the modern Glassmorphic Web Dashboard UI."""
-        return HTMLResponse(content=get_dashboard_html())
+    if ui_enabled:
+        @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+        @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+        async def render_dashboard():
+            """Serves the modern Glassmorphic Web Dashboard UI."""
+            return HTMLResponse(content=get_dashboard_html())
 
 
     # ─── Health ─────────────────────────────────────────────────────
