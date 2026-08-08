@@ -529,6 +529,43 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         _mark_legacy(response)
         return await _list_run_events_impl(run_id, after_seq, limit, session)
 
+    async def _get_run_timeline_impl(run_id: str, after_seq: int, limit: int, session: AsyncSession) -> dict:
+        """Timeline C5/M-02: eventos do journal + checkpoints LangGraph da run."""
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return await event_bus.get_timeline(run_id, after_seq=after_seq, limit=limit)
+
+    @app.get(
+        "/api/v1/runs/{run_id}/timeline",
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def get_run_timeline_v1(
+        run_id: str,
+        after_seq: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=500),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Rota canônica (M-02): timeline unificada (eventos + checkpoints) da run."""
+        return await _get_run_timeline_impl(run_id, after_seq, limit, session)
+
+    @app.get(
+        "/api/runs/{run_id}/timeline",
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def get_run_timeline_legacy(
+        run_id: str,
+        response: Response,
+        after_seq: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=500),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Alias legado de GET /api/v1/runs/{id}/timeline (M-18)."""
+        _mark_legacy(response)
+        return await _get_run_timeline_impl(run_id, after_seq, limit, session)
+
     async def _record_decision_impl(
         run_id: str, payload: HumanDecisionCreate, session: AsyncSession
     ) -> HumanDecisionModel:
