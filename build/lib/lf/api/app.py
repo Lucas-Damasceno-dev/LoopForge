@@ -4,11 +4,15 @@ Expõe endpoints REST, WebSockets autenticados para streaming e Web Dashboard UI
 """
 
 import asyncio
+import json
+import logging
 import os
+import sqlite3
 import time
 from collections import deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import (
     Depends,
@@ -23,7 +27,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lf.api.auth import verify_authentication
@@ -43,6 +47,8 @@ from lf.api.schemas import (
 )
 from lf.api.spa import mount_spa
 from lf.api.websocket_manager import ws_manager
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -74,6 +80,41 @@ def _mark_legacy(response: Response) -> None:
     """Marca a resposta como rota legada /api/runs* (M-18): Sunset + Deprecation."""
     response.headers["Sunset"] = "2026-12-31"
     response.headers["Deprecation"] = "true"
+
+
+def _telemetry_db_path() -> Path:
+    """Caminho do banco de telemetria resolvido em call-time (regra do database.py).
+
+    LF_API_TEST -> .loopforge/test_api.sqlite; caso contrário o default da API
+    (sqlite+aiosqlite:///.loopforge/telemetry.sqlite). O dispatcher polla
+    telemetry.sqlite no mesmo padrão — os dois precisam enxergar a MESMA
+    tabela human_decisions para o polling do gate casar com o POST /decide.
+    """
+    if os.getenv("LF_API_TEST"):
+        return Path(".loopforge/test_api.sqlite").resolve()
+    return Path(".loopforge/telemetry.sqlite").resolve()
+
+
+def _ensure_human_decisions_state_patch_column(db_path: Path) -> None:
+    """Garante a coluna aditiva ``state_patch`` em human_decisions (C3/M-12).
+
+    O modelo ORM ``HumanDecisionModel`` (models.py, fora do escopo da ADE) não
+    declara a coluna — ela é adicionada via SQL direto com o mesmo espírito da
+    migração aditiva de pipeline_runs em database.py. Telemetria: nunca derruba
+    o request (try/except + warning).
+    """
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        try:
+            conn.execute("PRAGMA busy_timeout=5000")
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(human_decisions)")}
+            if "state_patch" not in cols:
+                conn.execute("ALTER TABLE human_decisions ADD COLUMN state_patch TEXT")
+                conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning("Falha ao garantir coluna state_patch em human_decisions: %s", exc)
 
 
 def create_app(ui_enabled: bool | None = None) -> FastAPI:
@@ -488,6 +529,43 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         _mark_legacy(response)
         return await _list_run_events_impl(run_id, after_seq, limit, session)
 
+    async def _get_run_timeline_impl(run_id: str, after_seq: int, limit: int, session: AsyncSession) -> dict:
+        """Timeline C5/M-02: eventos do journal + checkpoints LangGraph da run."""
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return await event_bus.get_timeline(run_id, after_seq=after_seq, limit=limit)
+
+    @app.get(
+        "/api/v1/runs/{run_id}/timeline",
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def get_run_timeline_v1(
+        run_id: str,
+        after_seq: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=500),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Rota canônica (M-02): timeline unificada (eventos + checkpoints) da run."""
+        return await _get_run_timeline_impl(run_id, after_seq, limit, session)
+
+    @app.get(
+        "/api/runs/{run_id}/timeline",
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def get_run_timeline_legacy(
+        run_id: str,
+        response: Response,
+        after_seq: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=500),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Alias legado de GET /api/v1/runs/{id}/timeline (M-18)."""
+        _mark_legacy(response)
+        return await _get_run_timeline_impl(run_id, after_seq, limit, session)
+
     async def _record_decision_impl(
         run_id: str, payload: HumanDecisionCreate, session: AsyncSession
     ) -> HumanDecisionModel:
@@ -501,22 +579,34 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             user=payload.user,
         )
         session.add(decision)
+        if payload.state_patch is not None:
+            # C3 (M-12) action=adjust_state: persiste o state_patch na coluna
+            # aditiva (fora do ORM) no MESMO commit do INSERT — flush + UPDATE
+            # na mesma transação. Atomicidade é obrigatória: o polling do gate
+            # roda a cada 0.5s e, se a linha fosse visível com state_patch NULL
+            # antes do UPDATE, a decisão era consumida sem o patch (race real).
+            db_path = _telemetry_db_path()
+            _ensure_human_decisions_state_patch_column(db_path)
+            await session.flush()  # atribui decision.id (default _generate_uuid)
+            await session.execute(
+                text("UPDATE human_decisions SET state_patch = :sp WHERE id = :id"),
+                {"sp": json.dumps(payload.state_patch, ensure_ascii=False), "id": decision.id},
+            )
         await session.commit()
         await session.refresh(decision)
 
         # Emite evento via EventBus (persiste + broadcast) para notificar o
         # TaskDispatcher ou UI — M-06: só o EventBus publica no canal do run.
-        await event_bus.publish(
-            run_id,
-            "human_decision_submitted",
-            {
-                "gate_node": decision.gate_node,
-                "action": decision.action,
-                "feedback_category": decision.feedback_category,
-                "feedback_message": decision.feedback_message,
-                "user": decision.user,
-            },
-        )
+        event_payload: dict = {
+            "gate_node": decision.gate_node,
+            "action": decision.action,
+            "feedback_category": decision.feedback_category,
+            "feedback_message": decision.feedback_message,
+            "user": decision.user,
+        }
+        if payload.state_patch is not None:
+            event_payload["state_patch"] = payload.state_patch
+        await event_bus.publish(run_id, "human_decision_submitted", event_payload)
 
         return decision
 
