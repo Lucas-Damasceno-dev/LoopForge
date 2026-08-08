@@ -57,3 +57,9 @@ class GraphState(TypedDict):
 
     # Referência da persona ativa (carregada do ontology)
     persona_id: str | None
+
+    # CircuitBreaker (M-08/M-10): snapshot serializável definido pelo
+    # TaskDispatcher em _build_initial_state. PRECISA ser canal declarado —
+    # o LangGraph descarta chaves fora do TypedDict, e sem ele o hard-stop
+    # de budget do nó developer nunca via o estado (enforcement era morto).
+    circuit_breaker: dict
