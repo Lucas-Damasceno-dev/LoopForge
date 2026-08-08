@@ -836,6 +836,25 @@ class TaskDispatcher:
             self._record_decision(telemetry_run_id, node_name, action, cat, msg)
             return True
 
+        elif choice == "as":
+            # C3 (M-12) action=adjust_state (via POST /decide): aplica o
+            # state_patch ao checkpoint e a run prossegue (mesmo efeito de
+            # approve/continue). Campos fora do GraphState são descartados
+            # pelo LangGraph (documentado em _apply_state_patch_to_checkpoint).
+            action = "adjust_state"
+            patch = (remote_decision or {}).get("state_patch") or {}
+            if patch:
+                self._apply_state_patch_to_checkpoint(app, config, patch)
+                console.print(
+                    f"[bold cyan]✏️  Estado ajustado via state_patch ({len(patch)} campo(s)). Continuando...[/bold cyan]"
+                )
+            else:
+                console.print(
+                    "[bold yellow]⚠️  action=adjust_state sem state_patch — continuando sem alterações.[/bold yellow]"
+                )
+            self._record_decision(telemetry_run_id, node_name, action, cat, msg, state_patch=patch or None)
+            return True
+
         elif choice == "continue":
             # Timeout expirado (E10/F1-13): pipeline continua, mas NENHUMA
             # decisão humana é registrada — o audit trail fica intacto.
