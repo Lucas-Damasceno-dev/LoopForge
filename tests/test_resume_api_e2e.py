@@ -8,7 +8,6 @@ trajectories.db.
 """
 
 import asyncio
-import os
 
 import pytest
 import pytest_asyncio
