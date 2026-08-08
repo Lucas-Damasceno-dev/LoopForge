@@ -5,6 +5,7 @@ paginação ``after_seq``/``limit``; alias legado /api/runs/{id}/events com
 Sunset/Deprecation (M-18); 401 sem key quando auth ligada; 404 para run
 inexistente.
 """
+
 import asyncio
 import contextlib
 import os
@@ -49,9 +50,7 @@ async def setup_test_db():
 
 async def _run_mock_pipeline(client: AsyncClient, idea: str = "Backfill") -> tuple[str, str]:
     """Cria e espera uma pipeline mock terminar; devolve (run_id, status)."""
-    resp = await client.post(
-        "/api/runs", json={"idea": idea, "stack": "python", "mock_llm": True}
-    )
+    resp = await client.post("/api/runs", json={"idea": idea, "stack": "python", "mock_llm": True})
     assert resp.status_code == 201
     run_id = resp.json()["id"]
     waited = 0.0
@@ -94,9 +93,7 @@ async def test_events_backfill_after_run():
         started = next(e for e in events if e["event"] == "pipeline_started")
         assert "task_id" in started["payload"]  # A3: task_id dentro do payload
 
-        updated_statuses = [
-            e["payload"].get("status") for e in events if e["event"] == "run_updated"
-        ]
+        updated_statuses = [e["payload"].get("status") for e in events if e["event"] == "run_updated"]
         assert "running" in updated_statuses and "completed" in updated_statuses
 
         assert any(e["event"] == "pipeline_finished" for e in events)
@@ -112,7 +109,15 @@ async def test_events_pagination_after_seq_limit():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         run_id, _ = await _run_mock_pipeline(client, idea="Paginação")
 
-        todos = (await client.get(f"/api/v1/runs/{run_id}/events")).json()["events"]
+        # Aguarda o journal estabilizar: o status "completed" chega antes do
+        # último evento (run_updated/pipeline_finished tardios), o que quebraria
+        # a comparação total × seq final nas páginas.
+        for _ in range(30):
+            todos = (await client.get(f"/api/v1/runs/{run_id}/events")).json()["events"]
+            await asyncio.sleep(0.2)
+            again = (await client.get(f"/api/v1/runs/{run_id}/events")).json()["events"]
+            if len(todos) == len(again):
+                break
         total = len(todos)
         assert total > 5, f"esperado journal com vários eventos, veio {total}"
 
@@ -122,20 +127,12 @@ async def test_events_pagination_after_seq_limit():
         assert p1["next_after_seq"] == 5
 
         # Página 2: after_seq=5, limit=5 → seq 6..10
-        p2 = (
-            await client.get(
-                f"/api/v1/runs/{run_id}/events", params={"after_seq": 5, "limit": 5}
-            )
-        ).json()
+        p2 = (await client.get(f"/api/v1/runs/{run_id}/events", params={"after_seq": 5, "limit": 5})).json()
         assert [e["seq"] for e in p2["events"]] == [6, 7, 8, 9, 10]
         assert p2["next_after_seq"] == 10
 
         # Página final: after_seq=10 → resto, next_after_seq=None (acabou)
-        p3 = (
-            await client.get(
-                f"/api/v1/runs/{run_id}/events", params={"after_seq": 10, "limit": 5}
-            )
-        ).json()
+        p3 = (await client.get(f"/api/v1/runs/{run_id}/events", params={"after_seq": 10, "limit": 5})).json()
         rest = p3["events"]
         assert rest and rest[-1]["seq"] == total
         assert p3["next_after_seq"] is None
@@ -145,11 +142,7 @@ async def test_events_pagination_after_seq_limit():
         assert [e["seq"] for e in concatenated] == list(range(1, total + 1))
 
         # after_seq além do fim → lista vazia
-        beyond = (
-            await client.get(
-                f"/api/v1/runs/{run_id}/events", params={"after_seq": 9999}
-            )
-        ).json()
+        beyond = (await client.get(f"/api/v1/runs/{run_id}/events", params={"after_seq": 9999})).json()
         assert beyond["events"] == [] and beyond["next_after_seq"] is None
 
 
@@ -179,9 +172,7 @@ async def test_events_401_sem_key(monkeypatch):
         assert resp.status_code == 401
 
         # Com a key correta, o 404 de run inexistente aparece (auth passou)
-        ok = await client.get(
-            "/api/v1/runs/nao-existe/events", headers={"X-API-Key": "segredo"}
-        )
+        ok = await client.get("/api/v1/runs/nao-existe/events", headers={"X-API-Key": "segredo"})
         assert ok.status_code == 404
 
 
