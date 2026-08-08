@@ -69,7 +69,38 @@ async def init_db(settings: APISettings | None = None) -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migração aditiva de pipeline_runs (ADR-0003/M-02): colunas
+        # thread_id/parent_run_id + backfill. PRAGMA table_info é SQLite-only.
+        if is_sqlite:
+            await _apply_pipeline_runs_additive_migration(conn)
 
+
+async def _apply_pipeline_runs_additive_migration(conn) -> None:
+    """Migração aditiva de `pipeline_runs` (ADR-0003/M-02).
+
+    Adiciona as colunas `thread_id` e `parent_run_id` quando ausentes (detecção
+    via PRAGMA table_info) e faz backfill de `thread_id` espelhando a convenção
+    de thread vigente na v6.0.0 (`run-{id}-task-{substr(id,1,8)}`), para runs
+    legadas continuarem resumíveis pelo próprio thread real em trajectories.db.
+    Idempotente: só altera quando a coluna falta e o backfill apenas preenche
+    linhas com thread_id NULL — rodar N vezes é seguro.
+    """
+    from sqlalchemy import text
+
+    result = await conn.exec_driver_sql("PRAGMA table_info(pipeline_runs)")
+    columns = {row[1] for row in result.fetchall()}
+
+    if "thread_id" not in columns:
+        await conn.execute(text("ALTER TABLE pipeline_runs ADD COLUMN thread_id VARCHAR(50)"))
+    if "parent_run_id" not in columns:
+        await conn.execute(text("ALTER TABLE pipeline_runs ADD COLUMN parent_run_id VARCHAR(36)"))
+
+    await conn.execute(
+        text(
+            "UPDATE pipeline_runs SET thread_id = 'run-' || id || '-task-' || substr(id, 1, 8) "
+            "WHERE thread_id IS NULL"
+        )
+    )
 
 
 async def close_db() -> None:

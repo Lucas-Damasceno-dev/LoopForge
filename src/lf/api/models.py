@@ -28,6 +28,11 @@ class PipelineRun(Base):
     current_node: Mapped[str | None] = mapped_column(String(50), nullable=True)
     logs: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    # ADR-0003 (M-02): identidade run↔thread 1:1 persistida — a thread
+    # LangGraph canônica da run (`run-{id}`) e a run de origem em forks
+    # (NULL em runs raiz). Permite resume/fork/time-travel por chave real.
+    thread_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    parent_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now_utc, onupdate=_now_utc

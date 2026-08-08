@@ -269,37 +269,22 @@ class TaskDispatcher:
             logger.warning("Falha ao verificar decisão remota: %s", exc)
         return None
 
-    def _check_remote_decision(self, run_id: str, timeout: int = 300) -> dict | None:
-        """Poll por decisão remota via API com timeout.
+    @staticmethod
+    def _resolve_telemetry_run_id(thread_id: str) -> str:
+        """Deriva o run_id usado em human_decisions a partir do thread_id.
 
-        Verifica a cada 2s se há decisão gravada na tabela human_decisions
-        (escrita pelo endpoint POST /api/runs/{run_id}/decide).
-        Retorna a decisão assim que disponível, ou None se o timeout expirar.
+        Per ADR-0003 (M-22) a API grava human_decisions.run_id = uuid, mas o
+        thread da run é `run-{uuid}` (formato novo) ou `run-{uuid}-task-{uuid[:8]}`
+        (formato legado/backfill). Extrai o uuid para o polling consultar a
+        tabela pela mesma chave que a API usa. Threads fora do padrão 'run-'
+        (CLI/legadas) são usadas tal qual.
         """
-        console = Console()
-        deadline = time.monotonic() + timeout
-        last_checked: float = 0.0
-        poll_interval = 2.0
-
-        while time.monotonic() < deadline:
-            # Evita polling excessivo na mesma fração de segundo
-            now = time.monotonic()
-            if now - last_checked < poll_interval:
-                time.sleep(0.2)
-                continue
-            last_checked = now
-
-            decision = self._poll_remote_decision_once(run_id)
-            if decision:
-                console.print(f"[bold green]➜ Decisão Remota via API Detectada: {decision['action'].upper()}[/bold green]")
-                return decision
-
-            remaining = int(deadline - time.monotonic())
-            if remaining > 0 and remaining % 10 == 0:
-                console.print(f"[dim]⏳ Aguardando decisão remota... ({remaining}s restantes)[/dim]")
-
-        console.print("[dim]⏳ Tempo de espera por decisão remota expirou. Usando input local.[/dim]")
-        return None
+        if not thread_id.startswith("run-"):
+            return thread_id
+        run_id = thread_id[len("run-"):]
+        if "-task-" in run_id:
+            run_id = run_id.split("-task-", 1)[0]
+        return run_id
 
     def _record_decision(
         self,
@@ -334,6 +319,11 @@ class TaskDispatcher:
         state = snapshot.values
 
         run_id = config.get("configurable", {}).get("thread_id", "default-run")
+        # M-22 (ADR-0003): POST /decide grava human_decisions.run_id = uuid, mas
+        # o thread da run é `run-{uuid}` (ou o legado `run-{uuid}-task-{uuid[:8]}`).
+        # Extrai o uuid para consultar a tabela pelo mesmo run_id que a API usa —
+        # antes o polling usava o thread_id e nunca casava com a decisão remota.
+        telemetry_run_id = self._resolve_telemetry_run_id(run_id)
 
         if self.notify:
             title = f"⏸️ Pipeline Pausado — Gate antes de {next_node.upper()}"
@@ -462,7 +452,7 @@ class TaskDispatcher:
             if raw_choice in valid_choices:
                 choice = raw_choice
                 break
-            remote_decision = self._poll_remote_decision_once(run_id)
+            remote_decision = self._poll_remote_decision_once(telemetry_run_id)
             if remote_decision:
                 break
 
@@ -495,13 +485,13 @@ class TaskDispatcher:
         if choice == "x":
             action = "abort"
             console.print("[red]Pipeline abortado pelo operador humano.[/red]")
-            self._record_decision(run_id, node_name, action, cat, msg)
+            self._record_decision(telemetry_run_id, node_name, action, cat, msg)
             return False
 
         elif choice == "r":
             action = "retry"
             app.update_state(config, {"error": None})
-            self._record_decision(run_id, node_name, action, cat, msg)
+            self._record_decision(telemetry_run_id, node_name, action, cat, msg)
             return True
 
         elif choice == "a":
@@ -525,7 +515,7 @@ class TaskDispatcher:
                     }
                 ],
             })
-            self._record_decision(run_id, node_name, action, cat, msg)
+            self._record_decision(telemetry_run_id, node_name, action, cat, msg)
             return True
 
         elif choice == "continue":
@@ -537,7 +527,7 @@ class TaskDispatcher:
         else:
             action = "approve"
             console.print("[bold green]✅ Passo Aprovado. Continuando...[/bold green]")
-            self._record_decision(run_id, node_name, action, cat, msg)
+            self._record_decision(telemetry_run_id, node_name, action, cat, msg)
             return True
 
     def _review_mode_approval_gate(self, final_state: dict) -> bool:
@@ -637,7 +627,10 @@ class TaskDispatcher:
         refatoração do gate humano nesta migração).
         """
         initial_state = self._build_initial_state(task, project_id, shared_state=shared_state)
-        thread_id = f"{project_id}-{task.id}"
+        # ADR-0003 (M-02): run e thread são 1:1 — a thread da run é `run-{run_id}`.
+        # Quando project_id já é 'run-{uuid}' (chamada da API), usa-o direto,
+        # removendo o sufixo legado '-task-{uuid[:8]}' do task.id.
+        thread_id = project_id if project_id.startswith("run-") else f"{project_id}-{task.id}"
 
         if self.interactive:
             return self._dispatch_sync(initial_state, thread_id, task, project_id)
@@ -766,20 +759,29 @@ class TaskDispatcher:
         finally:
             checkpointer.conn.close()
 
-    def resume(self, project_id: str = "project", task_id: str = "task-1") -> dict:
-        """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via trajectories.db."""
+    def resume(self, project_id: str = "project", task_id: str = "task-1", thread_id: str | None = None) -> dict:
+        """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via trajectories.db.
+
+        ADR-0003 (M-01): a API passa o thread_id PERSISTIDO em pipeline_runs
+        (formato `run-{run_id}`); project_id/task_id seguem como fallback para
+        chamadas CLI/legadas (mesma regra do dispatch: project_id 'run-{uuid}'
+        já é a thread).
+        """
         if not self._trajectories_db().exists():
             raise RuntimeError(f"Nenhum banco de trajetórias encontrado em {self._trajectories_db()}")
         import asyncio
-        return asyncio.run(self._resume_async(project_id, task_id))
+        return asyncio.run(self._resume_async(project_id, task_id, thread_id))
 
-    async def _resume_async(self, project_id: str, task_id: str) -> dict:
+    async def _resume_async(self, project_id: str, task_id: str, thread_id: str | None = None) -> dict:
         """Resume assíncrono: aget_state/aupdate_state/astream sobre AsyncSqliteSaver."""
         from lf.pipeline.checkpointer import create_async_checkpointer
         checkpointer = create_async_checkpointer(self._trajectories_db())
         await checkpointer.setup()
         graph = self._get_graph(checkpointer=checkpointer)
-        thread_id = f"{project_id}-{task_id}"
+        # Mesma regra do dispatch (M-02): 'run-{uuid}' é a thread canônica da
+        # run; caso contrário deriva '{project_id}-{task_id}' (formato CLI).
+        if thread_id is None:
+            thread_id = project_id if project_id.startswith("run-") else f"{project_id}-{task_id}"
         config = {"configurable": {"thread_id": thread_id}}
 
         last_values: dict = {}
