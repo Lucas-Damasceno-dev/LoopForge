@@ -27,7 +27,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lf.api.auth import verify_authentication
@@ -542,28 +542,21 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             user=payload.user,
         )
         session.add(decision)
-        await session.commit()
-        await session.refresh(decision)
-
-        # C3 (M-12) action=adjust_state: persiste o state_patch na coluna
-        # aditiva (fora do ORM, garantida via SQL direto) para o dispatcher
-        # aplicar no checkpoint durante o polling do gate.
         if payload.state_patch is not None:
+            # C3 (M-12) action=adjust_state: persiste o state_patch na coluna
+            # aditiva (fora do ORM) no MESMO commit do INSERT — flush + UPDATE
+            # na mesma transação. Atomicidade é obrigatória: o polling do gate
+            # roda a cada 0.5s e, se a linha fosse visível com state_patch NULL
+            # antes do UPDATE, a decisão era consumida sem o patch (race real).
             db_path = _telemetry_db_path()
             _ensure_human_decisions_state_patch_column(db_path)
-            try:
-                conn = sqlite3.connect(str(db_path), timeout=10.0)
-                try:
-                    conn.execute("PRAGMA busy_timeout=5000")
-                    conn.execute(
-                        "UPDATE human_decisions SET state_patch = ? WHERE id = ?",
-                        (json.dumps(payload.state_patch, ensure_ascii=False), decision.id),
-                    )
-                    conn.commit()
-                finally:
-                    conn.close()
-            except Exception as exc:
-                logger.warning("Falha ao persistir state_patch da decisão %s: %s", decision.id, exc)
+            await session.flush()  # atribui decision.id (default _generate_uuid)
+            await session.execute(
+                text("UPDATE human_decisions SET state_patch = :sp WHERE id = :id"),
+                {"sp": json.dumps(payload.state_patch, ensure_ascii=False), "id": decision.id},
+            )
+        await session.commit()
+        await session.refresh(decision)
 
         # Emite evento via EventBus (persiste + broadcast) para notificar o
         # TaskDispatcher ou UI — M-06: só o EventBus publica no canal do run.
