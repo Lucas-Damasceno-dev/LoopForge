@@ -77,6 +77,7 @@ class TaskDispatcher:
         notify: bool = False,
         webhook_url: str | None = None,
         hitl_timeout_seconds: int | None = None,
+        hitl_on_timeout: str | None = None,
     ):
         self.mock_llm = mock_llm
         self.interactive = interactive
@@ -89,6 +90,16 @@ class TaskDispatcher:
 
             hitl_timeout_seconds = load_ade_config().hitl.timeout_seconds
         self.hitl_timeout_seconds = hitl_timeout_seconds
+        # C4 (M-11): comportamento ao esgotar o timeout do gate (fonte única
+        # ade.yaml hitl.on_timeout; continue/abort/pause).
+        if hitl_on_timeout is None:
+            from lf.config.loader import load_ade_config
+
+            hitl_on_timeout = load_ade_config().hitl.on_timeout
+        self.hitl_on_timeout = hitl_on_timeout
+        # C4 (M-11): gates HITL já anunciados (dedup do evento hitl_gate_reached
+        # por run+nó — re-entrada no MESMO gate não re-publica).
+        self._announced_hitl_gates: set[tuple[str, str]] = set()
         self._last_graph = None
         if self.circuit_breaker is None:
             self.circuit_breaker = CircuitBreaker(max_total_cost=_default_budget_usd())
@@ -294,9 +305,15 @@ class TaskDispatcher:
                     feedback_category TEXT,
                     feedback_message TEXT,
                     user TEXT DEFAULT 'human_operator',
-                    timestamp TEXT NOT NULL
+                    timestamp TEXT NOT NULL,
+                    state_patch TEXT
                 )
             """)
+            # C3 (M-12): migração aditiva da coluna state_patch — tabelas criadas
+            # pelo ORM (models.HumanDecisionModel) não declaram a coluna.
+            cols = {row[1] for row in cursor.execute("PRAGMA table_info(human_decisions)")}
+            if "state_patch" not in cols:
+                cursor.execute("ALTER TABLE human_decisions ADD COLUMN state_patch TEXT")
             conn.commit()
             conn.close()
         except Exception as e:
@@ -305,8 +322,9 @@ class TaskDispatcher:
     def _poll_remote_decision_once(self, run_id: str) -> dict | None:
         """Consulta única à tabela human_decisions por decisão remota.
 
-        Retorna {"action", "category", "message"} se houver decisão pendente
-        para o run_id, ou None caso contrário. Não bloqueia.
+        Retorna {"action", "category", "message", "state_patch"} se houver
+        decisão pendente para o run_id, ou None caso contrário. Não bloqueia.
+        ``state_patch`` (C3/M-12) é decodificado de JSON quando presente.
         """
         if not run_id or run_id in ("default-run", "test", "test-run", "test-thread"):
             return None
@@ -321,13 +339,20 @@ class TaskDispatcher:
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT action, feedback_category, feedback_message FROM human_decisions WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT action, feedback_category, feedback_message, state_patch "
+                "FROM human_decisions WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1",
                 (run_id,),
             )
             row = cursor.fetchone()
             conn.close()
             if row:
-                return {"action": row[0], "category": row[1], "message": row[2]}
+                result: dict = {"action": row[0], "category": row[1], "message": row[2]}
+                if row[3]:
+                    try:
+                        result["state_patch"] = json.loads(row[3])
+                    except json.JSONDecodeError:
+                        pass
+                return result
         except Exception as exc:
             logger.warning("Falha ao verificar decisão remota: %s", exc)
         return None
@@ -356,8 +381,13 @@ class TaskDispatcher:
         action: str,
         category: str | None = None,
         message: str | None = None,
+        state_patch: dict | None = None,
     ):
-        """Salva histórico de decisões humanas no SQLite."""
+        """Salva histórico de decisões humanas no SQLite.
+
+        ``state_patch`` (C3/M-12) é serializado em JSON na coluna aditiva
+        ``state_patch`` (garantida por _ensure_human_decisions_table).
+        """
         try:
             db_path = Path(".loopforge/telemetry.sqlite").resolve()
             self._ensure_human_decisions_table(db_path)
@@ -365,9 +395,12 @@ class TaskDispatcher:
             cursor = conn.cursor()
             decision_id = str(uuid.uuid4())
             now_iso = datetime.now(UTC).isoformat()
+            patch_json = json.dumps(state_patch, ensure_ascii=False) if state_patch else None
             cursor.execute(
-                "INSERT INTO human_decisions VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (decision_id, run_id, gate_node, action, category, message, "human_operator", now_iso),
+                "INSERT INTO human_decisions "
+                "(id, run_id, gate_node, action, feedback_category, feedback_message, user, timestamp, state_patch) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (decision_id, run_id, gate_node, action, category, message, "human_operator", now_iso, patch_json),
             )
             conn.commit()
             conn.close()
@@ -470,6 +503,30 @@ class TaskDispatcher:
         except Exception as exc:
             logger.warning("Falha ao gravar pipeline_runs (run %s): %s", run_id, exc)
 
+    def _apply_state_patch_to_checkpoint(self, app, config: dict, patch: dict) -> None:
+        """Aplica o state_patch ao estado do checkpoint (C3/M-12).
+
+        No caminho HITL síncrono o grafo é compilado com ``SqliteSaver``
+        (``aupdate_state`` lança NotImplementedError com saver síncrono), então
+        usa ``update_state`` direto — o mesmo padrão dos demais actions do gate
+        (retry/adjust_prompt). Para grafo compilado com ``AsyncSqliteSaver``
+        (padrão do resume async), delega ``aupdate_state`` a um loop dedicado
+        via ``asyncio.run`` (equivalente ao ``asyncio.to_thread`` do padrão
+        async).
+
+        NOTA (documentado): canais fora do ``GraphState`` TypedDict são
+        descartados pelo LangGraph — ``update_state`` só persiste chaves que são
+        canais declarados (idea, stack, routing_mode, requirements, code,
+        next_agent, etc.). Campos arbitrários não sobrevivem ao checkpoint.
+        """
+        if not patch:
+            return
+        saver_name = type(getattr(app, "checkpointer", None)).__name__
+        if "Async" in saver_name:
+            asyncio.run(app.aupdate_state(config, patch))
+        else:
+            app.update_state(config, patch)
+
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
         """Manipula interrupção humana (HITL) exibindo os artefatos do nó RECÉM-CONCLUÍDO e o gate do PRÓXIMO nó."""
         console = Console()
@@ -483,6 +540,23 @@ class TaskDispatcher:
         # Extrai o uuid para consultar a tabela pelo mesmo run_id que a API usa —
         # antes o polling usava o thread_id e nunca casava com a decisão remota.
         telemetry_run_id = self._resolve_telemetry_run_id(run_id)
+
+        # C4 (M-11): evento hitl_gate_reached na PRIMEIRA entrada do gate —
+        # dedup por (run, nó) evita re-publicação em re-entradas no mesmo gate.
+        if (telemetry_run_id, next_node) not in self._announced_hitl_gates:
+            self._announced_hitl_gates.add((telemetry_run_id, next_node))
+            self._broadcast_ws(
+                "hitl_gate_reached",
+                run_id,
+                {
+                    "gate_node": next_node,
+                    "thread_id": run_id,
+                    "run_id": telemetry_run_id,
+                    "timeout_seconds": self.hitl_timeout_seconds,
+                    "on_timeout": self.hitl_on_timeout,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
 
         if self.notify:
             title = f"⏸️ Pipeline Pausado — Gate antes de {next_node.upper()}"
@@ -603,8 +677,11 @@ class TaskDispatcher:
         console.print("  [blue]a[/blue] — Solicitar alterações / Ajustar Prompt (Request Changes)")
         console.print("  [red]x[/red] — Abortar pipeline")
 
+        timeout_mode = {"continue": "CONTINUAR", "abort": "ABORTAR", "pause": "AGUARDAR DECISÃO TARDIA"}.get(
+            self.hitl_on_timeout, "CONTINUAR"
+        )
         console.print(
-            f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: CONTINUAR)[/dim]"
+            f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: {timeout_mode})[/dim]"
         )
 
         # Lê tecla única (sem Enter) com poll remoto curto intercalado para

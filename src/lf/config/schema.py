@@ -105,6 +105,7 @@ class AdeMcpServer(BaseModel):
 
 class AdeBudget(BaseModel):
     """Fonte única do budget (M-08): alimenta o CircuitBreaker do dispatcher."""
+
     max_usd: float = Field(10.0, ge=0, description="Limite de custo em USD por run (fonte única via ade.yaml)")
 
 
@@ -115,6 +116,10 @@ class AdeProviders(BaseModel):
 
 class AdeHITL(BaseModel):
     timeout_seconds: int = 300
+    # C4 (M-11): comportamento ao esgotar o timeout do gate sem decisão.
+    # continue = transição graciosa (comportamento legado); abort = run falha
+    # controladamente; pause = gate permanece aberto aguardando decisão tardia.
+    on_timeout: Literal["continue", "abort", "pause"] = "continue"
 
 
 class AdeConfig(BaseModel):
