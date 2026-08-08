@@ -132,7 +132,17 @@ async def test_timeline_paginacao_after_seq_limit():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         run_id, _ = await _run_mock_pipeline(client, idea="Timeline paginação")
 
-        todos = (await client.get(f"/api/v1/runs/{run_id}/timeline")).json()["timeline"]
+        # Aguarda a timeline estabilizar: o status "completed" chega antes de
+        # eventos tardios (run_updated/pipeline_finished), o que mudaria o
+        # total_count no MEIO da paginação e quebraria a reconstrução final.
+        todos: list[dict] = []
+        for _ in range(30):
+            before = (await client.get(f"/api/v1/runs/{run_id}/timeline")).json()["timeline"]
+            await asyncio.sleep(0.2)
+            after = (await client.get(f"/api/v1/runs/{run_id}/timeline")).json()["timeline"]
+            if len(before) == len(after):
+                todos = after
+                break
         total = len(todos)
         assert total >= 10, f"esperado timeline com vários itens, veio {total}"
 
