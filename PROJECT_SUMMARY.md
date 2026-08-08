@@ -1,4 +1,4 @@
-# 📊 Project Executive Summary: Criar sistema de tarefas
+# 📊 Project Executive Summary: Corrigir bug na função de cálculo de impostos
 
 ![QA Status](https://img.shields.io/badge/QA-PASS-brightgreen)
 ![Security Audit](https://img.shields.io/badge/AppSec-PASS-brightgreen)
