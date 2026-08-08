@@ -5,9 +5,13 @@ persistido na tabela ``events`` (telemetry.sqlite) e broadcastado via WebSocket
 no formato ``{seq, event, run_id, timestamp, payload}`` (03-contratos-api.md).
 O backfill REST (GET /runs/{id}/events) consumirá ``list_events``.
 """
+
 import asyncio
+import json
+import logging
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy import JSON, DateTime, Integer, String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +20,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from lf.api import database
 from lf.api.database import Base
 from lf.api.websocket_manager import ws_manager
+
+logger = logging.getLogger(__name__)
 
 
 def _generate_uuid() -> str:
@@ -37,6 +43,61 @@ class Event(Base):
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+
+
+def _load_checkpoints_for_thread(thread_id: str) -> list[dict]:
+    """Carrega os checkpoints LangGraph do thread (C5/M-02), para rodar em to_thread.
+
+    Lê a tabela ``checkpoints`` de ``.loopforge/trajectories.db`` (o MESMO banco
+    do AsyncSqliteSaver da ADE) usando a conexão do ``SqliteSaver`` síncrono
+    (factory ``create_sync_checkpointer`` em checkpointer.py) e desserializa o
+    blob ``checkpoint`` (msgpack via ``serde.loads_typed``) e o ``metadata``
+    (JSON puro). Sem banco, sem thread ou em erro de leitura → lista vazia
+    (telemetria nunca derruba o request).
+    """
+    db_path = Path(".loopforge/trajectories.db").resolve()
+    if not db_path.exists():
+        return []
+    try:
+        from lf.pipeline.checkpointer import create_sync_checkpointer
+
+        saver = create_sync_checkpointer(db_path)
+        try:
+            saver.setup()
+            cursor = saver.conn.cursor()
+            cursor.execute(
+                "SELECT checkpoint_id, parent_checkpoint_id, type, checkpoint, metadata "
+                "FROM checkpoints WHERE thread_id = ? ORDER BY checkpoint_id ASC",
+                (thread_id,),
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+        finally:
+            saver.conn.close()
+
+        items: list[dict] = []
+        for checkpoint_id, parent_checkpoint_id, cp_type, checkpoint_blob, metadata_blob in rows:
+            try:
+                checkpoint = saver.serde.loads_typed((cp_type, checkpoint_blob))
+            except Exception:
+                checkpoint = {}
+            try:
+                metadata = json.loads(metadata_blob) if metadata_blob else {}
+            except Exception:
+                metadata = {}
+            items.append(
+                {
+                    "checkpoint_id": checkpoint_id,
+                    "parent_checkpoint_id": parent_checkpoint_id,
+                    "type": cp_type,
+                    "metadata": metadata,
+                    "checkpoint": dict(checkpoint),
+                }
+            )
+        return items
+    except Exception as exc:
+        logger.warning("Falha ao ler checkpoints da thread %s: %s", thread_id, exc)
+        return []
 
 
 class EventBus:
@@ -114,6 +175,82 @@ class EventBus:
             result = await session.execute(stmt)
             events = result.scalars().all()
         return [self._to_envelope(e) for e in events]
+
+    async def get_timeline(self, run_id: str, after_seq: int = 0, limit: int = 100) -> dict:
+        """Timeline unificada da run (C5/M-02): eventos do journal + checkpoints.
+
+        Intercala os dois streams (eventos da tabela ``events`` + checkpoints do
+        LangGraph na thread canônica ``run-{id}``, ADR-0003) ordenado por
+        timestamp. Cada item da timeline tem ``{seq, type, timestamp, node,
+        data}`` — ``seq`` é a posição 1-based na lista MERGED; ``type`` é
+        ``"event"`` ou ``"checkpoint"``; ``node`` vem do payload/metadata quando
+        disponível; ``data`` é o payload do evento OU o checkpoint inteiro
+        serializado (checkpoint_id, parent_checkpoint_id, type, metadata,
+        checkpoint).
+
+        ``after_seq``/``limit`` paginam a timeline merged e o retorno segue o
+        padrão do backfill de events: ``{run_id, timeline, total_count,
+        has_more, next_after_seq}``.
+        """
+        # Query 1: TODOS os eventos do journal (a paginação acontece pós-merge).
+        events = await self.list_events(run_id, after_seq=0, limit=10**9)
+        # Query 2: checkpoints LangGraph da thread canônica da run (em to_thread).
+        checkpoints = await asyncio.to_thread(_load_checkpoints_for_thread, f"run-{run_id}")
+
+        merged: list[dict] = []
+        for env in events:
+            merged.append(
+                {
+                    "type": "event",
+                    "timestamp": env["timestamp"],
+                    "node": env["payload"].get("node"),
+                    "data": env["payload"],
+                    "_sort": (env["timestamp"], 0, env["seq"]),
+                }
+            )
+        for cp in checkpoints:
+            ts = (cp["checkpoint"] or {}).get("ts") or ""
+            merged.append(
+                {
+                    "type": "checkpoint",
+                    "timestamp": ts,
+                    "node": cp["metadata"].get("node"),
+                    "data": cp,
+                    "_sort": (ts, 1, cp["checkpoint_id"]),
+                }
+            )
+
+        # Intercala por timestamp (eventos antes de checkpoints no mesmo instante)
+        # e deduplica itens idênticos (type+timestamp+data), se houver.
+        merged.sort(key=lambda item: item["_sort"])
+        timeline: list[dict] = []
+        seen: set[tuple] = set()
+        for item in merged:
+            dedup_key = (
+                item["type"],
+                item["timestamp"],
+                json.dumps(item["data"], sort_keys=True, default=str),
+            )
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+            item.pop("_sort")
+            timeline.append(item)
+
+        for idx, item in enumerate(timeline, start=1):
+            item["seq"] = idx
+
+        total_count = len(timeline)
+        page = [item for item in timeline if item["seq"] > after_seq][:limit]
+        has_more = after_seq + len(page) < total_count
+        next_after_seq = page[-1]["seq"] if page and has_more else None
+        return {
+            "run_id": run_id,
+            "timeline": page,
+            "total_count": total_count,
+            "has_more": has_more,
+            "next_after_seq": next_after_seq,
+        }
 
 
 event_bus = EventBus()
