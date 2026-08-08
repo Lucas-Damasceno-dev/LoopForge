@@ -12,8 +12,8 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import HTTPException
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
