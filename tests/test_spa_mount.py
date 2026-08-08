@@ -19,10 +19,16 @@ INDEX_CONTENT = "<html><body><h1>LoopForge SPA</h1></body></html>"
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def setup_test_db():
-    """Configura banco SQLite limpo para cada teste (padrão de test_api.py)."""
+async def setup_test_db(tmp_path, monkeypatch):
+    """Configura banco SQLite limpo para cada teste (padrão de test_api.py).
+
+    Endurecido com chdir(tmp_path): o DB fica isolado por teste, evitando a
+    contenção de arquivo quando outras lanes rodam pytest no mesmo repo em
+    paralelo (sqlite3.OperationalError: disk I/O error).
+    """
     from lf.api.database import Base, engine
 
+    monkeypatch.chdir(tmp_path)
     os.environ["LF_API_TEST"] = "1"
     os.environ["LF_API_REQUIRE_AUTH"] = "false"
     db_file = ".loopforge/test_api.sqlite"
