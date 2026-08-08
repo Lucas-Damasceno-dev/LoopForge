@@ -65,3 +65,27 @@ class HumanDecisionResponse(BaseModel):
     timestamp: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CostBudget(BaseModel):
+    """Budget efetivo de uma run (M-08/M-10): fonte única ade.yaml + overrides."""
+    max_usd: float
+    percent_used: float
+
+
+class CostResponse(BaseModel):
+    """Custo acumulado de uma run em llm_costs + estado do budget (M-08/M-10)."""
+    run_id: str
+    spent_usd: float
+    estimated: bool
+    budget: CostBudget
+    budget_warning: bool
+
+
+class BudgetOverrideRequest(BaseModel):
+    """Corpo do POST /runs/{id}/cost/override (M-10)."""
+    max_usd: float | None = Field(
+        None,
+        gt=0,
+        description="Novo limite de budget em USD; ausente/nulo = usa ade.yaml budget.max_usd",
+    )

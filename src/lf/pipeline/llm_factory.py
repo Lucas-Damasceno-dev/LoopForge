@@ -182,10 +182,37 @@ class CostTracker:
                     prompt_tokens INTEGER NOT NULL,
                     completion_tokens INTEGER NOT NULL,
                     cost_usd REAL NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    run_id TEXT,
+                    node TEXT,
+                    estimated INTEGER DEFAULT 0
                 )
                 """
             )
+            self._apply_additive_migration(conn)
+
+    @staticmethod
+    def _apply_additive_migration(conn) -> None:
+        """Migração aditiva de ``llm_costs`` (M-08/M-09).
+
+        Adiciona ``run_id``, ``node`` e ``estimated`` quando ausentes (detecção
+        via PRAGMA table_info + ALTER TABLE) — mesma técnica idempotente de
+        ``_apply_pipeline_runs_additive_migration`` em lf/api/database.py, mas
+        SEM tocar naquele módulo (outro lane). Rodar N vezes é seguro; em DBs
+        com schema novo (CREATE acima já com as colunas) é read-only.
+        """
+        try:
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(llm_costs)")}
+            if "run_id" not in columns:
+                conn.execute("ALTER TABLE llm_costs ADD COLUMN run_id TEXT")
+            if "node" not in columns:
+                conn.execute("ALTER TABLE llm_costs ADD COLUMN node TEXT")
+            if "estimated" not in columns:
+                conn.execute("ALTER TABLE llm_costs ADD COLUMN estimated INTEGER DEFAULT 0")
+        except Exception as exc:
+            # Tabela recém-criada ou sem permissão: o CREATE já cobre o schema
+            # novo; não deve quebrar o rastreamento por causa da migração.
+            logger.warning("Migração aditiva de llm_costs não aplicada: %s", exc)
 
     @staticmethod
     def _count_tokens(text: str, model: str = "") -> int:
@@ -216,6 +243,9 @@ class CostTracker:
         response_text: str,
         prompt_tokens: int | None = None,
         completion_tokens: int | None = None,
+        run_id: str | None = None,
+        node: str | None = None,
+        estimated: bool = False,
     ) -> float:
         if prompt_tokens is None:
             prompt_tokens = self._count_tokens(prompt_text, model)
@@ -227,8 +257,9 @@ class CostTracker:
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "INSERT INTO llm_costs (model, prompt_tokens, completion_tokens, cost_usd) VALUES (?, ?, ?, ?)",
-                (model, prompt_tokens, completion_tokens, cost),
+                "INSERT INTO llm_costs (model, prompt_tokens, completion_tokens, cost_usd, run_id, node, estimated) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (model, prompt_tokens, completion_tokens, cost, run_id, node, 1 if estimated else 0),
             )
         return cost
 
@@ -308,6 +339,10 @@ class OpenRouterProvider(BaseLLMProvider):
         # Passa token counts reais da API se disponíveis
         pt = usage.get("prompt_tokens") if usage else None
         ct = usage.get("completion_tokens") if usage else None
+        # M-08/M-09: run_id/node não estão disponíveis neste caller (o estado
+        # do pipeline não carrega run_id; o plumbing run_id→nó é feito no
+        # dispatcher/app em outra lane). Ficam None — o custo ainda entra no
+        # ledger agregado de llm_costs, sem dimensão de run.
         CostTracker().track(model, full_prompt, text, prompt_tokens=pt, completion_tokens=ct)
         if schema_model:
             try:
@@ -418,6 +453,9 @@ class NativeLLMProvider(BaseLLMProvider):
         # Payload final consolidado -> cache (requisito: nunca deltas)
         if cache:
             llm_cache.set(full_prompt, text)
+        # M-08/M-09: run_id/node indisponíveis neste caller (ver comentário em
+        # OpenRouterProvider.generate) — ficam None, custo real sem dimensão
+        # de run até o plumbing run_id→nó (outra lane).
         with contextlib.suppress(Exception):
             CostTracker().track(model, full_prompt, text)
         return text

@@ -18,6 +18,7 @@ from ...guardrails.circuit_breaker import CircuitBreaker
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 from ...runner.opencode.runner import DEFAULT_OPENCODE_MODEL
+from langgraph.types import interrupt
 
 logger = logging.getLogger(__name__)
 
@@ -283,6 +284,29 @@ def developer(state: GraphState) -> dict:
 
     default_main = _get_default_filename_by_stack(stack)
 
+    # M-10 (hard-stop = PAUSA, não falha): checa o budget ANTES de qualquer
+    # caminho (inclusive o short-circuit mock) para o gate valer em toda run.
+    # CircuitBreaker vem do estado como snapshot serializável (canal
+    # `circuit_breaker` do GraphState, fonte única ade.yaml via dispatcher).
+    cb_data = state.get("circuit_breaker")
+    cb = CircuitBreaker.from_snapshot(cb_data) if isinstance(cb_data, dict) else cb_data
+    if cb is not None:
+        cb.record_iteration()
+        if cb.budget_exceeded:
+            print("--- CIRCUIT BREAKER: orçamento excedido — run PAUSADA (hard-stop M-10) ---")
+            # Interrompe o grafo no próprio nó developer: o checkpoint fica
+            # PENDENTE em 'developer' (next != vazio) — a run NÃO falha e pode
+            # ser retomada via resume após POST /cost/override (que aplica o
+            # novo limite ao CircuitBreaker do estado). Ao retomar, o nó
+            # re-executa do topo com o CB atualizado e segue o fluxo normal.
+            interrupt({
+                "paused_budget": True,
+                "reason": "budget_exceeded",
+                "node": "developer",
+                "max_usd": cb.max_total_cost,
+                "spent_usd": cb.total_cost,
+            })
+
     if state.get("mock_llm"):
         print(f"--- INFO: Developer modo MOCK (stack decidida pelo TL: {stack}) ---")
         contract_tests = state.get("contract_tests", "")
@@ -412,18 +436,6 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     user_prompt = "\n".join(prompt_parts)
 
     print(f"--- Chamando LLM Engine (Stack TL: {stack}, Model: {model_name})... ---")
-    cb_data = state.get("circuit_breaker")
-    cb = CircuitBreaker.from_snapshot(cb_data) if isinstance(cb_data, dict) else cb_data
-    if cb is not None:
-        cb.record_iteration()
-        if cb.budget_exceeded:
-            print("--- CIRCUIT BREAKER: orçamento excedido, abortando iteração do Developer ---")
-            return {
-                **state,
-                "attempt_count": attempt_count,
-                "next_agent": "parallel_audit",
-                "error": "Circuit breaker acionado: custo estimado excedeu o limite de budget.",
-            }
     try:
         raw = call_llm_via_opencode(
             system_prompt=system_prompt,

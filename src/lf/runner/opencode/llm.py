@@ -58,8 +58,16 @@ def call_llm_via_opencode(
         return mock_text
 
     # Circuit breaker check antes de spawnar subprocesso
-    if circuit_breaker is not None and not circuit_breaker.can_proceed():
-        raise RuntimeError("Circuit breaker is open - cannot proceed")
+    if circuit_breaker is not None:
+        # M-08: o estado do grafo carrega o CircuitBreaker como SNAPSHOT (dict)
+        # serializável (canal `circuit_breaker` do GraphState). Reconstrói a
+        # instância para o can_proceed() funcionar — antes o dict chegava aqui
+        # e o enforcement do CB ficava morto nos nós.
+        if isinstance(circuit_breaker, dict):
+            from ...guardrails.circuit_breaker import CircuitBreaker
+            circuit_breaker = CircuitBreaker.from_snapshot(circuit_breaker)
+        if not circuit_breaker.can_proceed():
+            raise RuntimeError("Circuit breaker is open - cannot proceed")
 
     # Monta prompt final com instrução de formato
     if schema_model:
@@ -91,6 +99,7 @@ Responda SOMENTE o objeto JSON puro."""
     )
 
     raw_response_text = ""
+    used_subprocess = False
     with _console.status(f"⏳ Consultando LLM ({display_model})...", spinner="dots"):
         if openrouter_key:
             model_name = model or DEFAULT_OPENROUTER_MODEL
@@ -107,12 +116,30 @@ Responda SOMENTE o objeto JSON puro."""
                 if not result.success:
                     raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
                 raw_response_text = result.clean_stdout
+                used_subprocess = True
         else:
             runner = OpenCodeRunner()
             result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
             if not result.success:
                 raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
             raw_response_text = result.clean_stdout
+            used_subprocess = True
+
+    # M-09: custo ESTIMADO do path OpenCode subprocess (não havia registro —
+    # o hard-stop de budget ficava cego exatamente quando mais importa). Usa o
+    # mesmo padrão do CostTracker (tiktoken/chars fallback) com estimated=True.
+    # Falha de tracking nunca quebra a chamada LLM (contextlib.suppress).
+    if used_subprocess:
+        try:
+            from ...pipeline.llm_factory import CostTracker
+            CostTracker().track(
+                model=display_model,
+                prompt_text=full_prompt,
+                response_text=raw_response_text,
+                estimated=True,
+            )
+        except Exception:
+            pass
 
     # Tenta extrair JSON
     if schema_model:
