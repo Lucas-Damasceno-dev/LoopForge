@@ -9,8 +9,10 @@ from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from lf.api.auth import verify_authentication
 
 
 class TrajectoryStep(BaseModel):
@@ -31,7 +33,11 @@ class TrajectoryEnvelope(BaseModel):
     events: list[dict[str, Any]] = Field(default_factory=list)
 
 
-trajectories_router = APIRouter(prefix="/api/v1/trajectories", tags=["Trajectories"])
+trajectories_router = APIRouter(
+    prefix="/api/v1/trajectories",
+    tags=["Trajectories"],
+    dependencies=[Depends(verify_authentication)],  # M-03: auth em todas as rotas
+)
 
 
 def _trajectories_db() -> Path:

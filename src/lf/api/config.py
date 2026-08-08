@@ -1,4 +1,5 @@
 """Configuração oficial da API REST e Web UI do LoopForge."""
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -64,11 +65,20 @@ class APISettings(BaseSettings):
     api_key: str | None = None
     require_auth: bool = False
 
+    # CORS (M-04): default "*" (wildcard). LF_CORS_ORIGINS lista origens
+    # separadas por vírgula, ex.: "http://localhost:5173,https://app.example.com".
+    cors_origins: str = "*"
+
     # Pool de conexões (usado quando PostgreSQL for fornecido)
     db_pool_size: int = 5
     db_max_overflow: int = 10
 
     model_config = {"env_prefix": "LF_API_", "env_file": ".env", "extra": "ignore"}
+
+    def cors_origins_list(self) -> list[str]:
+        """Origens CORS efetivas (env LF_CORS_ORIGINS ou default do settings)."""
+        raw = os.getenv("LF_CORS_ORIGINS") or self.cors_origins
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
 def get_api_settings() -> APISettings:

@@ -1,10 +1,15 @@
 """Endpoints de provedores LLM (auto-descoberta)."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from lf.api.auth import verify_authentication
 from lf.config.loader import load_ade_config
 from lf.pipeline.providers.ollama import OllamaProvider
 
-providers_router = APIRouter(prefix="/api/v1/providers", tags=["Providers"])
+providers_router = APIRouter(
+    prefix="/api/v1/providers",
+    tags=["Providers"],
+    dependencies=[Depends(verify_authentication)],  # M-03: auth em todas as rotas
+)
 
 
 @providers_router.get("/ollama/models")

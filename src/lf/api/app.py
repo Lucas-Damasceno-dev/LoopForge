@@ -2,8 +2,10 @@
 
 Expõe endpoints REST, WebSockets autenticados para streaming e Web Dashboard UI.
 """
+import asyncio
 import os
 import time
+from collections import deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -13,6 +15,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -26,6 +29,7 @@ from lf.api.auth import verify_authentication
 from lf.api.config import get_api_settings
 from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
+from lf.api.events import event_bus
 from lf.api.models import HumanDecisionModel, PipelineRun
 from lf.api.schemas import (
     HealthResponse,
@@ -48,6 +52,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
+class RunQueueState:
+    """Estado da fila de execução E3 (M-21): 1 run ativa + FIFO de runs `queued`.
+
+    ``pending`` guarda os run_ids na ordem de chegada; ``active`` é a run em
+    execução (ou None); ``params`` guarda os parâmetros de execução (idea,
+    stack, mock_llm, routing_mode, interactive) — o PipelineRun não persiste
+    esses campos, então são retidos em memória até a promoção.
+    """
+
+    def __init__(self) -> None:
+        self.pending: deque[str] = deque()
+        self.active: str | None = None
+        self.lock = asyncio.Lock()
+        self.params: dict[str, dict] = {}
+
+
+def _mark_legacy(response: Response) -> None:
+    """Marca a resposta como rota legada /api/runs* (M-18): Sunset + Deprecation."""
+    response.headers["Sunset"] = "2026-12-31"
+    response.headers["Deprecation"] = "true"
+
+
 def create_app(ui_enabled: bool | None = None) -> FastAPI:
     """Factory da aplicação FastAPI oficial do LoopForge.
 
@@ -63,11 +89,17 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # ─── Middleware: CORS ───────────────────────────────────────────
+    # Estado da fila E3 (M-21) — 1 run ativa + fila FIFO (por instância da app)
+    app.state.run_queue = RunQueueState()
+
+    # ─── Middleware: CORS (M-04) ───────────────────────────────────
+    # Origens de LF_CORS_ORIGINS (vírgula) ou default ["*"]. Wildcard não
+    # combina com allow_credentials=True (inválido/ignorado em browsers).
+    cors_origins = settings.cors_origins_list()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=cors_origins,
+        allow_credentials="*" not in cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -132,22 +164,12 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             ws_manager.disconnect(websocket)
 
     # ─── CRUD & Execução de Runs ──────────────────────────────────
-    @app.post(
-        "/api/runs",
-        response_model=RunResponse,
-        status_code=201,
-        tags=["Runs"],
-        dependencies=[Depends(verify_authentication)],
-    )
-    async def create_run(
-        payload: RunCreate,
-        session: AsyncSession = Depends(get_session),
-    ):
-        """Cria e dispara uma nova execução de pipeline em segundo plano."""
+    async def _create_run_impl(payload: RunCreate, session: AsyncSession) -> PipelineRun:
+        """Cria a run como `queued` e a enfileira na fila E3 (M-21)."""
         run = PipelineRun(
             idea=payload.idea,
             stack=payload.stack,
-            status="pending",
+            status="queued",
         )
         session.add(run)
         await session.commit()
@@ -161,20 +183,48 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
                 "status": run.status,
             }
         )
+        await event_bus.publish(run.id, "run_updated", {"status": "queued"})
 
-        import asyncio
-        asyncio.create_task(
-            _execute_pipeline_in_background(
-                run_id=run.id,
-                idea=payload.idea,
-                stack=payload.stack,
-                mock_llm=payload.mock_llm,
-                routing_mode=payload.routing_mode,
-                interactive=payload.interactive,
-            )
+        # Enfileira e promove se houver vaga. O await garante que a resposta
+        # reflete o status real (running se promoveu, queued se há run ativa).
+        await _execute_pipeline_in_background(
+            app,
+            run_id=run.id,
+            idea=run.idea,
+            stack=run.stack,
+            mock_llm=payload.mock_llm,
+            routing_mode=payload.routing_mode,
+            interactive=payload.interactive,
         )
-
+        await session.refresh(run)
         return run
+
+    @app.post(
+        "/api/v1/runs",
+        response_model=RunResponse,
+        status_code=201,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def create_run_v1(payload: RunCreate, session: AsyncSession = Depends(get_session)):
+        """Rota canônica (M-18): cria e enfileira uma nova run."""
+        return await _create_run_impl(payload, session)
+
+    @app.post(
+        "/api/runs",
+        response_model=RunResponse,
+        status_code=201,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def create_run_legacy(
+        payload: RunCreate,
+        response: Response,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Alias legado de POST /api/v1/runs (M-18): delega e marca Sunset."""
+        _mark_legacy(response)
+        return await _create_run_impl(payload, session)
 
     @app.post(
         "/api/runs/{run_id}/execute",
@@ -191,38 +241,26 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         if not run:
             raise HTTPException(status_code=404, detail="Run not found")
 
-        import asyncio
-        asyncio.create_task(
-            _execute_pipeline_in_background(
-                run_id=run.id,
-                idea=run.idea,
-                stack=run.stack,
-            )
+        await _execute_pipeline_in_background(
+            app,
+            run_id=run.id,
+            idea=run.idea,
+            stack=run.stack,
         )
 
         return run
 
-    @app.post(
-        "/api/runs/{run_id}/resume",
-        response_model=RunResponse,
-        tags=["Runs"],
-        dependencies=[Depends(verify_authentication)],
-    )
-    async def resume_run(
-        run_id: str,
-        session: AsyncSession = Depends(get_session),
-    ):
-        """Retoma uma execução de pipeline interrompida a partir do último checkpoint."""
+    async def _resume_run_impl(run_id: str, session: AsyncSession) -> PipelineRun:
+        """Retoma uma execução interrompida usando o thread_id persistido (M-01)."""
         run = await session.get(PipelineRun, run_id)
         if not run:
             raise HTTPException(status_code=404, detail="Run not found")
 
-        import asyncio
         target_id = run.id
         # M-01/ADR-0003: usa o thread_id PERSISTIDO no PipelineRun (fonte
         # canônica), em vez de reconstruir 'project'/'run-{id}' à mão. Fallback
         # 'run-{id}' cobre runs recém-criadas cujo dispatch ainda não persistiu
-        # a coluna (mesmo valor que será gravado em _execute_pipeline_in_background).
+        # a coluna (mesmo valor gravado por _promote_next/_execute_pipeline_in_background).
         thread_id = run.thread_id or f"run-{target_id}"
 
         def _sync_resume():
@@ -259,18 +297,33 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         asyncio.create_task(_resume_in_bg())
         return run
 
-    @app.get(
-        "/api/runs",
-        response_model=RunListResponse,
+    @app.post(
+        "/api/v1/runs/{run_id}/resume",
+        response_model=RunResponse,
         tags=["Runs"],
         dependencies=[Depends(verify_authentication)],
     )
-    async def list_runs(
-        skip: int = Query(0, ge=0),
-        limit: int = Query(20, ge=1, le=100),
+    async def resume_run_v1(run_id: str, session: AsyncSession = Depends(get_session)):
+        """Rota canônica (M-18): retoma do último checkpoint (thread_id persistido)."""
+        return await _resume_run_impl(run_id, session)
+
+    @app.post(
+        "/api/runs/{run_id}/resume",
+        response_model=RunResponse,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def resume_run_legacy(
+        run_id: str,
+        response: Response,
         session: AsyncSession = Depends(get_session),
     ):
-        """Lista execuções de pipeline com paginação."""
+        """Alias legado de POST /api/v1/runs/{id}/resume (M-18)."""
+        _mark_legacy(response)
+        return await _resume_run_impl(run_id, session)
+
+    async def _list_runs_impl(skip: int, limit: int, session: AsyncSession) -> RunListResponse:
+        """Lista execuções de pipeline com paginação (expoe status queued)."""
         total_query = select(func.count(PipelineRun.id))
         total_result = await session.execute(total_query)
         total = total_result.scalar_one()
@@ -284,17 +337,65 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         return RunListResponse(items=list(runs), total=total)
 
     @app.get(
+        "/api/v1/runs",
+        response_model=RunListResponse,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def list_runs_v1(
+        skip: int = Query(0, ge=0),
+        limit: int = Query(20, ge=1, le=100),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Rota canônica (M-18): lista paginada de runs."""
+        return await _list_runs_impl(skip, limit, session)
+
+    @app.get(
+        "/api/runs",
+        response_model=RunListResponse,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def list_runs_legacy(
+        response: Response,
+        skip: int = Query(0, ge=0),
+        limit: int = Query(20, ge=1, le=100),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Alias legado de GET /api/v1/runs (M-18)."""
+        _mark_legacy(response)
+        return await _list_runs_impl(skip, limit, session)
+
+    async def _get_run_impl(run_id: str, session: AsyncSession) -> PipelineRun:
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return run
+
+    @app.get(
+        "/api/v1/runs/{run_id}",
+        response_model=RunResponse,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def get_run_v1(run_id: str, session: AsyncSession = Depends(get_session)):
+        """Rota canônica (M-18): detalhes de uma run."""
+        return await _get_run_impl(run_id, session)
+
+    @app.get(
         "/api/runs/{run_id}",
         response_model=RunResponse,
         tags=["Runs"],
         dependencies=[Depends(verify_authentication)],
     )
-    async def get_run(run_id: str, session: AsyncSession = Depends(get_session)):
-        """Retorna detalhes de uma execução específica."""
-        run = await session.get(PipelineRun, run_id)
-        if not run:
-            raise HTTPException(status_code=404, detail="Run not found")
-        return run
+    async def get_run_legacy(
+        run_id: str,
+        response: Response,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Alias legado de GET /api/v1/runs/{id} (M-18)."""
+        _mark_legacy(response)
+        return await _get_run_impl(run_id, session)
 
     @app.patch(
         "/api/runs/{run_id}",
@@ -345,18 +446,9 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         await session.commit()
 
 
-    @app.post(
-        "/api/runs/{run_id}/decide",
-        response_model=HumanDecisionResponse,
-        status_code=201,
-        tags=["Human-in-the-Loop"],
-        dependencies=[Depends(verify_authentication)],
-    )
-    async def record_human_decision(
-        run_id: str,
-        payload: HumanDecisionCreate,
-        session: AsyncSession = Depends(get_session),
-    ):
+    async def _record_decision_impl(
+        run_id: str, payload: HumanDecisionCreate, session: AsyncSession
+    ) -> HumanDecisionModel:
         """Registra decisão humana (HITL) vinda da Web Dashboard UI ou CLI."""
         decision = HumanDecisionModel(
             run_id=run_id,
@@ -384,6 +476,38 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         )
 
         return decision
+
+    @app.post(
+        "/api/v1/runs/{run_id}/decide",
+        response_model=HumanDecisionResponse,
+        status_code=201,
+        tags=["Human-in-the-Loop"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def record_human_decision_v1(
+        run_id: str,
+        payload: HumanDecisionCreate,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Rota canônica (M-18): registra decisão humana para a run."""
+        return await _record_decision_impl(run_id, payload, session)
+
+    @app.post(
+        "/api/runs/{run_id}/decide",
+        response_model=HumanDecisionResponse,
+        status_code=201,
+        tags=["Human-in-the-Loop"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def record_human_decision_legacy(
+        run_id: str,
+        payload: HumanDecisionCreate,
+        response: Response,
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Alias legado de POST /api/v1/runs/{id}/decide (M-18)."""
+        _mark_legacy(response)
+        return await _record_decision_impl(run_id, payload, session)
 
     @app.get(
         "/api/runs/{run_id}/decisions",
@@ -458,44 +582,113 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     app.include_router(providers_router)
 
     # ─── Config API (ADE Fase 1) ─────────────────────────────────────
+    # Auth aplicada no include (config.py não importa auth no módulo para
+    # evitar ciclo: auth.py importa APISettings deste módulo — M-03).
     from lf.api.config import config_router
 
-    app.include_router(config_router)
+    app.include_router(config_router, dependencies=[Depends(verify_authentication)])
 
     return app
 
 
+async def _set_run_status(run_id: str, status: str, **extra) -> None:
+    """Persiste o status (e campos extras) do PipelineRun e publica run_updated (M-21)."""
+    from lf.api.database import session_factory
+    from lf.api.models import PipelineRun
+
+    if session_factory:
+        async with session_factory() as session:
+            run = await session.get(PipelineRun, run_id)
+            if run:
+                run.status = status
+                for key, value in extra.items():
+                    setattr(run, key, value)
+                await session.commit()
+    await event_bus.publish(run_id, "run_updated", {"status": status})
+
+
+async def _promote_next(app: FastAPI) -> None:
+    """Promove a próxima run da fila (FIFO) para `running` e dispara a execução.
+
+    M-21 (E3): no máximo 1 run ativa. A execução roda em background e, no
+    término (finally em `_run_pipeline`), chama `_promote_next` de novo.
+    """
+    q = app.state.run_queue
+    async with q.lock:
+        if q.active is not None or not q.pending:
+            return
+        run_id = q.pending.popleft()
+        q.active = run_id
+        params = q.params.pop(run_id, {})
+
+    idea = params.get("idea", "")
+    stack = params.get("stack", "python")
+    mock_llm = params.get("mock_llm", False)
+    routing_mode = params.get("routing_mode", "full")
+    interactive = params.get("interactive", False)
+
+    # M-02/ADR-0003: thread canônica `run-{id}` persistida junto da promoção.
+    await _set_run_status(run_id, "running", thread_id=f"run-{run_id}", parent_run_id=run_id)
+
+    asyncio.create_task(
+        _run_pipeline(
+            app,
+            run_id=run_id,
+            idea=idea,
+            stack=stack,
+            mock_llm=mock_llm,
+            routing_mode=routing_mode,
+            interactive=interactive,
+        )
+    )
+
+
 async def _execute_pipeline_in_background(
+    app: FastAPI,
     run_id: str,
     idea: str,
     stack: str,
     mock_llm: bool = False,
     routing_mode: str = "full",
     interactive: bool = False,
-):
-    """Executa a pipeline assincronamente em segundo plano e atualiza o estado da Run no DB."""
-    import asyncio
+) -> None:
+    """Enfileira a run na fila E3 (FIFO) e dispara a promoção se houver vaga.
+
+    M-21: runs novas nascem `queued` e só executam quando a anterior terminar.
+    Idempotente: uma run já ativa/enfileirada não é enfileirada de novo.
+    """
+    q = app.state.run_queue
+    async with q.lock:
+        if run_id == q.active or run_id in q.pending:
+            return
+        q.params[run_id] = {
+            "idea": idea,
+            "stack": stack,
+            "mock_llm": mock_llm,
+            "routing_mode": routing_mode,
+            "interactive": interactive,
+        }
+        q.pending.append(run_id)
+    await _promote_next(app)
+
+
+async def _run_pipeline(
+    app: FastAPI,
+    run_id: str,
+    idea: str,
+    stack: str,
+    mock_llm: bool = False,
+    routing_mode: str = "full",
+    interactive: bool = False,
+) -> None:
+    """Executa a pipeline de uma run JÁ promovida; no fim, promove a próxima da fila."""
     import os
     import time
 
-    from lf.api.database import session_factory
-    from lf.api.models import PipelineRun
     from lf.config.schema import TaskSchema
     from lf.orchestrator.task_dispatcher import TaskDispatcher
 
     start_time = time.time()
-
-    if session_factory:
-        async with session_factory() as session:
-            run = await session.get(PipelineRun, run_id)
-            if run:
-                run.status = "running"
-                # M-02/ADR-0003: persiste a thread canônica `run-{run_id}` que o
-                # dispatcher usa no dispatch (resume/UI leem a coluna, nunca a
-                # convenção de string). parent_run_id guarda a run de origem.
-                run.thread_id = f"run-{run_id}"
-                run.parent_run_id = run_id
-                await session.commit()
 
     task = TaskSchema(
         id=f"task-{run_id[:8]}",
@@ -539,15 +732,13 @@ async def _execute_pipeline_in_background(
         final_status = "completed" if (not err and tests_failed == 0) else "failed"
         log_msg = err if err else f"Pipeline concluída em {duration}s. Testes com falha: {tests_failed}"
 
-        if session_factory:
-            async with session_factory() as session:
-                run = await session.get(PipelineRun, run_id)
-                if run:
-                    run.status = final_status
-                    run.current_node = final_state.get("next_agent", "FINISH")
-                    run.duration_seconds = duration
-                    run.logs = log_msg
-                    await session.commit()
+        await _set_run_status(
+            run_id,
+            final_status,
+            current_node=final_state.get("next_agent", "FINISH"),
+            duration_seconds=duration,
+            logs=log_msg,
+        )
 
         await ws_manager.broadcast({
             "event": "pipeline_finished",
@@ -557,18 +748,21 @@ async def _execute_pipeline_in_background(
         })
     except Exception as e:
         duration = round(time.time() - start_time, 2)
-        if session_factory:
-            async with session_factory() as session:
-                run = await session.get(PipelineRun, run_id)
-                if run:
-                    run.status = "failed"
-                    run.duration_seconds = duration
-                    run.logs = f"Erro na execução da pipeline: {e}"
-                    await session.commit()
-
+        await _set_run_status(
+            run_id,
+            "failed",
+            duration_seconds=duration,
+            logs=f"Erro na execução da pipeline: {e}",
+        )
         await ws_manager.broadcast({
             "event": "pipeline_error",
             "run_id": run_id,
             "error": str(e),
         })
+    finally:
+        # M-21: libera a vaga e promove a próxima da fila (FIFO).
+        q = app.state.run_queue
+        async with q.lock:
+            q.active = None
+        await _promote_next(app)
 

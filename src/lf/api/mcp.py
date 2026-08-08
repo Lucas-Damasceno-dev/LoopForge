@@ -1,11 +1,16 @@
 """Endpoints MCP da ADE (lista de servidores e ferramentas)."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from lf.api.auth import verify_authentication
 from lf.config.loader import load_ade_config
 from lf.mcp.permissions import MCPUnavailable
 from lf.mcp.registry import MCPRegistry
 
-mcp_router = APIRouter(prefix="/api/v1/mcp", tags=["MCP"])
+mcp_router = APIRouter(
+    prefix="/api/v1/mcp",
+    tags=["MCP"],
+    dependencies=[Depends(verify_authentication)],  # M-03: auth em todas as rotas
+)
 
 
 def _registry() -> MCPRegistry:
