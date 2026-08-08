@@ -9,14 +9,14 @@
 
 ## Test & Verify
 
-- Active test suite: `tests/` (32 files).
+- Active test suite: `tests/` (63 files).
 - Local & CI: `pytest tests/`. CI targets `tests/`.
 - CI pipeline order: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests/`.
 - CI matrix: Python 3.11 + 3.12.
 
 ## Architecture
 
-- LangGraph `StateGraph` with nodes: **CPO → PM → Tech Lead → Developer → QA → Parallel Audit (AppSec + DevOps concurrently) → Lessons**.
+- LangGraph `StateGraph` with nodes: **CPO → PM → Tech Lead → Test Writer → Developer → QA → Parallel Audit (AppSec + DevOps concurrently)** — `NodeRegistry` em `src/lf/pipeline/graph.py`: cpo, pm, tech_lead, test_writer, developer, qa, appsec, devops, parallel_audit. `lessons` **não é nó**: é função/artefato (`generate_lessons_md` em `src/lf/pipeline/nodes/lessons.py`) executado dentro do nó `parallel_audit`.
 - Two routing modes (decided by `entry_router` in `graph.py`):
   - **full**: CPO→PM→TL→Dev→QA→Audit (default for features)
   - **fast**: Developer→QA→Audit (for bugfix/refactor/simple tasks)
@@ -29,7 +29,7 @@
 
 | Path | Role |
 |---|---|
-| `src/lf/pipeline/nodes/*.py` | One file per agent persona (cpo, pm, tech_lead, developer, qa, appsec, devops, parallel_audit, lessons) |
+| `src/lf/pipeline/nodes/*.py` | One file per agent persona (cpo, pm, tech_lead, test_writer, developer, qa, appsec, devops, parallel_audit) + `lessons.py` (função `generate_lessons_md` chamada por `parallel_audit`) |
 | `src/lf/orchestrator/task_dispatcher.py` | `dispatch()` invokes graph, `resume()` from checkpoint, HITL handler |
 | `src/lf/runner/opencode/runner.py` | `OpenCodeRunner` — spawns `opencode` subprocess via `script -q -c` |
 | `src/lf/runner/harness/runner.py` | `TestHarnessRunner` — auto-detects test command from manifests |
@@ -48,7 +48,7 @@
 ## Runtime Config & Data
 
 - Config: `.loopforge.json` — loaded/saved by `src/lf/config/loader.py` (supports JSON and YAML).
-- Checkpoints: `.loopforge/checkpoints.sqlite` (LangGraph `SqliteSaver`).
+- Checkpoints (trajectories): `.loopforge/trajectories.db` (LangGraph `AsyncSqliteSaver` — ativo desde a ADE). `.loopforge/checkpoints.sqlite` (~66 MB) é arquivo **legado** da época do `SqliteSaver`: o engine não o usa mais; NÃO apagar, apenas ignorar (`.loopforge/` é gitignored).
 - LLM cache: `.loopforge/llm_cache.sqlite` (SHA256 keyed by prompt, shared with `SQLiteLLMCache`).
 - Telemetry: `.loopforge/telemetry.sqlite`.
 - Ontology: `examples/the-foundry/` (The Foundry — personas, schemas, state machine).
@@ -82,7 +82,7 @@ QA node uses `TestHarnessRunner` to run tests.
 - **Language**: Portuguese for docs, comments, CLI output — maintain this.
 - **Console output**: Uses `rich` (Console, Table, Syntax, Prompt).
 - **Events**: `lf run` emits WebSocket events (`pipeline_started`, `node_execution`, `pipeline_finished`).
-- **Resume**: `lf resume` or `lf run --resume <task_id>` — loads checkpoint from `.loopforge/checkpoints.sqlite`.
+- **Resume**: `lf resume` or `lf run --resume <task_id>` — loads checkpoint from `.loopforge/trajectories.db`.
 - **Circuit breaker** in `TaskDispatcher` gates on `max_total_cost` from config `budget_limit_usd`.
 - **Worktrees** managed in `.slim/worktrees/` — git worktrees for isolated feature work.
 - **CI**: Ruff select rules are `E,F,W,I,N,UP,SIM` only. Mypy scans `src/lf` only. Coverage threshold: 75%.
