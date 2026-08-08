@@ -69,14 +69,18 @@ async def _next_nodes_of_thread(thread_id: str) -> list[str]:
 
 
 async def _wait_status(client: AsyncClient, run_id: str, timeout: float = 30.0) -> str:
-    """Poll GET /api/runs/{id} até a run sair de pending/running."""
+    """Poll GET /api/runs/{id} até a run sair de pending/running.
+
+    n2b (M-10): ``paused`` também é estado terminal — o hard-stop de budget
+    agora marca a run como ``paused`` no DB (antes ficava ``completed``).
+    """
     waited = 0.0
     status = "pending"
     while waited < timeout:
         resp = await client.get(f"/api/runs/{run_id}")
         assert resp.status_code == 200
         status = resp.json()["status"]
-        if status in ("completed", "failed"):
+        if status in ("completed", "failed", "paused"):
             return status
         await asyncio.sleep(0.2)
         waited += 0.2
