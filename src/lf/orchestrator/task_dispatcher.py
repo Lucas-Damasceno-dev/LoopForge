@@ -19,7 +19,7 @@ from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
 
-from lf.api.websocket_manager import ws_manager
+from lf.api.events import event_bus
 from lf.config.schema import TaskSchema
 from lf.guardrails.circuit_breaker import CircuitBreaker
 from lf.ontology.state_machine.definition import TaskState
@@ -154,22 +154,52 @@ class TaskDispatcher:
 
         return state
 
-    def _broadcast_ws(self, event_type: str, task_id: str, payload: dict):
-        """Emite evento via WebSocket manager para conectividade em tempo real."""
+    def _broadcast_ws(self, event_type: str, task_id: str, payload: dict, thread_id: str | None = None):
+        """Emite evento via EventBus (A3/M-05): persiste no journal + broadcast envelope v1.
+
+        O EventBus é o emissor único — não há mais chamada direta ao
+        ws_manager aqui. O evento é persistido na tabela ``events`` e
+        broadcastado como envelope v1 ``{seq, event, run_id, timestamp,
+        payload}`` (ADR-0002). O ``task_id`` é mantido DENTRO do payload (a
+        SPA consome até o B1).
+
+        O ``run_id`` do journal é derivado do ``thread_id`` via
+        ``_resolve_telemetry_run_id``: no fluxo API o thread é ``run-{uuid}``
+        e o journal fica chaveado pelo uuid (a mesma chave do GET
+        /api/v1/runs/{id}/events e de human_decisions). Call sites sem
+        thread_id (ex.: CLI legada) caem no ``task_id`` tal qual.
+
+        Retorna a Task agendada quando há loop ativo (o caller async pode
+        aguardá-la via ``_publish_event_async`` para garantir persistência em
+        ordem de seq); retorna None em contexto síncrono (o publish roda
+        bloqueante via ``asyncio.run``).
+        """
+        run_id = self._resolve_telemetry_run_id(thread_id or task_id)
         try:
-            message = {
-                "event": event_type,
-                "task_id": task_id,
-                "timestamp": datetime.now(UTC).isoformat(),
-                **payload,
-            }
+            loop = asyncio.get_running_loop()
+            return loop.create_task(
+                event_bus.publish(run_id, event_type, {**payload, "task_id": task_id})
+            )
+        except RuntimeError:
             try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(ws_manager.broadcast(message))
-            except RuntimeError:
-                asyncio.run(ws_manager.broadcast(message))
-        except Exception as exc:
-            logger.warning("Falha ao transmitir evento WS: %s", exc)
+                asyncio.run(event_bus.publish(run_id, event_type, {**payload, "task_id": task_id}))
+            except Exception as exc:
+                logger.warning("Falha ao publicar evento via EventBus: %s", exc)
+            return None
+
+    async def _publish_event_async(self, event_type: str, task_id: str, payload: dict, thread_id: str | None = None) -> None:
+        """Aguarda a publicação do evento (seq ordenado e sem fire-and-forget).
+
+        Usado pelos caminhos async (_dispatch_async/_resume_async): o await na
+        Task agendada por _broadcast_ws evita o race de seq do create_task
+        solto (COUNT+1 concorrente gerava seq duplicados/fora de ordem).
+        """
+        scheduled = self._broadcast_ws(event_type, task_id, payload, thread_id=thread_id)
+        if isinstance(scheduled, (asyncio.Task, asyncio.Future)):
+            try:
+                await scheduled
+            except Exception as exc:
+                logger.warning("Falha ao publicar evento via EventBus: %s", exc)
 
     def _get_input_with_timeout(self, prompt_text: str, timeout: int = 300) -> str:
         """Lê input com suporte a timeout no Unix/Linux."""
@@ -664,16 +694,16 @@ class TaskDispatcher:
             graph = self._get_graph(checkpointer=checkpointer)
             config = {"configurable": {"thread_id": thread_id}}
 
-            self._broadcast_ws("pipeline_started", task_id, {"idea": initial_state.get("idea"), "node": initial_state.get("next_agent")})
+            await self._publish_event_async("pipeline_started", task_id, {"idea": initial_state.get("idea"), "node": initial_state.get("next_agent")}, thread_id=thread_id)
 
             async for event in graph.astream(initial_state, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
-                        self._broadcast_ws("node_execution", task_id, {
+                        await self._publish_event_async("node_execution", task_id, {
                             "node": node_name,
                             "status": "completed",
                             **self._safe_output(output),
-                        })
+                        }, thread_id=thread_id)
 
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
@@ -685,10 +715,10 @@ class TaskDispatcher:
 
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
-            self._broadcast_ws(final_event, task_id, {
+            await self._publish_event_async(final_event, task_id, {
                 "status": final_status,
                 "error": result.get("error"),
-            })
+            }, thread_id=thread_id)
 
             if self.notify:
                 status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
@@ -698,7 +728,7 @@ class TaskDispatcher:
             return result
 
         except Exception as e:
-            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)})
+            await self._publish_event_async("pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id)
             return {**initial_state, "error": str(e), "status": "failed"}
 
         finally:
@@ -717,7 +747,7 @@ class TaskDispatcher:
         config = {"configurable": {"thread_id": thread_id}}
         task_id = task.id
 
-        self._broadcast_ws("pipeline_started", task_id, {"idea": task.title, "node": initial_state.get("next_agent")})
+        self._broadcast_ws("pipeline_started", task_id, {"idea": task.title, "node": initial_state.get("next_agent")}, thread_id=thread_id)
 
         try:
             for event in graph.stream(initial_state, config):
@@ -727,7 +757,7 @@ class TaskDispatcher:
                             "node": node_name,
                             "status": "completed",
                             **self._safe_output(output),
-                        })
+                        }, thread_id=thread_id)
 
             if self.interactive:
                 snapshot = graph.get_state(config)
@@ -742,7 +772,7 @@ class TaskDispatcher:
                                     "node": node_name,
                                     "status": "completed",
                                     **self._safe_output(output),
-                                })
+                                }, thread_id=thread_id)
                     snapshot = graph.get_state(config)
 
             state_snapshot = graph.get_state(config)
@@ -758,7 +788,7 @@ class TaskDispatcher:
             self._broadcast_ws(final_event, task_id, {
                 "status": final_status,
                 "error": result.get("error"),
-            })
+            }, thread_id=thread_id)
 
             if self.notify:
                 status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
@@ -768,7 +798,7 @@ class TaskDispatcher:
             return result
 
         except Exception as e:
-            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)})
+            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id)
             return {**initial_state, "error": str(e), "status": "failed"}
 
         finally:
@@ -813,34 +843,34 @@ class TaskDispatcher:
 
             await graph.aupdate_state(config, {"error": None})
 
-            self._broadcast_ws("pipeline_resumed", task_id, {
+            await self._publish_event_async("pipeline_resumed", task_id, {
                 "thread_id": thread_id,
                 "resuming_from_node": resuming_node,
-            })
+            }, thread_id=thread_id)
 
             async for event in graph.astream(None, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
-                        self._broadcast_ws("node_execution", task_id, {
+                        await self._publish_event_async("node_execution", task_id, {
                             "node": node_name,
                             "status": "completed",
                             **self._safe_output(output),
-                        })
+                        }, thread_id=thread_id)
 
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
-            self._broadcast_ws(final_event, task_id, {
+            await self._publish_event_async(final_event, task_id, {
                 "status": final_status,
                 "error": result.get("error"),
-            })
+            }, thread_id=thread_id)
 
             return result
 
         except Exception as e:
-            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)})
+            await self._publish_event_async("pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id)
             return {**last_values, "error": str(e), "status": "failed"}
 
         finally:

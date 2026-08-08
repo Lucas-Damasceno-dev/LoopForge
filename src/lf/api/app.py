@@ -144,7 +144,10 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
 
-        await ws_manager.connect(websocket)
+        # M-06: /ws/runs/{run_id} registra canal FILTRADO por run
+        # (ws_manager.connect(run_id, ws)); /ws/streaming segue global
+        # (run_id=None → connect(ws) legado).
+        await ws_manager.connect(run_id, websocket)
         try:
             await ws_manager.send_personal_message(
                 {
@@ -159,9 +162,9 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
                 if data.get("type") == "ping":
                     await ws_manager.send_personal_message({"type": "pong"}, websocket)
         except WebSocketDisconnect:
-            ws_manager.disconnect(websocket)
+            ws_manager.disconnect(run_id, websocket)
         except Exception:
-            ws_manager.disconnect(websocket)
+            ws_manager.disconnect(run_id, websocket)
 
     # ─── CRUD & Execução de Runs ──────────────────────────────────
     async def _create_run_impl(payload: RunCreate, session: AsyncSession) -> PipelineRun:
@@ -175,13 +178,10 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         await session.commit()
         await session.refresh(run)
 
-        await ws_manager.broadcast(
-            {
-                "event": "run_created",
-                "run_id": run.id,
-                "idea": run.idea,
-                "status": run.status,
-            }
+        await event_bus.publish(
+            run.id,
+            "run_created",
+            {"idea": run.idea, "status": run.status},
         )
         await event_bus.publish(run.id, "run_updated", {"status": "queued"})
 
@@ -445,6 +445,49 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         await session.delete(run)
         await session.commit()
 
+    async def _list_run_events_impl(
+        run_id: str, after_seq: int, limit: int, session: AsyncSession
+    ) -> dict:
+        """Backfill M-06: envelopes v1 persistidos da run, em ordem de seq."""
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        events = await event_bus.list_events(run_id, after_seq=after_seq, limit=limit)
+        # next_after_seq = último seq retornado quando o limite foi atingido
+        # (pode haver mais páginas); None quando não há mais eventos.
+        next_after_seq = events[-1]["seq"] if events and len(events) == limit else None
+        return {"run_id": run_id, "events": events, "next_after_seq": next_after_seq}
+
+    @app.get(
+        "/api/v1/runs/{run_id}/events",
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def list_run_events_v1(
+        run_id: str,
+        after_seq: int = Query(0, ge=0),
+        limit: int = Query(200, ge=1, le=1000),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Rota canônica (M-06): backfill de eventos persistidos da run."""
+        return await _list_run_events_impl(run_id, after_seq, limit, session)
+
+    @app.get(
+        "/api/runs/{run_id}/events",
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def list_run_events_legacy(
+        run_id: str,
+        response: Response,
+        after_seq: int = Query(0, ge=0),
+        limit: int = Query(200, ge=1, le=1000),
+        session: AsyncSession = Depends(get_session),
+    ):
+        """Alias legado de GET /api/v1/runs/{id}/events (M-18)."""
+        _mark_legacy(response)
+        return await _list_run_events_impl(run_id, after_seq, limit, session)
+
 
     async def _record_decision_impl(
         run_id: str, payload: HumanDecisionCreate, session: AsyncSession
@@ -462,17 +505,18 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         await session.commit()
         await session.refresh(decision)
 
-        # Emite evento via WebSocket para notificar o TaskDispatcher ou UI
-        await ws_manager.broadcast(
+        # Emite evento via EventBus (persiste + broadcast) para notificar o
+        # TaskDispatcher ou UI — M-06: só o EventBus publica no canal do run.
+        await event_bus.publish(
+            run_id,
+            "human_decision_submitted",
             {
-                "event": "human_decision_submitted",
-                "run_id": run_id,
                 "gate_node": decision.gate_node,
                 "action": decision.action,
                 "feedback_category": decision.feedback_category,
                 "feedback_message": decision.feedback_message,
                 "user": decision.user,
-            }
+            },
         )
 
         return decision
@@ -588,6 +632,11 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     app.include_router(config_router, dependencies=[Depends(verify_authentication)])
 
+    # ─── Costs (Fase A, n4 — M-08/M-10) ──────────────────────────────
+    from lf.api.costs import costs_router
+
+    app.include_router(costs_router, dependencies=[Depends(verify_authentication)])
+
     return app
 
 
@@ -672,6 +721,35 @@ async def _execute_pipeline_in_background(
     await _promote_next(app)
 
 
+async def _checkpoint_next_nodes(thread_id: str) -> list[str]:
+    """Nós PENDENTES do checkpoint da thread (vazio = run terminou).
+
+    M-10: o hard-stop de budget PAUSA o grafo via ``interrupt()`` do LangGraph
+    (developer.py) — a run NÃO falha; o checkpoint fica com ``next != []``
+    (pendente no nó que interrompeu). Verificado empiricamente: o dispatch NÃO
+    expõe ``__interrupt__`` no estado retornado (``state_snapshot.values`` não
+    o contém), então a detecção confiável é consultar o saver (trajectories.db).
+    """
+    from pathlib import Path
+
+    from lf.pipeline.checkpointer import create_async_checkpointer
+    from lf.pipeline.graph import build_graph
+
+    db_path = Path(".loopforge/trajectories.db").resolve()
+    if not db_path.exists():
+        return []
+    saver = create_async_checkpointer(db_path)
+    try:
+        await saver.setup()
+        graph = build_graph(checkpointer=saver)
+        snap = await graph.aget_state({"configurable": {"thread_id": thread_id}})
+        return list(snap.next) if snap else []
+    except Exception:
+        return []
+    finally:
+        await saver.conn.close()
+
+
 async def _run_pipeline(
     app: FastAPI,
     run_id: str,
@@ -730,22 +808,39 @@ async def _run_pipeline(
         )
 
         final_status = "completed" if (not err and tests_failed == 0) else "failed"
+        current_node = final_state.get("next_agent", "FINISH")
         log_msg = err if err else f"Pipeline concluída em {duration}s. Testes com falha: {tests_failed}"
+
+        # M-10: hard-stop de budget = PAUSA (interrupt no grafo) — detecta pelo
+        # checkpoint com next != [] (mecanismo documentado em
+        # _checkpoint_next_nodes). NÃO quebra o caminho normal (completed) nem
+        # o de erro (failed): só o caminho "success" passa pela checagem.
+        if final_status == "completed" and not err:
+            pending = await _checkpoint_next_nodes(f"run-{run_id}")
+            if pending:
+                final_status = "paused"
+                current_node = pending[0]
+                log_msg = (
+                    f"Run pausada no nó {pending[0]} (budget excedido) — "
+                    "use POST /cost/override + /resume para retomar"
+                )
 
         await _set_run_status(
             run_id,
             final_status,
-            current_node=final_state.get("next_agent", "FINISH"),
+            current_node=current_node,
             duration_seconds=duration,
             logs=log_msg,
         )
 
-        await ws_manager.broadcast({
-            "event": "pipeline_finished",
-            "run_id": run_id,
-            "status": final_status,
-            "duration_seconds": duration,
-        })
+        await event_bus.publish(
+            run_id,
+            "pipeline_finished",
+            {
+                "status": final_status,
+                "duration_seconds": duration,
+            },
+        )
     except Exception as e:
         duration = round(time.time() - start_time, 2)
         await _set_run_status(
@@ -754,11 +849,11 @@ async def _run_pipeline(
             duration_seconds=duration,
             logs=f"Erro na execução da pipeline: {e}",
         )
-        await ws_manager.broadcast({
-            "event": "pipeline_error",
-            "run_id": run_id,
-            "error": str(e),
-        })
+        await event_bus.publish(
+            run_id,
+            "pipeline_error",
+            {"error": str(e)},
+        )
     finally:
         # M-21: libera a vaga e promove a próxima da fila (FIFO).
         q = app.state.run_queue
