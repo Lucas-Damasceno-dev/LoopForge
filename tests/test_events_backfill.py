@@ -172,7 +172,7 @@ async def test_events_legacy_alias_headers():
 async def test_events_401_sem_key(monkeypatch):
     """Auth ligada: GET /events sem X-API-Key → 401."""
     monkeypatch.setenv("LF_API_REQUIRE_AUTH", "true")
-    monkeypatch.setenv("LF_API_KEY", "segredo")
+    monkeypatch.setenv("LF_API_API_KEY", "segredo")  # APISettings: env_prefix LF_API_
     app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/api/v1/runs/qualquer/events")

@@ -55,7 +55,7 @@ async def setup_test_db():
             os.remove(f)
     os.environ.pop("LF_API_TEST", None)
     os.environ.pop("LF_API_REQUIRE_AUTH", None)
-    os.environ.pop("LF_API_KEY", None)
+    os.environ.pop("LF_API_API_KEY", None)
 
 
 def _collect_events(ws, timeout: float = 25.0) -> list[dict]:
@@ -83,7 +83,7 @@ def _collect_events(ws, timeout: float = 25.0) -> list[dict]:
 def test_ws_run_channel_receives_only_run_events(monkeypatch):
     """/ws/runs/{run_id} (com token) recebe SÓ envelopes v1 daquele run, seq incremental."""
     monkeypatch.setenv("LF_API_REQUIRE_AUTH", "true")
-    monkeypatch.setenv("LF_API_KEY", "test-key")
+    monkeypatch.setenv("LF_API_API_KEY", "test-key")  # APISettings: env_prefix LF_API_
     app = create_app()
     headers = {"X-API-Key": "test-key"}
 
@@ -164,7 +164,7 @@ def test_ws_streaming_global_receives_same_events():
 def test_ws_run_channel_rejeita_token_invalido(monkeypatch):
     """Auth ligada: token errado em /ws/runs/{run_id} é rejeitado (1008)."""
     monkeypatch.setenv("LF_API_REQUIRE_AUTH", "true")
-    monkeypatch.setenv("LF_API_KEY", "token-certo")
+    monkeypatch.setenv("LF_API_API_KEY", "token-certo")
     app = create_app()
 
     with TestClient(app) as tc:
