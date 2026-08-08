@@ -690,13 +690,41 @@ class TaskDispatcher:
         # inválidas (\r, \n, '') são ignoradas e a espera continua; (c) entre
         # leituras faz poll remoto curto; (d) sai no deadline global
         # (hitl_timeout_seconds) ou quando houver decisão (local ou remota).
+        #
+        # C4 (M-11) on_timeout no esgotamento do deadline:
+        #   continue = transição graciosa (legado, human_decision_expired);
+        #   abort    = run falha controladamente (pipeline_failed, sem LLM);
+        #   pause    = NÃO consome LLM, mantém o gate aberto re-aguardando a
+        #              decisão tardia. gate_started (timestamp do início do
+        #              gate) + flag timeout_elapsed distinguem 'expirado mas
+        #              aguardando' de 'nunca expirou'.
         choice: str | None = None
         remote_decision: dict | None = None
-        deadline = time.monotonic() + self.hitl_timeout_seconds
+        gate_started = time.monotonic()
+        deadline = gate_started + self.hitl_timeout_seconds
+        timeout_elapsed = False
+        pause_announced = False
         poll_interval = 0.5
         valid_choices = ("c", "r", "a", "x")
         prompt_text = "➜ Escolha [c/r/a/x] (default: c): "
-        while time.monotonic() < deadline:
+        while True:
+            if time.monotonic() >= deadline:
+                if self.hitl_on_timeout == "pause":
+                    # Expirou MAS o gate permanece aberto (deadline vira
+                    # infinito — não expira de novo). O timestamp do início
+                    # do gate (gate_started) é a referência que distingue a
+                    # decisão tardia ('expirado mas aguardando') da que veio
+                    # dentro do prazo ('nunca expirou').
+                    if not pause_announced:
+                        pause_announced = True
+                        console.print(
+                            "\n[yellow]⏰ Tempo limite esgotado (on_timeout=pause). "
+                            "Gate permanece aberto aguardando decisão tardia...[/yellow]"
+                        )
+                    deadline = float("inf")
+                else:
+                    timeout_elapsed = True
+                    break
             raw_choice = self._get_single_key_with_timeout(prompt_text, poll_interval)
             prompt_text = ""
             if raw_choice in valid_choices:
@@ -708,12 +736,39 @@ class TaskDispatcher:
 
         if choice is None:
             if remote_decision:
-                choice_map = {"approve": "c", "retry": "r", "adjust_prompt": "a", "abort": "x"}
+                choice_map = {
+                    "approve": "c",
+                    "retry": "r",
+                    "adjust_prompt": "a",
+                    "adjust_state": "as",
+                    "abort": "x",
+                }
                 choice = choice_map.get(remote_decision["action"], "c")
                 console.print(
                     f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]"
                 )
-            else:
+            elif timeout_elapsed and self.hitl_on_timeout == "abort":
+                # C4 (M-11) on_timeout=abort: run falha CONTROLADAMENTE sem
+                # consumir LLM (nenhum nó é re-agendado). O estado final é
+                # marcado como failed via update_state para o dispatcher
+                # persistir status failed em pipeline_runs.
+                reason = "hitl_timeout_abort"
+                console.print(
+                    f"\n[red]⏰ Tempo limite esgotado e on_timeout=abort: abortando pipeline ({reason}).[/red]"
+                )
+                self._broadcast_ws(
+                    "pipeline_failed",
+                    run_id,
+                    {
+                        "motivo": reason,
+                        "node": next_node,
+                        "timeout_seconds": self.hitl_timeout_seconds,
+                        "run_status": "failed",
+                    },
+                )
+                app.update_state(config, {"error": "HITL timeout sem decisão — abortado (on_timeout=abort)."})
+                return False
+            elif timeout_elapsed:
                 # Timeout expirado sem decisão -> transição GRACIOSA (E10/F1-13):
                 # NÃO aborta; continua a pipeline e marca a run como decision_expired.
                 # NÃO grava em human_decisions (nenhuma decisão humana real foi
