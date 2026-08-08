@@ -63,12 +63,12 @@ async def test_dashboard_ui(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_create_run(client: AsyncClient):
-    """POST /api/runs deve criar uma nova run."""
+    """POST /api/runs deve criar uma nova run (fila E3: promovida a running)."""
     resp = await client.post("/api/runs", json={"idea": "Build a login page"})
     assert resp.status_code == 201
     data = resp.json()
     assert data["idea"] == "Build a login page"
-    assert data["status"] == "pending"
+    assert data["status"] == "running"
     assert data["stack"] == "python"
     assert "id" in data
 
