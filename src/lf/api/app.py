@@ -48,6 +48,8 @@ from lf.api.schemas import (
 from lf.api.spa import mount_spa
 from lf.api.websocket_manager import ws_manager
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -78,6 +80,41 @@ def _mark_legacy(response: Response) -> None:
     """Marca a resposta como rota legada /api/runs* (M-18): Sunset + Deprecation."""
     response.headers["Sunset"] = "2026-12-31"
     response.headers["Deprecation"] = "true"
+
+
+def _telemetry_db_path() -> Path:
+    """Caminho do banco de telemetria resolvido em call-time (regra do database.py).
+
+    LF_API_TEST -> .loopforge/test_api.sqlite; caso contrário o default da API
+    (sqlite+aiosqlite:///.loopforge/telemetry.sqlite). O dispatcher polla
+    telemetry.sqlite no mesmo padrão — os dois precisam enxergar a MESMA
+    tabela human_decisions para o polling do gate casar com o POST /decide.
+    """
+    if os.getenv("LF_API_TEST"):
+        return Path(".loopforge/test_api.sqlite").resolve()
+    return Path(".loopforge/telemetry.sqlite").resolve()
+
+
+def _ensure_human_decisions_state_patch_column(db_path: Path) -> None:
+    """Garante a coluna aditiva ``state_patch`` em human_decisions (C3/M-12).
+
+    O modelo ORM ``HumanDecisionModel`` (models.py, fora do escopo da ADE) não
+    declara a coluna — ela é adicionada via SQL direto com o mesmo espírito da
+    migração aditiva de pipeline_runs em database.py. Telemetria: nunca derruba
+    o request (try/except + warning).
+    """
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        try:
+            conn.execute("PRAGMA busy_timeout=5000")
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(human_decisions)")}
+            if "state_patch" not in cols:
+                conn.execute("ALTER TABLE human_decisions ADD COLUMN state_patch TEXT")
+                conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning("Falha ao garantir coluna state_patch em human_decisions: %s", exc)
 
 
 def create_app(ui_enabled: bool | None = None) -> FastAPI:
@@ -508,19 +545,38 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         await session.commit()
         await session.refresh(decision)
 
+        # C3 (M-12) action=adjust_state: persiste o state_patch na coluna
+        # aditiva (fora do ORM, garantida via SQL direto) para o dispatcher
+        # aplicar no checkpoint durante o polling do gate.
+        if payload.state_patch is not None:
+            db_path = _telemetry_db_path()
+            _ensure_human_decisions_state_patch_column(db_path)
+            try:
+                conn = sqlite3.connect(str(db_path), timeout=10.0)
+                try:
+                    conn.execute("PRAGMA busy_timeout=5000")
+                    conn.execute(
+                        "UPDATE human_decisions SET state_patch = ? WHERE id = ?",
+                        (json.dumps(payload.state_patch, ensure_ascii=False), decision.id),
+                    )
+                    conn.commit()
+                finally:
+                    conn.close()
+            except Exception as exc:
+                logger.warning("Falha ao persistir state_patch da decisão %s: %s", decision.id, exc)
+
         # Emite evento via EventBus (persiste + broadcast) para notificar o
         # TaskDispatcher ou UI — M-06: só o EventBus publica no canal do run.
-        await event_bus.publish(
-            run_id,
-            "human_decision_submitted",
-            {
-                "gate_node": decision.gate_node,
-                "action": decision.action,
-                "feedback_category": decision.feedback_category,
-                "feedback_message": decision.feedback_message,
-                "user": decision.user,
-            },
-        )
+        event_payload: dict = {
+            "gate_node": decision.gate_node,
+            "action": decision.action,
+            "feedback_category": decision.feedback_category,
+            "feedback_message": decision.feedback_message,
+            "user": decision.user,
+        }
+        if payload.state_patch is not None:
+            event_payload["state_patch"] = payload.state_patch
+        await event_bus.publish(run_id, "human_decision_submitted", event_payload)
 
         return decision
 
