@@ -4,11 +4,15 @@ Expõe endpoints REST, WebSockets autenticados para streaming e Web Dashboard UI
 """
 
 import asyncio
+import json
+import logging
 import os
+import sqlite3
 import time
 from collections import deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import (
     Depends,
