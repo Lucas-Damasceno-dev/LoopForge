@@ -235,7 +235,7 @@ async def test_cost_endpoint_sums_warning_and_estimated(tmp_path, monkeypatch):
     tracker.track("default", "", "", prompt_tokens=1000, completion_tokens=0, run_id=run_id, node="developer")
     tracker.track("default", "", "", prompt_tokens=1000, completion_tokens=0, run_id=run_id, node="qa", estimated=True)
 
-    app = create_app()
+    app = _app_with_costs()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(f"/api/v1/runs/{run_id}/cost")
         assert resp.status_code == 200
