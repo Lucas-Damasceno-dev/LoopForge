@@ -15,11 +15,15 @@ KEY = "teste-key-123"
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_auth_env(tmp_path, monkeypatch):
-    """Auth ativada (LF_API_REQUIRE_AUTH=true + LF_API_KEY) em tmp_path."""
+    """Auth ativada (LF_API_REQUIRE_AUTH=true + LF_API_API_KEY) em tmp_path.
+
+    O APISettings usa env_prefix "LF_API_", então a chave lida pelo pydantic é
+    LF_API_API_KEY (mesma convenção usada por lf serve — cli/commands/serve.py).
+    """
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("LF_API_TEST", "1")
     monkeypatch.setenv("LF_API_REQUIRE_AUTH", "true")
-    monkeypatch.setenv("LF_API_KEY", KEY)
+    monkeypatch.setenv("LF_API_API_KEY", KEY)
     await init_db()
     yield
     await close_db()
