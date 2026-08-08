@@ -219,16 +219,11 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
         import asyncio
         target_id = run.id
-        # M-01/ADR-0003: usa o thread_id PERSISTIDO no PipelineRun (fonte
-        # canônica), em vez de reconstruir 'project'/'run-{id}' à mão. Fallback
-        # 'run-{id}' cobre runs recém-criadas cujo dispatch ainda não persistiu
-        # a coluna (mesmo valor que será gravado em _execute_pipeline_in_background).
-        thread_id = run.thread_id or f"run-{target_id}"
 
         def _sync_resume():
             from lf.orchestrator.task_dispatcher import TaskDispatcher
             dispatcher = TaskDispatcher()
-            return dispatcher.resume(thread_id=thread_id)
+            return dispatcher.resume(project_id="project", task_id=f"run-{target_id}")
 
         async def _resume_in_bg():
             from lf.api.database import session_factory
@@ -490,11 +485,6 @@ async def _execute_pipeline_in_background(
             run = await session.get(PipelineRun, run_id)
             if run:
                 run.status = "running"
-                # M-02/ADR-0003: persiste a thread canônica `run-{run_id}` que o
-                # dispatcher usa no dispatch (resume/UI leem a coluna, nunca a
-                # convenção de string). parent_run_id guarda a run de origem.
-                run.thread_id = f"run-{run_id}"
-                run.parent_run_id = run_id
                 await session.commit()
 
     task = TaskSchema(
