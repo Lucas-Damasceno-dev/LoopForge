@@ -121,7 +121,7 @@ def test_budget_pause_dispatcher_and_resume_after_override(tmp_path, monkeypatch
 async def test_budget_hard_stop_pause_override_resume_e2e():
     """E2E via API: run pausada por budget, override e resume (M-08/M-10)."""
     _write_ade_budget(Path.cwd(), 0.01)
-    app = create_app()
+    app = _app_with_costs()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.post(
             "/api/runs",
