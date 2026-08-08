@@ -10,6 +10,7 @@ pelo CostTracker em lf/pipeline/llm_factory.py) — por isso as rotas leem o
 arquivo direto (resolvido em call-time, mesmo padrão do CostTracker), enquanto
 a existência da run vem do ORM (session).
 """
+
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lf.api.auth import verify_authentication
 from lf.api.database import get_session
 from lf.api.models import PipelineRun
-from lf.api.schemas import BudgetOverrideRequest, CostResponse
+from lf.api.schemas import BudgetOverrideRequest, CostNode, CostResponse
 from lf.config.loader import load_budget_usd
 
 costs_router = APIRouter(prefix="/api/v1", tags=["Costs"])
@@ -78,6 +79,41 @@ def _sum_run_costs(run_id: str) -> tuple[float, bool]:
             conn.close()
     except sqlite3.Error:
         return 0.0, False
+
+
+def _node_cost_breakdown(run_id: str) -> list[CostNode]:
+    """Custo agregado por nó da run (D1/Fase D): base dos chips da UI.
+
+    Segunda query dedicada (não funde com _sum_run_costs): o total já tem
+    semântica de COALESCE 0 e é SQLite barato. ``estimated`` por nó = true se
+    QUALQUER linha do nó é estimada. Retorna [] se a tabela não existir.
+    """
+    import sqlite3
+
+    db_path = _telemetry_db()
+    if not db_path.exists():
+        return []
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        try:
+            conn.execute("PRAGMA busy_timeout=5000")
+            rows = conn.execute(
+                "SELECT node, SUM(cost_usd), MAX(estimated) FROM llm_costs "
+                "WHERE run_id = ? GROUP BY node ORDER BY node",
+                (run_id,),
+            ).fetchall()
+            return [
+                CostNode(
+                    node=str(row[0]),
+                    spent_usd=round(float(row[1] or 0.0), 6),
+                    estimated=bool(row[2]),
+                )
+                for row in rows
+            ]
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return []
 
 
 async def _apply_override_to_checkpoint(run_id: str, thread_id: str, max_usd: float) -> bool:
@@ -150,6 +186,7 @@ async def get_run_cost(
             "percent_used": round(percent_used, 4),
         },
         budget_warning=budget_warning,
+        nodes=_node_cost_breakdown(run_id),
     )
 
 
@@ -193,4 +230,5 @@ async def override_run_budget(
             "percent_used": round(percent_used, 4),
         },
         budget_warning=budget_warning,
+        nodes=_node_cost_breakdown(run_id),
     )

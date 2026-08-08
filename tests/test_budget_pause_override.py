@@ -6,6 +6,7 @@ no nó developer → a run fica PAUSADA (checkpoint pendente em 'developer', NÃ
 falha) → POST /cost/override com limite maior (aplica ao CircuitBreaker do
 checkpoint) → resume re-executa o developer e conclui.
 """
+
 import asyncio
 import sqlite3
 from pathlib import Path
@@ -166,9 +167,7 @@ async def test_budget_hard_stop_pause_override_resume_e2e():
                 break
             waited += 0.2
         assert data.get("status") != "failed", f"resume falhou: {data}"
-        assert data.get("logs") and "retomada" in data["logs"], (
-            f"resume não concluiu após override: {data}"
-        )
+        assert data.get("logs") and "retomada" in data["logs"], f"resume não concluiu após override: {data}"
         assert await _next_nodes_of_thread(thread_id) == []
 
 
@@ -189,9 +188,11 @@ def test_llm_costs_additive_migration_and_run_fields(tmp_path):
     assert {"run_id", "node", "estimated"} <= cols, f"colunas ausentes: {cols}"
 
     tracker.track("default", "abcd", "xy", run_id="run-abc", node="developer", estimated=True)
-    row = sqlite3.connect(str(db)).execute(
-        "SELECT run_id, node, estimated FROM llm_costs WHERE run_id = 'run-abc'"
-    ).fetchone()
+    row = (
+        sqlite3.connect(str(db))
+        .execute("SELECT run_id, node, estimated FROM llm_costs WHERE run_id = 'run-abc'")
+        .fetchone()
+    )
     assert row == ("run-abc", "developer", 1)
 
     # Idempotente: reabrir não quebra nem duplica colunas
@@ -213,9 +214,11 @@ def test_opencode_subprocess_tracks_estimated_cost(tmp_path, monkeypatch):
     out = llm_module.call_llm_via_opencode("sys", "user", cache=False, mock=False)
     assert out == "resposta do subprocesso"
 
-    row = sqlite3.connect(".loopforge/telemetry.sqlite").execute(
-        "SELECT estimated, cost_usd FROM llm_costs ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = (
+        sqlite3.connect(".loopforge/telemetry.sqlite")
+        .execute("SELECT estimated, cost_usd FROM llm_costs ORDER BY id DESC LIMIT 1")
+        .fetchone()
+    )
     assert row is not None, "nenhum custo registrado para o subprocesso"
     assert row[0] == 1, "custo do subprocesso deveria ser estimado"
     assert row[1] > 0
@@ -263,3 +266,52 @@ async def test_cost_endpoint_sums_warning_and_estimated(tmp_path, monkeypatch):
         # Override inválido → 422 (max_usd <= 0)
         bad = await client.post(f"/api/v1/runs/{run_id}/cost/override", json={"max_usd": 0})
         assert bad.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_cost_endpoint_nodes_breakdown(tmp_path, monkeypatch):
+    """D1 (Fase D): GET /cost retorna breakdown `nodes` por nó.
+
+    GROUP BY node com ORDER BY node; `estimated` por nó (true se alguma linha
+    do nó é estimada); run de OUTRO run_id não vaza; total = soma dos nodes.
+    """
+    _write_ade_budget(tmp_path, 0.01)
+    from lf.api.database import session_factory
+    from lf.api.models import PipelineRun
+
+    async with session_factory() as session:
+        run = PipelineRun(idea="Cost nodes", stack="python", status="completed")
+        session.add(run)
+        await session.commit()
+        run_id = run.id
+
+    tracker = CostTracker(Path(".loopforge/telemetry.sqlite"))
+    # default: (0.001 input, 0.002 output)/1k → N tokens = N * 0.000001 USD
+    tracker.track("default", "", "", prompt_tokens=100, completion_tokens=0, run_id=run_id, node="cpo")
+    tracker.track("default", "", "", prompt_tokens=200, completion_tokens=0, run_id=run_id, node="cpo")
+    tracker.track("default", "", "", prompt_tokens=300, completion_tokens=0, run_id=run_id, node="qa", estimated=True)
+    # run de outro id não deve aparecer no breakdown da run alvo
+    tracker.track("default", "", "", prompt_tokens=400, completion_tokens=0, run_id="outra-run", node="pm")
+
+    app = _app_with_costs()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(f"/api/v1/runs/{run_id}/cost")
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # campo aditivo: total inalterado e igual à soma dos nodes
+        assert data["spent_usd"] == pytest.approx(0.0006, abs=1e-6)
+        nodes = data["nodes"]
+        assert [n["node"] for n in nodes] == ["cpo", "qa"], "ORDER BY node"
+        assert data["spent_usd"] == pytest.approx(sum(n["spent_usd"] for n in nodes), abs=1e-6)
+
+        cpo, qa = nodes
+        assert cpo["spent_usd"] == pytest.approx(0.0003, abs=1e-6)
+        assert cpo["estimated"] is False  # nenhuma linha estimada do cpo
+        assert qa["spent_usd"] == pytest.approx(0.0003, abs=1e-6)
+        assert qa["estimated"] is True  # a linha do qa foi registrada como estimada
+
+        # POST /cost/override também devolve nodes (mesmo response_model)
+        ov = await client.post(f"/api/v1/runs/{run_id}/cost/override", json={"max_usd": 0.01})
+        assert ov.status_code == 200
+        assert ov.json()["nodes"] == nodes

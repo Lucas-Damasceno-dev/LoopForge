@@ -1,13 +1,14 @@
 """Configuração oficial da API REST e Web UI do LoopForge."""
+
 import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from pydantic_settings import BaseSettings
 
 from lf.config.loader import load_ade_config, save_ade_config
-from lf.config.schema import AdeConfig
+from lf.config.schema import AdeConfig, AdeMcpServer
 
 config_router = APIRouter(prefix="/api/v1/config", tags=["Config"])
 
@@ -39,6 +40,11 @@ async def patch_config(payload: dict):
                 # Sub-modelos aninhados (AdeHITL, AdeProviders, etc.) são
                 # reconstruídos com validação pydantic (422 se inválido).
                 setattr(merged, key, annotation(**value))
+            elif key == "mcp_servers" and isinstance(value, list):
+                # D3 (Fase D): lista de servers é reconstruída como
+                # list[AdeMcpServer] VALIDADA (antes era setada crua — itens
+                # inválidos eram silenciosamente descartados pelo serializer).
+                setattr(merged, key, TypeAdapter(list[AdeMcpServer]).validate_python(value))
             else:
                 setattr(merged, key, value)
         validated = AdeConfig(**merged.model_dump())

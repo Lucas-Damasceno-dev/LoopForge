@@ -92,6 +92,14 @@ class CostBudget(BaseModel):
     percent_used: float
 
 
+class CostNode(BaseModel):
+    """Custo agregado por nó da run (D1/Fase D): base dos chips de custo na UI."""
+
+    node: str
+    spent_usd: float
+    estimated: bool
+
+
 class CostResponse(BaseModel):
     """Custo acumulado de uma run em llm_costs + estado do budget (M-08/M-10)."""
 
@@ -100,6 +108,8 @@ class CostResponse(BaseModel):
     estimated: bool
     budget: CostBudget
     budget_warning: bool
+    # D1 (Fase D): breakdown por nó — campo ADITIVO (SPA depende dos demais).
+    nodes: list[CostNode] = Field(default_factory=list)
 
 
 class BudgetOverrideRequest(BaseModel):
@@ -109,4 +119,13 @@ class BudgetOverrideRequest(BaseModel):
         None,
         gt=0,
         description="Novo limite de budget em USD; ausente/nulo = usa ade.yaml budget.max_usd",
+    )
+
+
+class MCPToolCallRequest(BaseModel):
+    """Corpo do POST /api/v1/mcp/servers/{name}/tools/{tool} (D2)."""
+
+    arguments: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Argumentos da tool MCP (JSON); ausente/vazio = {}",
     )
