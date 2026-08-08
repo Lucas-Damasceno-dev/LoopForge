@@ -31,6 +31,21 @@ from lf.runner.git.pr import create_github_pr
 logger = logging.getLogger(__name__)
 
 
+def _default_budget_usd() -> float:
+    """M-08: fonte única do budget — ``ade.yaml budget.max_usd`` (default 10.0).
+
+    Resolve em call-time (não import-time) para respeitar os.chdir()/
+    monkeypatch.chdir() dos testes e da CLI. Falha silenciosamente para o
+    default 10.0 se o arquivo estiver ausente ou inválido (mesmo espírito do
+    load_ade_config().hitl.timeout_seconds usado no __init__).
+    """
+    try:
+        from lf.config.loader import load_budget_usd
+        return load_budget_usd()
+    except Exception:
+        return 10.0
+
+
 def _send_notification(title: str, message: str, webhook_url: str | None = None):
     """Envia notificação desktop e/ou webhook para Slack/Discord."""
     with contextlib.suppress(Exception):
@@ -73,12 +88,12 @@ class TaskDispatcher:
         self.hitl_timeout_seconds = hitl_timeout_seconds
         self._last_graph = None
         if self.circuit_breaker is None:
-            self.circuit_breaker = CircuitBreaker(max_total_cost=10.0)
+            self.circuit_breaker = CircuitBreaker(max_total_cost=_default_budget_usd())
 
     def _resolve_circuit_breaker(self):
         if self.circuit_breaker is not None:
             return self.circuit_breaker
-        return CircuitBreaker(max_total_cost=10.0)
+        return CircuitBreaker(max_total_cost=_default_budget_usd())
 
     def _get_graph(self, checkpointer=None):
         """Retorna grafo compilado (cache por sessão)."""

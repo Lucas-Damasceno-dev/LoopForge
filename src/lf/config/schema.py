@@ -104,7 +104,8 @@ class AdeMcpServer(BaseModel):
 
 
 class AdeBudget(BaseModel):
-    max_usd: float = 10.0
+    """Fonte única do budget (M-08): alimenta o CircuitBreaker do dispatcher."""
+    max_usd: float = Field(10.0, ge=0, description="Limite de custo em USD por run (fonte única via ade.yaml)")
 
 
 class AdeProviders(BaseModel):

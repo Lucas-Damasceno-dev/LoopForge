@@ -45,6 +45,17 @@ def load_ade_config(config_path: str | Path = ".loopforge/ade.yaml") -> AdeConfi
     return AdeConfig(**data)
 
 
+def load_budget_usd(config_path: str | Path = ".loopforge/ade.yaml") -> float:
+    """Fonte única do budget por run (M-08): ``ade.yaml budget.max_usd``.
+
+    Default 10.0 quando o arquivo/valor estiver ausente (AdeBudget.max_usd).
+    Usado pelo TaskDispatcher para construir o CircuitBreaker (antes havia
+    literal 10.0 no dispatcher e ``budget_limit_usd`` só no CLI — fontes
+    desconexas).
+    """
+    return load_ade_config(config_path).budget.max_usd
+
+
 def save_ade_config(config: AdeConfig, config_path: str | Path = ".loopforge/ade.yaml") -> Path:
     path = Path(config_path)
     path.parent.mkdir(parents=True, exist_ok=True)
