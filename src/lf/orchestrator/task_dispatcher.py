@@ -348,10 +348,8 @@ class TaskDispatcher:
             if row:
                 result: dict = {"action": row[0], "category": row[1], "message": row[2]}
                 if row[3]:
-                    try:
+                    with contextlib.suppress(json.JSONDecodeError):
                         result["state_patch"] = json.loads(row[3])
-                    except json.JSONDecodeError:
-                        pass
                 return result
         except Exception as exc:
             logger.warning("Falha ao verificar decisão remota: %s", exc)
@@ -680,9 +678,7 @@ class TaskDispatcher:
         timeout_mode = {"continue": "CONTINUAR", "abort": "ABORTAR", "pause": "AGUARDAR DECISÃO TARDIA"}.get(
             self.hitl_on_timeout, "CONTINUAR"
         )
-        console.print(
-            f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: {timeout_mode})[/dim]"
-        )
+        console.print(f"\n[dim]Tempo limite: {self.hitl_timeout_seconds}s (ao esgotar: {timeout_mode})[/dim]")
 
         # Lê tecla única (sem Enter) com poll remoto curto intercalado para
         # não congelar o gate: (a) chama _get_single_key_with_timeout a cada
