@@ -1,0 +1,52 @@
+name: spa drift + smoke install
+
+on:
+  push:
+    branches: [feature/ade-fase-a]
+  pull_request:
+    branches: [feature/ade-fase-a]
+
+jobs:
+  spa-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar que o dist da SPA não está commitado no git
+        run: |
+          # Drift = build da SPA commitado no repo. O dist embutido é
+          # sincronizado via scripts/sync_dist.py e NUNCA vai pro git.
+          committed=$(git ls-files src/lf/ade/static/dist/ | grep -v -x 'src/lf/ade/static/dist/.gitkeep' || true)
+          if [ -n "$committed" ]; then
+            echo "Drift detectado: arquivos do dist da SPA commitados no git:"
+            echo "$committed"
+            exit 1
+          fi
+          echo "OK: src/lf/ade/static/dist/ contém apenas .gitkeep (nenhum dist commitado)."
+
+      - name: Validar que scripts/sync_dist.py executa
+        run: |
+          python scripts/sync_dist.py --help
+
+  smoke-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Criar venv limpa e instalar o engine
+        run: |
+          python -m venv /tmp/smoke-venv
+          /tmp/smoke-venv/bin/python -m pip install --upgrade pip
+          /tmp/smoke-venv/bin/python -m pip install .
+
+      - name: Importar lf e localizar o SPA_DIST embutido
+        run: |
+          /tmp/smoke-venv/bin/python -c "import lf; from lf.ade import SPA_DIST; print(SPA_DIST)"
+
+      - name: Importar a factory do app FastAPI
+        run: |
+          /tmp/smoke-venv/bin/python -c "from lf.api.app import create_app; app=create_app()"

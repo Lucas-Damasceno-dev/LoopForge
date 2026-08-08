@@ -2,6 +2,7 @@
 
 Expõe endpoints REST, WebSockets autenticados para streaming e Web Dashboard UI.
 """
+
 import asyncio
 import os
 import time
@@ -40,6 +41,7 @@ from lf.api.schemas import (
     RunResponse,
     RunUpdate,
 )
+from lf.api.spa import mount_spa
 from lf.api.websocket_manager import ws_manager
 
 
@@ -115,12 +117,12 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     # ─── Dashboard Web UI ───────────────────────────────────────────
     if ui_enabled:
+
         @app.get("/", response_class=HTMLResponse, include_in_schema=False)
         @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
         async def render_dashboard():
             """Serves the modern Glassmorphic Web Dashboard UI."""
             return HTMLResponse(content=get_dashboard_html())
-
 
     # ─── Health ─────────────────────────────────────────────────────
     @app.get("/health", response_model=HealthResponse, tags=["System"])
@@ -265,11 +267,13 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
         def _sync_resume():
             from lf.orchestrator.task_dispatcher import TaskDispatcher
+
             dispatcher = TaskDispatcher()
             return dispatcher.resume(thread_id=thread_id)
 
         async def _resume_in_bg():
             from lf.api.database import session_factory
+
             if session_factory:
                 async with session_factory() as bg_session:
                     r = await bg_session.get(PipelineRun, target_id)
@@ -328,9 +332,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         total_result = await session.execute(total_query)
         total = total_result.scalar_one()
 
-        query = (
-            select(PipelineRun).order_by(PipelineRun.created_at.desc()).offset(skip).limit(limit)
-        )
+        query = select(PipelineRun).order_by(PipelineRun.created_at.desc()).offset(skip).limit(limit)
         result = await session.execute(query)
         runs = result.scalars().all()
 
@@ -445,9 +447,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         await session.delete(run)
         await session.commit()
 
-    async def _list_run_events_impl(
-        run_id: str, after_seq: int, limit: int, session: AsyncSession
-    ) -> dict:
+    async def _list_run_events_impl(run_id: str, after_seq: int, limit: int, session: AsyncSession) -> dict:
         """Backfill M-06: envelopes v1 persistidos da run, em ordem de seq."""
         run = await session.get(PipelineRun, run_id)
         if not run:
@@ -487,7 +487,6 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         """Alias legado de GET /api/v1/runs/{id}/events (M-18)."""
         _mark_legacy(response)
         return await _list_run_events_impl(run_id, after_seq, limit, session)
-
 
     async def _record_decision_impl(
         run_id: str, payload: HumanDecisionCreate, session: AsyncSession
@@ -565,8 +564,11 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     ):
         """Lista todo o histórico de decisões humanas (HITL) para uma execução."""
         from sqlalchemy import select
+
         result = await session.execute(
-            select(HumanDecisionModel).where(HumanDecisionModel.run_id == run_id).order_by(HumanDecisionModel.timestamp.asc())
+            select(HumanDecisionModel)
+            .where(HumanDecisionModel.run_id == run_id)
+            .order_by(HumanDecisionModel.timestamp.asc())
         )
         decisions = result.scalars().all()
         return decisions
@@ -577,6 +579,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         """Retorna metadados, AST e métricas de dependência do Codebase Genome."""
         try:
             from genome import GenomeScanner
+
             scanner = GenomeScanner(".")
             g = scanner.scan()
             return g.model_dump()
@@ -588,9 +591,13 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         """Retorna contratos de interface rastreados e quebras detectadas pelo Agentic Registry."""
         try:
             from registry import RegistryChecker
+
             checker = RegistryChecker(".")
             breaking = checker.check()
-            return {"breaking_changes": [b.model_dump() for b in breaking], "status": "ok" if not breaking else "warning"}
+            return {
+                "breaking_changes": [b.model_dump() for b in breaking],
+                "status": "ok" if not breaking else "warning",
+            }
         except Exception as e:
             return {"error": str(e), "breaking_changes": []}
 
@@ -599,6 +606,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         """Retorna histórico de sessões, causas-raiz e recomendações do Agentic Retro."""
         try:
             from retro import RetroStore, SessionAnalyzer
+
             store = RetroStore()
             sessions = store.list_sessions(limit=5)
             analyzer = SessionAnalyzer()
@@ -636,6 +644,11 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     from lf.api.costs import costs_router
 
     app.include_router(costs_router, dependencies=[Depends(verify_authentication)])
+
+    # ─── SPA React (M-16/B4) ─────────────────────────────────────────
+    # Monta o dist da SPA em /app se disponível (env LF_SPA_DIST ou pacote
+    # embutido lf.ade.static.dist na B5); sem dist, apenas loga warning.
+    mount_spa(app)
 
     return app
 
@@ -801,11 +814,7 @@ async def _run_pipeline(
 
         err = final_state.get("error")
         test_report = final_state.get("test_report", {})
-        tests_failed = (
-            test_report.get("summary", {}).get("tests_failed", 0)
-            if isinstance(test_report, dict)
-            else 0
-        )
+        tests_failed = test_report.get("summary", {}).get("tests_failed", 0) if isinstance(test_report, dict) else 0
 
         final_status = "completed" if (not err and tests_failed == 0) else "failed"
         current_node = final_state.get("next_agent", "FINISH")
@@ -821,8 +830,7 @@ async def _run_pipeline(
                 final_status = "paused"
                 current_node = pending[0]
                 log_msg = (
-                    f"Run pausada no nó {pending[0]} (budget excedido) — "
-                    "use POST /cost/override + /resume para retomar"
+                    f"Run pausada no nó {pending[0]} (budget excedido) — use POST /cost/override + /resume para retomar"
                 )
 
         await _set_run_status(
@@ -860,4 +868,3 @@ async def _run_pipeline(
         async with q.lock:
             q.active = None
         await _promote_next(app)
-

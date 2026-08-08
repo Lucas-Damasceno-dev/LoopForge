@@ -41,6 +41,11 @@ dev = [
 [project.scripts]
 lf = "lf.cli.main:main"
 
+[tool.setuptools.package-data]
+# Dist embutido da SPA (sincronizado via scripts/sync_dist.py) — entra no wheel.
+# `static/` não é um pacote (sem __init__.py), então os dados ficam no pacote lf.ade.
+"lf.ade" = ["static/dist/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

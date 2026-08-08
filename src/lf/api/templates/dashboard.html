@@ -349,9 +349,37 @@
     .form-input, .form-textarea, .form-select { width: 100%; padding: 0.75rem; border-radius: 8px; background: #04060c; border: 1px solid var(--border-glass); color: var(--text-main); font-family: 'Inter', sans-serif; font-size: 0.875rem; }
     .form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: var(--cyan); }
     .modal-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 0.5rem; }
+
+    /* M-16/B4: banner de deprecação do dashboard legado (nova interface em /app) */
+    .deprecated-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      background: linear-gradient(135deg, #b45309, #d97706);
+      color: #fff;
+      text-align: center;
+      padding: 0.55rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .deprecated-banner a {
+      color: #fff;
+      text-decoration: underline;
+      font-weight: 700;
+    }
+
+    /* Reserva o espaço do banner para o header sticky não ficar escondido */
+    body { padding-top: 2.4rem; }
   </style>
 </head>
 <body>
+
+  <div class="deprecated-banner">
+    ⚠️ Dashboard legado — use a nova interface em <a href="/app">/app</a>
+  </div>
 
   <header>
     <div class="brand-group">
@@ -634,10 +662,20 @@ graph LR
     }
 
     // Connect WebSockets
+    function getApiToken() {
+      // M-16/B4: com auth ativa o handler WS fecha 1008 sem token — envia a key
+      // (se o usuário tiver salvo em localStorage) via ?token= (mecanismo já
+      // aceito pelo handler). Sem key salva, conecta sem parâmetro.
+      return localStorage.getItem('lf_api_key') || '';
+    }
+
     function initWebSocket() {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws/streaming`;
-      
+      let wsUrl = `${wsProtocol}//${window.location.host}/ws/streaming`;
+      const apiToken = getApiToken();
+      if (apiToken) {
+        wsUrl += `?token=${encodeURIComponent(apiToken)}`;
+      }
       try {
         const ws = new WebSocket(wsUrl);
         ws.onopen = () => {
