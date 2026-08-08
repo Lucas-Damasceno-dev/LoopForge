@@ -22,10 +22,15 @@ async def setup_test_db():
 
     os.environ["LF_API_TEST"] = "1"
     os.environ["LF_API_REQUIRE_AUTH"] = "false"
-    db_file = ".loopforge/test_api.sqlite"
-    if os.path.exists(db_file):
+    # Remove o banco E os arquivos WAL/SHM: em journal_mode=WAL, remover só o
+    # .sqlite e deixar o -wal órfão causa "disk I/O error" na próxima abertura.
+    for f in (
+        ".loopforge/test_api.sqlite",
+        ".loopforge/test_api.sqlite-wal",
+        ".loopforge/test_api.sqlite-shm",
+    ):
         with contextlib.suppress(Exception):
-            os.remove(db_file)
+            os.remove(f)
     await init_db()
     if engine is not None:
         async with engine.begin() as conn:
@@ -33,6 +38,10 @@ async def setup_test_db():
             await conn.run_sync(Base.metadata.create_all)
     yield
     await close_db()
+    # Garante que nenhum WAL órfão polua o próximo teste do módulo/suíte.
+    for f in (".loopforge/test_api.sqlite-wal", ".loopforge/test_api.sqlite-shm"):
+        with contextlib.suppress(Exception):
+            os.remove(f)
     os.environ.pop("LF_API_TEST", None)
     os.environ.pop("LF_API_REQUIRE_AUTH", None)
 
