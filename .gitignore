@@ -7,6 +7,7 @@ venv/
 
 # Build outputs
 dist/
+!src/lf/ade/static/dist/
 *.egg-info/
 
 # LoopForge runtime data
