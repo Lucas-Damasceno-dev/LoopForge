@@ -41,6 +41,7 @@ def _default_budget_usd() -> float:
     """
     try:
         from lf.config.loader import load_budget_usd
+
         return load_budget_usd()
     except Exception:
         return 10.0
@@ -58,6 +59,7 @@ def _send_notification(title: str, message: str, webhook_url: str | None = None)
     if webhook_url:
         try:
             import urllib.request
+
             payload = json.dumps({"text": f"*{title}*\n{message}"}).encode("utf-8")
             req = urllib.request.Request(webhook_url, data=payload, headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=3)
@@ -84,6 +86,7 @@ class TaskDispatcher:
         self.webhook_url = webhook_url
         if hitl_timeout_seconds is None:
             from lf.config.loader import load_ade_config
+
             hitl_timeout_seconds = load_ade_config().hitl.timeout_seconds
         self.hitl_timeout_seconds = hitl_timeout_seconds
         self._last_graph = None
@@ -125,7 +128,6 @@ class TaskDispatcher:
             "project_dir": ".",
             "stack": getattr(task, "stack", None),
             "next_agent": target_agent,
-
             "attempt_count": getattr(task, "attempts", 0),
             "qa_attempt_count": 0,
             "appsec_attempt_count": 0,
@@ -134,9 +136,10 @@ class TaskDispatcher:
             "feedback_history": [],
             "mock_llm": self.mock_llm,
             "llm_provider": "openrouter" if os.getenv("OPENROUTER_API_KEY") else "google",
-            "llm_model_name": os.getenv("OPENROUTER_MODEL") or os.getenv("OPENCODE_MODEL") or ("inclusionai/ling-3.0-flash:free" if os.getenv("OPENROUTER_API_KEY") else "gemini-2.0-flash"),
+            "llm_model_name": os.getenv("OPENROUTER_MODEL")
+            or os.getenv("OPENCODE_MODEL")
+            or ("inclusionai/ling-3.0-flash:free" if os.getenv("OPENROUTER_API_KEY") else "gemini-2.0-flash"),
             "llm_temperature": 0.3,
-
             "routing_mode": getattr(task, "routing_mode", "full"),
             "task_type": getattr(task, "task_type", "feature"),
             "complexity_level": getattr(task, "complexity_level", "standard"),
@@ -154,7 +157,14 @@ class TaskDispatcher:
 
         return state
 
-    def _broadcast_ws(self, event_type: str, task_id: str, payload: dict, thread_id: str | None = None):
+    def _broadcast_ws(
+        self,
+        event_type: str,
+        task_id: str,
+        payload: dict,
+        thread_id: str | None = None,
+        run_id: str | None = None,
+    ):
         """Emite evento via EventBus (A3/M-05): persiste no journal + broadcast envelope v1.
 
         O EventBus é o emissor único — não há mais chamada direta ao
@@ -167,19 +177,22 @@ class TaskDispatcher:
         ``_resolve_telemetry_run_id``: no fluxo API o thread é ``run-{uuid}``
         e o journal fica chaveado pelo uuid (a mesma chave do GET
         /api/v1/runs/{id}/events e de human_decisions). Call sites sem
-        thread_id (ex.: CLI legada) caem no ``task_id`` tal qual.
+        thread_id (ex.: CLI legada) caem no ``task_id`` tal qual. A2/M-07:
+        quando ``run_id`` é passado explicitamente (dispatcher canônico), ele
+        vence a derivação — para runs CLI o journal fica chaveado pelo MESMO
+        id da linha em pipeline_runs (backfill GET /runs/{id}/events funciona
+        para runs CLI).
 
         Retorna a Task agendada quando há loop ativo (o caller async pode
         aguardá-la via ``_publish_event_async`` para garantir persistência em
         ordem de seq); retorna None em contexto síncrono (o publish roda
         bloqueante via ``asyncio.run``).
         """
-        run_id = self._resolve_telemetry_run_id(thread_id or task_id)
+        if run_id is None:
+            run_id = self._resolve_telemetry_run_id(thread_id or task_id)
         try:
             loop = asyncio.get_running_loop()
-            return loop.create_task(
-                event_bus.publish(run_id, event_type, {**payload, "task_id": task_id})
-            )
+            return loop.create_task(event_bus.publish(run_id, event_type, {**payload, "task_id": task_id}))
         except RuntimeError:
             try:
                 asyncio.run(event_bus.publish(run_id, event_type, {**payload, "task_id": task_id}))
@@ -187,14 +200,21 @@ class TaskDispatcher:
                 logger.warning("Falha ao publicar evento via EventBus: %s", exc)
             return None
 
-    async def _publish_event_async(self, event_type: str, task_id: str, payload: dict, thread_id: str | None = None) -> None:
+    async def _publish_event_async(
+        self,
+        event_type: str,
+        task_id: str,
+        payload: dict,
+        thread_id: str | None = None,
+        run_id: str | None = None,
+    ) -> None:
         """Aguarda a publicação do evento (seq ordenado e sem fire-and-forget).
 
         Usado pelos caminhos async (_dispatch_async/_resume_async): o await na
         Task agendada por _broadcast_ws evita o race de seq do create_task
         solto (COUNT+1 concorrente gerava seq duplicados/fora de ordem).
         """
-        scheduled = self._broadcast_ws(event_type, task_id, payload, thread_id=thread_id)
+        scheduled = self._broadcast_ws(event_type, task_id, payload, thread_id=thread_id, run_id=run_id)
         if isinstance(scheduled, (asyncio.Task, asyncio.Future)):
             try:
                 await scheduled
@@ -253,8 +273,6 @@ class TaskDispatcher:
             if old_settings is not None:
                 with contextlib.suppress(Exception):
                     termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-
-
 
     def _ensure_human_decisions_table(self, db_path: Path) -> None:
         """Garante que a tabela human_decisions exista no SQLite de telemetria.
@@ -326,7 +344,7 @@ class TaskDispatcher:
         """
         if not thread_id.startswith("run-"):
             return thread_id
-        run_id = thread_id[len("run-"):]
+        run_id = thread_id[len("run-") :]
         if "-task-" in run_id:
             run_id = run_id.split("-task-", 1)[0]
         return run_id
@@ -356,6 +374,102 @@ class TaskDispatcher:
         except Exception as e:
             print(f"--- AVISO: Falha ao gravar decisão humana: {e} ---")
 
+    def _pipeline_run_id(self, thread_id: str) -> str:
+        """Id da linha em pipeline_runs (M-07/A2).
+
+        Thread ``run-{uuid}`` (API) → o MESMO uuid que a API usa como id da
+        run (o ON CONFLICT(id) atualiza a MESMA linha, sem duplicar). Thread
+        CLI (``project-task-1``) → novo ``uuid4`` (não há run pré-criada); o
+        thread real fica salvo na coluna ``thread_id``.
+        """
+        if thread_id.startswith("run-"):
+            return self._resolve_telemetry_run_id(thread_id)
+        return str(uuid.uuid4())
+
+    def _upsert_pipeline_run(
+        self,
+        run_id: str,
+        status: str,
+        idea: str | None = None,
+        stack: str | None = None,
+        current_node: str | None = None,
+        duration_seconds: float | None = None,
+        thread_id: str | None = None,
+    ) -> None:
+        """Upsert idempotente em pipeline_runs (M-07/A2) — writer canônico.
+
+        Runs CLI (`lf run --mock`) nunca passaram pelo ``create_all`` da API,
+        então a tabela pode não existir: garante com o MESMO schema de
+        models.PipelineRun (incluindo thread_id/parent_run_id) no MESMO db_path
+        do ``_record_decision`` (``.loopforge/telemetry.sqlite``, resolvido em
+        call-time). ``INSERT ... ON CONFLICT(id) DO UPDATE`` preserva
+        ``created_at`` e não sobrescreve ``idea``/``stack`` já gravados pela
+        API quando não informados (cláusula CASE).
+
+        Telemetria: NUNCA derruba a pipeline (try/except + logger.warning).
+        """
+        try:
+            db_path = Path(".loopforge/telemetry.sqlite").resolve()
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(str(db_path), timeout=10.0)
+            conn.execute("PRAGMA busy_timeout=5000")
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS pipeline_runs (
+                        id VARCHAR(36) PRIMARY KEY,
+                        idea TEXT NOT NULL,
+                        stack VARCHAR(50) DEFAULT 'python',
+                        status VARCHAR(20) DEFAULT 'pending',
+                        current_node VARCHAR(50),
+                        logs TEXT,
+                        duration_seconds FLOAT DEFAULT 0.0,
+                        thread_id VARCHAR(50),
+                        parent_run_id VARCHAR(36),
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                # Formato de timestamp do SQLAlchemy no SQLite (space-separated,
+                # sem tz) para o ORM da API ler sem fricção (teste (c)).
+                now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")
+                conn.execute(
+                    """
+                    INSERT INTO pipeline_runs
+                        (id, idea, stack, status, current_node, duration_seconds,
+                         thread_id, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        status = excluded.status,
+                        current_node = excluded.current_node,
+                        duration_seconds = excluded.duration_seconds,
+                        thread_id = excluded.thread_id,
+                        updated_at = excluded.updated_at,
+                        idea = CASE WHEN excluded.idea IS NOT NULL
+                                    THEN excluded.idea ELSE pipeline_runs.idea END,
+                        stack = CASE WHEN excluded.stack IS NOT NULL
+                                     THEN excluded.stack ELSE pipeline_runs.stack END
+                    """,
+                    (
+                        run_id,
+                        idea or "",
+                        stack or "python",
+                        status,
+                        current_node,
+                        # A tabela pode ter sido criada pelo create_all da API
+                        # (models.PipelineRun: Mapped[float] => NOT NULL, sem
+                        # DEFAULT DB-side) — NULL quebraria o upsert "running".
+                        0.0 if duration_seconds is None else duration_seconds,
+                        thread_id,
+                        now,
+                        now,
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as exc:
+            logger.warning("Falha ao gravar pipeline_runs (run %s): %s", run_id, exc)
+
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
         """Manipula interrupção humana (HITL) exibindo os artefatos do nó RECÉM-CONCLUÍDO e o gate do PRÓXIMO nó."""
         console = Console()
@@ -375,9 +489,15 @@ class TaskDispatcher:
             msg_text = f"LoopForge aguardando aprovação humana antes de executar o nó {next_node}."
             _send_notification(title, msg_text, webhook_url=self.webhook_url)
 
-        console.print("\n[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]")
-        console.print(f"[bold yellow]⏸️  HUMAN-IN-THE-LOOP GATE — Próximo Nó: [bold white]{next_node.upper()}[/bold white][/bold yellow]")
-        console.print("[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]\n")
+        console.print(
+            "\n[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]"
+        )
+        console.print(
+            f"[bold yellow]⏸️  HUMAN-IN-THE-LOOP GATE — Próximo Nó: [bold white]{next_node.upper()}[/bold white][/bold yellow]"
+        )
+        console.print(
+            "[bold yellow]═══════════════════════════════════════════════════════════════════[/bold yellow]\n"
+        )
 
         # 1. Se estamos pausados antes de QA, o nó que recém-executou foi o DEVELOPER -> mostra o código gerado
         if next_node == "qa":
@@ -388,21 +508,25 @@ class TaskDispatcher:
                 console.print("[bold red]┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓[/bold red]")
                 console.print("[bold red]┃ ⚠️  ERRO: A saída do Developer contém ERRO do LLM/ferramenta[/bold red]")
                 console.print("[bold red]┃    Não é código válido. Revise antes de aprovar.           [/bold red]")
-                console.print("[bold red]┃    Sugestão: digite [yellow]r[/yellow] para retentar ou [yellow]a[/yellow] para ajustar o prompt.[/bold red]")
+                console.print(
+                    "[bold red]┃    Sugestão: digite [yellow]r[/yellow] para retentar ou [yellow]a[/yellow] para ajustar o prompt.[/bold red]"
+                )
                 console.print("[bold red]┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛[/bold red]")
                 console.print()
 
             if code:
                 import re
-                clean_code = re.sub(r'\x1b\[[0-9;]*m', '', str(code)[:600])
+
+                clean_code = re.sub(r"\x1b\[[0-9;]*m", "", str(code)[:600])
                 try:
-                    syntax = Syntax(clean_code + ("..." if len(code) > 600 else ""), "python", theme="monokai", line_numbers=True)
+                    syntax = Syntax(
+                        clean_code + ("..." if len(code) > 600 else ""), "python", theme="monokai", line_numbers=True
+                    )
                     console.print(syntax)
                 except Exception:
                     console.print(clean_code)
             else:
                 console.print("[dim]Nenhum código gerado.[/dim]")
-
 
         # 2. Se estamos pausados antes do DEVELOPER, mostra a especificação do TECH LEAD
         elif next_node == "developer":
@@ -450,7 +574,9 @@ class TaskDispatcher:
                     sev_fmt = f"[yellow]{sev}[/yellow]"
                 else:
                     sev_fmt = f"[cyan]{sev}[/cyan]"
-                table.add_row(str(v.get("id", "-")), sev_fmt, str(v.get("rule_id", "-")), str(v.get("description", "-")))
+                table.add_row(
+                    str(v.get("id", "-")), sev_fmt, str(v.get("rule_id", "-")), str(v.get("description", "-"))
+                )
             console.print(table)
 
         # 5. Se estamos pausados antes do PARALLEL AUDIT, mostra resumo da auditoria final
@@ -477,7 +603,9 @@ class TaskDispatcher:
         console.print("  [blue]a[/blue] — Solicitar alterações / Ajustar Prompt (Request Changes)")
         console.print("  [red]x[/red] — Abortar pipeline")
 
-        console.print(f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: CONTINUAR)[/dim]")
+        console.print(
+            f"\n[dim]Tempo limite para resposta: {self.hitl_timeout_seconds}s (Padrão ao esgotar tempo: CONTINUAR)[/dim]"
+        )
 
         # Lê tecla única (sem Enter) com poll remoto curto intercalado para
         # não congelar o gate: (a) chama _get_single_key_with_timeout a cada
@@ -505,27 +633,33 @@ class TaskDispatcher:
             if remote_decision:
                 choice_map = {"approve": "c", "retry": "r", "adjust_prompt": "a", "abort": "x"}
                 choice = choice_map.get(remote_decision["action"], "c")
-                console.print(f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]")
+                console.print(
+                    f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]"
+                )
             else:
                 # Timeout expirado sem decisão -> transição GRACIOSA (E10/F1-13):
                 # NÃO aborta; continua a pipeline e marca a run como decision_expired.
                 # NÃO grava em human_decisions (nenhuma decisão humana real foi
                 # tomada) — decisão tardia via POST /api/runs/{run_id}/decide
                 # continua aceita (poll ordena timestamp DESC, sem linha falsa).
-                console.print("\n[yellow]⏰ Tempo limite de resposta esgotado. Continuando pipeline (default: c).[/yellow]")
+                console.print(
+                    "\n[yellow]⏰ Tempo limite de resposta esgotado. Continuando pipeline (default: c).[/yellow]"
+                )
                 run_status = "decision_expired"
-                self._broadcast_ws("human_decision_expired", run_id, {
-                    "node": next_node,
-                    "timeout_seconds": self.hitl_timeout_seconds,
-                    "run_status": run_status,
-                })
+                self._broadcast_ws(
+                    "human_decision_expired",
+                    run_id,
+                    {
+                        "node": next_node,
+                        "timeout_seconds": self.hitl_timeout_seconds,
+                        "run_status": run_status,
+                    },
+                )
                 choice = "continue"
 
         action = "approve"
         cat = None
         msg = None
-
-
 
         if choice == "x":
             action = "abort"
@@ -547,19 +681,26 @@ class TaskDispatcher:
             cat_map = {"1": "bug", "2": "style", "3": "missing_feature", "4": "general"}
             cat = cat_map.get(cat_choice.strip(), "general")
 
-            msg = self._get_input_with_timeout("➜ Mensagem detalhada de feedback: ", timeout=120) or "Ajustar implementação."
+            msg = (
+                self._get_input_with_timeout("➜ Mensagem detalhada de feedback: ", timeout=120)
+                or "Ajustar implementação."
+            )
 
-            app.update_state(config, {
-                "error": None,
-                "feedback_history": state.get("feedback_history", []) + [
-                    {
-                        "from": "human",
-                        "node": node_name,
-                        "category": cat,
-                        "message": msg,
-                    }
-                ],
-            })
+            app.update_state(
+                config,
+                {
+                    "error": None,
+                    "feedback_history": state.get("feedback_history", [])
+                    + [
+                        {
+                            "from": "human",
+                            "node": node_name,
+                            "category": cat,
+                            "message": msg,
+                        }
+                    ],
+                },
+            )
             self._record_decision(telemetry_run_id, node_name, action, cat, msg)
             return True
 
@@ -578,15 +719,21 @@ class TaskDispatcher:
     def _review_mode_approval_gate(self, final_state: dict) -> bool:
         """Modo Revisão: Exibe o plano/artefatos completos e solicita aprovação final antes de escrever em disco."""
         console = Console()
-        console.print("\n[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]")
+        console.print(
+            "\n[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]"
+        )
         console.print("[bold magenta]🔍 MODO REVISÃO INTERATIVA — APROVAÇÃO DE MUDANÇAS[/bold magenta]")
-        console.print("[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]\n")
+        console.print(
+            "[bold magenta]═══════════════════════════════════════════════════════════════════[/bold magenta]\n"
+        )
 
         console.print(f"[bold]Ideia / Objetivo:[/bold] {final_state.get('idea')}")
         console.print(f"[bold]Épico CPO:[/bold] {final_state.get('epic', {}).get('title', 'N/A')}")
         console.print(f"[bold]User Stories PM:[/bold] {len(final_state.get('user_stories', []))} estória(s)")
         console.print(f"[bold]Tech Spec Tech Lead:[/bold] {final_state.get('tech_spec', '')[:150]}...")
-        console.print(f"[bold]DevOps Score:[/bold] {final_state.get('devops_review', {}).get('deployability_score', 100.0)}/100")
+        console.print(
+            f"[bold]DevOps Score:[/bold] {final_state.get('devops_review', {}).get('deployability_score', 100.0)}/100"
+        )
 
         console.print("\n[bold yellow]Deseja aplicar todas as mudanças propostas no disco?[/bold yellow]")
         choice = self._get_input_with_timeout("➜ Aplicar alterações? [s/N]: ", timeout=120).strip().lower()
@@ -641,11 +788,13 @@ class TaskDispatcher:
         if not self._trajectories_db().exists():
             return []
         import asyncio
+
         return asyncio.run(self._list_checkpoints_async())
 
     async def _list_checkpoints_async(self) -> list[str]:
         """Lê os thread_ids únicos do banco de trajetórias via AsyncSqliteSaver.alist."""
         from lf.pipeline.checkpointer import create_async_checkpointer
+
         checkpointer = create_async_checkpointer(self._trajectories_db())
         try:
             await checkpointer.setup()
@@ -681,29 +830,55 @@ class TaskDispatcher:
             return self._dispatch_sync(initial_state, thread_id, task, project_id)
 
         import asyncio
+
         return asyncio.run(self._dispatch_async(initial_state, thread_id, task, project_id))
 
     async def _dispatch_async(self, initial_state: dict, thread_id: str, task: TaskSchema, project_id: str) -> dict:
         """Dispatcher assíncrono: astream + AsyncSqliteSaver em trajectories.db."""
         from lf.pipeline.checkpointer import create_async_checkpointer
+
         checkpointer = create_async_checkpointer(self._trajectories_db())
         task_id = task.id
+        # A2/M-07: id da linha em pipeline_runs (1 por dispatch — CLI gera
+        # uuid novo; API reusa o uuid da run) + duração da execução.
+        pipeline_run_id = self._pipeline_run_id(thread_id)
+        start_time = time.monotonic()
 
         try:
             await checkpointer.setup()
             graph = self._get_graph(checkpointer=checkpointer)
             config = {"configurable": {"thread_id": thread_id}}
 
-            await self._publish_event_async("pipeline_started", task_id, {"idea": initial_state.get("idea"), "node": initial_state.get("next_agent")}, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                "running",
+                idea=initial_state.get("idea"),
+                stack=initial_state.get("stack"),
+                current_node=initial_state.get("next_agent"),
+                thread_id=thread_id,
+            )
+            await self._publish_event_async(
+                "pipeline_started",
+                task_id,
+                {"idea": initial_state.get("idea"), "node": initial_state.get("next_agent")},
+                thread_id=thread_id,
+                run_id=pipeline_run_id,
+            )
 
             async for event in graph.astream(initial_state, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
-                        await self._publish_event_async("node_execution", task_id, {
-                            "node": node_name,
-                            "status": "completed",
-                            **self._safe_output(output),
-                        }, thread_id=thread_id)
+                        await self._publish_event_async(
+                            "node_execution",
+                            task_id,
+                            {
+                                "node": node_name,
+                                "status": "completed",
+                                **self._safe_output(output),
+                            },
+                            thread_id=thread_id,
+                            run_id=pipeline_run_id,
+                        )
 
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
@@ -715,20 +890,51 @@ class TaskDispatcher:
 
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
-            await self._publish_event_async(final_event, task_id, {
-                "status": final_status,
-                "error": result.get("error"),
-            }, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                final_status,
+                idea=initial_state.get("idea"),
+                stack=initial_state.get("stack"),
+                current_node=result.get("next_agent", "FINISH"),
+                duration_seconds=round(time.monotonic() - start_time, 2),
+                thread_id=thread_id,
+            )
+            await self._publish_event_async(
+                final_event,
+                task_id,
+                {
+                    "status": final_status,
+                    "error": result.get("error"),
+                },
+                thread_id=thread_id,
+                run_id=pipeline_run_id,
+            )
 
             if self.notify:
                 status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
-                _send_notification("🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url)
+                _send_notification(
+                    "🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url
+                )
 
             self._create_pr_with_labels(task, result, project_id)
             return result
 
         except Exception as e:
-            await self._publish_event_async("pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                "failed",
+                idea=initial_state.get("idea"),
+                stack=initial_state.get("stack"),
+                duration_seconds=round(time.monotonic() - start_time, 2),
+                thread_id=thread_id,
+            )
+            await self._publish_event_async(
+                "pipeline_error",
+                task_id,
+                {"error": str(e)},
+                thread_id=thread_id,
+                run_id=pipeline_run_id,
+            )
             return {**initial_state, "error": str(e), "status": "failed"}
 
         finally:
@@ -742,22 +948,46 @@ class TaskDispatcher:
         task futura (regressão dos testes HITL tem prioridade nesta migração).
         """
         from lf.pipeline.checkpointer import create_sync_checkpointer
+
         checkpointer = create_sync_checkpointer(self._trajectories_db())
         graph = self._get_graph(checkpointer=checkpointer)
         config = {"configurable": {"thread_id": thread_id}}
         task_id = task.id
+        # A2/M-07: mesmo id de linha por dispatch (1 por execução).
+        pipeline_run_id = self._pipeline_run_id(thread_id)
+        start_time = time.monotonic()
 
-        self._broadcast_ws("pipeline_started", task_id, {"idea": task.title, "node": initial_state.get("next_agent")}, thread_id=thread_id)
+        self._upsert_pipeline_run(
+            pipeline_run_id,
+            "running",
+            idea=initial_state.get("idea"),
+            stack=initial_state.get("stack"),
+            current_node=initial_state.get("next_agent"),
+            thread_id=thread_id,
+        )
+        self._broadcast_ws(
+            "pipeline_started",
+            task_id,
+            {"idea": task.title, "node": initial_state.get("next_agent")},
+            thread_id=thread_id,
+            run_id=pipeline_run_id,
+        )
 
         try:
             for event in graph.stream(initial_state, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
-                        self._broadcast_ws("node_execution", task_id, {
-                            "node": node_name,
-                            "status": "completed",
-                            **self._safe_output(output),
-                        }, thread_id=thread_id)
+                        self._broadcast_ws(
+                            "node_execution",
+                            task_id,
+                            {
+                                "node": node_name,
+                                "status": "completed",
+                                **self._safe_output(output),
+                            },
+                            thread_id=thread_id,
+                            run_id=pipeline_run_id,
+                        )
 
             if self.interactive:
                 snapshot = graph.get_state(config)
@@ -768,11 +998,17 @@ class TaskDispatcher:
                     for event in graph.stream(None, config):
                         for node_name, output in event.items():
                             if isinstance(output, dict):
-                                self._broadcast_ws("node_execution", task_id, {
-                                    "node": node_name,
-                                    "status": "completed",
-                                    **self._safe_output(output),
-                                }, thread_id=thread_id)
+                                self._broadcast_ws(
+                                    "node_execution",
+                                    task_id,
+                                    {
+                                        "node": node_name,
+                                        "status": "completed",
+                                        **self._safe_output(output),
+                                    },
+                                    thread_id=thread_id,
+                                    run_id=pipeline_run_id,
+                                )
                     snapshot = graph.get_state(config)
 
             state_snapshot = graph.get_state(config)
@@ -785,20 +1021,47 @@ class TaskDispatcher:
 
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
-            self._broadcast_ws(final_event, task_id, {
-                "status": final_status,
-                "error": result.get("error"),
-            }, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                final_status,
+                idea=initial_state.get("idea"),
+                stack=initial_state.get("stack"),
+                current_node=result.get("next_agent", "FINISH"),
+                duration_seconds=round(time.monotonic() - start_time, 2),
+                thread_id=thread_id,
+            )
+            self._broadcast_ws(
+                final_event,
+                task_id,
+                {
+                    "status": final_status,
+                    "error": result.get("error"),
+                },
+                thread_id=thread_id,
+                run_id=pipeline_run_id,
+            )
 
             if self.notify:
                 status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
-                _send_notification("🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url)
+                _send_notification(
+                    "🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url
+                )
 
             self._create_pr_with_labels(task, result, project_id)
             return result
 
         except Exception as e:
-            self._broadcast_ws("pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                "failed",
+                idea=initial_state.get("idea"),
+                stack=initial_state.get("stack"),
+                duration_seconds=round(time.monotonic() - start_time, 2),
+                thread_id=thread_id,
+            )
+            self._broadcast_ws(
+                "pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id, run_id=pipeline_run_id
+            )
             return {**initial_state, "error": str(e), "status": "failed"}
 
         finally:
@@ -815,11 +1078,13 @@ class TaskDispatcher:
         if not self._trajectories_db().exists():
             raise RuntimeError(f"Nenhum banco de trajetórias encontrado em {self._trajectories_db()}")
         import asyncio
+
         return asyncio.run(self._resume_async(project_id, task_id, thread_id))
 
     async def _resume_async(self, project_id: str, task_id: str, thread_id: str | None = None) -> dict:
         """Resume assíncrono: aget_state/aupdate_state/astream sobre AsyncSqliteSaver."""
         from lf.pipeline.checkpointer import create_async_checkpointer
+
         checkpointer = create_async_checkpointer(self._trajectories_db())
         await checkpointer.setup()
         graph = self._get_graph(checkpointer=checkpointer)
@@ -828,6 +1093,9 @@ class TaskDispatcher:
         if thread_id is None:
             thread_id = project_id if project_id.startswith("run-") else f"{project_id}-{task_id}"
         config = {"configurable": {"thread_id": thread_id}}
+        # A2/M-07: id da linha em pipeline_runs (API reusa o uuid da run).
+        pipeline_run_id = self._pipeline_run_id(thread_id)
+        start_time = time.monotonic()
 
         last_values: dict = {}
         try:
@@ -839,38 +1107,85 @@ class TaskDispatcher:
             last_values = snapshot.values
             resuming_node = snapshot.next[0] if snapshot.next else last_values.get("next_agent", "cpo")
 
-            print(f"--- CHECKPOINT RECOVERY: Retomando pipeline (thread: {thread_id}) a partir do nó '{resuming_node}' ---")
+            print(
+                f"--- CHECKPOINT RECOVERY: Retomando pipeline (thread: {thread_id}) a partir do nó '{resuming_node}' ---"
+            )
 
             await graph.aupdate_state(config, {"error": None})
 
-            await self._publish_event_async("pipeline_resumed", task_id, {
-                "thread_id": thread_id,
-                "resuming_from_node": resuming_node,
-            }, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                "running",
+                idea=last_values.get("idea"),
+                stack=last_values.get("stack"),
+                current_node=resuming_node,
+                thread_id=thread_id,
+            )
+            await self._publish_event_async(
+                "pipeline_resumed",
+                task_id,
+                {
+                    "thread_id": thread_id,
+                    "resuming_from_node": resuming_node,
+                },
+                thread_id=thread_id,
+                run_id=pipeline_run_id,
+            )
 
             async for event in graph.astream(None, config):
                 for node_name, output in event.items():
                     if isinstance(output, dict):
-                        await self._publish_event_async("node_execution", task_id, {
-                            "node": node_name,
-                            "status": "completed",
-                            **self._safe_output(output),
-                        }, thread_id=thread_id)
+                        await self._publish_event_async(
+                            "node_execution",
+                            task_id,
+                            {
+                                "node": node_name,
+                                "status": "completed",
+                                **self._safe_output(output),
+                            },
+                            thread_id=thread_id,
+                            run_id=pipeline_run_id,
+                        )
 
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
-            await self._publish_event_async(final_event, task_id, {
-                "status": final_status,
-                "error": result.get("error"),
-            }, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                final_status,
+                idea=last_values.get("idea"),
+                stack=last_values.get("stack"),
+                current_node=result.get("next_agent", "FINISH"),
+                duration_seconds=round(time.monotonic() - start_time, 2),
+                thread_id=thread_id,
+            )
+            await self._publish_event_async(
+                final_event,
+                task_id,
+                {
+                    "status": final_status,
+                    "error": result.get("error"),
+                },
+                thread_id=thread_id,
+                run_id=pipeline_run_id,
+            )
 
             return result
 
         except Exception as e:
-            await self._publish_event_async("pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id)
+            self._upsert_pipeline_run(
+                pipeline_run_id,
+                "failed",
+                idea=last_values.get("idea"),
+                stack=last_values.get("stack"),
+                duration_seconds=round(time.monotonic() - start_time, 2),
+                thread_id=thread_id,
+            )
+            await self._publish_event_async(
+                "pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id, run_id=pipeline_run_id
+            )
             return {**last_values, "error": str(e), "status": "failed"}
 
         finally:
