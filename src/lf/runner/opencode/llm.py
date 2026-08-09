@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import UTC
+from pathlib import Path
 
 from rich.console import Console
 
@@ -8,6 +9,30 @@ from ...pipeline.cache import SQLiteLLMCache
 from .runner import DEFAULT_OPENCODE_MODEL, OpenCodeRunner
 
 _console = Console()
+
+# Marcadores de erro de modelo/servidor que NÃO são resposta LLM válida. O
+# wrapper `script` mascara o exit code do subprocesso (success=True mesmo com
+# falha), então o gate precisa checar o TEXTO da resposta, não o código de saída.
+_LLM_ERROR_MARKERS = ("Model not found", "UnknownError", "Unexpected server error", "model_not_found")
+
+
+def _raise_if_llm_error_marker(raw_response_text: str, result=None) -> None:
+    """Gate: resposta LLM contendo marcador de erro vira RuntimeError.
+
+    Roda MESMO quando `result.success` é True — o wrapper `script` mascara o
+    exit code e texto de erro ("Model not found"/"UnknownError") chegava como
+    resposta válida, fazendo o Developer seguir para QA com código vazio.
+    """
+    haystack = raw_response_text or ""
+    if result is not None:
+        haystack += "\n" + (getattr(result, "stdout", "") or "") + "\n" + (getattr(result, "stderr", "") or "")
+    for marker in _LLM_ERROR_MARKERS:
+        if marker in haystack:
+            raise RuntimeError(
+                "LLM Engine falhou: resposta contém erro de modelo/servidor. "
+                "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
+                f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
+            )
 
 
 def call_llm_via_opencode(
@@ -19,6 +44,7 @@ def call_llm_via_opencode(
     mock: bool = False,
     cache: bool = True,
     circuit_breaker=None,
+    project_root: str | Path | None = None,
 ) -> str | dict | list:
     """Chama OpenCode como LLM para geração de texto/estruturado.
 
@@ -31,6 +57,9 @@ def call_llm_via_opencode(
         mock: Se True, retorna mock
         cache: Se True, usa cache SQLite (SQLiteLLMCache de llm_factory)
         circuit_breaker: CircuitBreaker opcional para preemptar subprocessos
+        project_root: Diretório da run (cwd do subprocesso opencode). Default:
+            os.getcwd(). Subprocessos opencode herdam PWD, então passar o dir
+            correto impede que o agente escreva no repo real.
 
     Returns:
         str se não tiver schema_model, dict se tiver schema_model
@@ -65,6 +94,7 @@ def call_llm_via_opencode(
         # e o enforcement do CB ficava morto nos nós.
         if isinstance(circuit_breaker, dict):
             from ...guardrails.circuit_breaker import CircuitBreaker
+
             circuit_breaker = CircuitBreaker.from_snapshot(circuit_breaker)
         if not circuit_breaker.can_proceed():
             raise RuntimeError("Circuit breaker is open - cannot proceed")
@@ -89,40 +119,56 @@ Responda SOMENTE o objeto JSON puro."""
         DEFAULT_OPENROUTER_MODEL,
         call_openrouter_api,
     )
+
     openrouter_key = os.environ.get("OPENROUTER_API_KEY") or DEFAULT_OPENROUTER_KEY
 
     display_model = (
-        model
-        or os.environ.get("OPENROUTER_MODEL")
-        or os.environ.get("OPENCODE_MODEL")
-        or DEFAULT_OPENCODE_MODEL
+        model or os.environ.get("OPENROUTER_MODEL") or os.environ.get("OPENCODE_MODEL") or DEFAULT_OPENCODE_MODEL
     )
 
     raw_response_text = ""
     used_subprocess = False
+    run_root = project_root or os.getcwd()
     with _console.status(f"⏳ Consultando LLM ({display_model})...", spinner="dots"):
         if openrouter_key:
             model_name = model or DEFAULT_OPENROUTER_MODEL
             user_content = user_prompt + (format_instruction if schema_model else "")
             try:
                 raw_response_text, _ = call_openrouter_api(
-                    user_content, model=model_name, api_key=openrouter_key,
+                    user_content,
+                    model=model_name,
+                    api_key=openrouter_key,
                     system_prompt=system_prompt,
                 )
+            except RuntimeError:
+                # Gate já levantou (erro de modelo/servidor) — não cai no
+                # fallback: propaga como erro de LLM, não como falha de API.
+                raise
             except Exception as e:
-                print(f"--- AVISO: LLM API ({model_name}) falhou após retentativas ({e}). Executando OpenCodeRunner fallback ---")
+                print(
+                    f"--- AVISO: LLM API ({model_name}) falhou após retentativas ({e}). Executando OpenCodeRunner fallback ---"
+                )
                 runner = OpenCodeRunner()
-                result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
+                result = runner.run(
+                    final_prompt, project_root=run_root, model=model_to_use, circuit_breaker=circuit_breaker
+                )
                 if not result.success:
                     raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
                 raw_response_text = result.clean_stdout
+                _raise_if_llm_error_marker(raw_response_text, result)
                 used_subprocess = True
+            # Gate do path OpenRouter direto: roda fora do try para o RuntimeError
+            # não ser confundido com falha da API e capturado pelo fallback.
+            _raise_if_llm_error_marker(raw_response_text)
         else:
             runner = OpenCodeRunner()
-            result = runner.run(final_prompt, project_root=os.getcwd(), model=model_to_use, circuit_breaker=circuit_breaker)
+            result = runner.run(
+                final_prompt, project_root=run_root, model=model_to_use, circuit_breaker=circuit_breaker
+            )
             if not result.success:
                 raise RuntimeError(f"OpenCode LLM call failed: {result.stderr}")
             raw_response_text = result.clean_stdout
+            _raise_if_llm_error_marker(raw_response_text, result)
             used_subprocess = True
 
     # M-09: custo ESTIMADO do path OpenCode subprocess (não havia registro —
@@ -132,6 +178,7 @@ Responda SOMENTE o objeto JSON puro."""
     if used_subprocess:
         try:
             from ...pipeline.llm_factory import CostTracker
+
             CostTracker().track(
                 model=display_model,
                 prompt_text=full_prompt,
@@ -146,8 +193,7 @@ Responda SOMENTE o objeto JSON puro."""
         parsed = _extract_json_from_text(raw_response_text)
         if parsed is None:
             raise RuntimeError(
-                f"LLM não retornou JSON válido para {schema_model.__name__}. "
-                f"Resposta: {raw_response_text[:500]}"
+                f"LLM não retornou JSON válido para {schema_model.__name__}. Resposta: {raw_response_text[:500]}"
             )
         if isinstance(parsed, dict):
             validated = schema_model(**parsed)
@@ -179,6 +225,7 @@ Responda SOMENTE o objeto JSON puro."""
 
 def _extract_json_from_text(text: str) -> dict | list | None:
     import re
+
     if not text:
         return None
     # Direct parse attempt
@@ -227,17 +274,17 @@ def _extract_json_from_text(text: str) -> dict | list | None:
                 depth -= 1
                 if depth == 0:
                     try:
-                        return json.loads(text[start:i + 1])
+                        return json.loads(text[start : i + 1])
                     except Exception:
                         # Se o primeiro objeto falhou, continua para achar outro
                         break
     return None
 
 
-
 def _mock_response(schema_model) -> dict:
     """Gera resposta mock baseada no schema Pydantic."""
     from datetime import datetime
+
     now = datetime.now(UTC).isoformat()
     mock = {}
     for name, field in schema_model.model_fields.items():

@@ -2,6 +2,7 @@
 Nó QA: executa testes reais via harness e gera relatório estruturado,
 sem mutação direta de estado e sem reportar PASS falso para 0 testes.
 """
+
 from __future__ import annotations
 
 import json
@@ -41,7 +42,9 @@ def qa(state: GraphState) -> dict:
         new_feedback = feedback_history + [
             {"from": "qa", "message": "Nenhum código gerado — Developer falhou", "timestamp": now_iso}
         ]
-        print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
+        print(
+            f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---"
+        )
         return {
             **state,
             "test_report": fail_report,
@@ -63,11 +66,15 @@ def qa(state: GraphState) -> dict:
     user_story_id = user_stories[0].get("id", "US001") if user_stories else "US001"
 
     # 🩹 Self-Healing MVP de Dependências: se falhar por versão incompatível, tenta auto-fixar
-    if (harness_result.get("passed", 0) == 0 or harness_result.get("errors")) and _attempt_dependency_self_healing(product_dir, harness_result):
+    if (harness_result.get("passed", 0) == 0 or harness_result.get("errors")) and _attempt_dependency_self_healing(
+        product_dir, harness_result
+    ):
         print("--- INFO: Re-executando Test Harness após Self-Healing de dependências ---")
         harness_result = _run_harness(product_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
 
-    print(f"--- INFO: Harness executado (passou={harness_result.get('passed')}, erros={len(harness_result.get('errors', []))}) ---")
+    print(
+        f"--- INFO: Harness executado (passou={harness_result.get('passed')}, erros={len(harness_result.get('errors', []))}) ---"
+    )
 
     report = _build_report_from_harness(report_id, now_iso, harness_result, user_story_id)
 
@@ -125,14 +132,18 @@ def qa(state: GraphState) -> dict:
             json.dump(report, f, indent=2, ensure_ascii=False)
         print(f"--- INFO: Test report salvo em {path} ---")
 
-    is_pass = report.get("summary", {}).get("status") == "PASS" and report.get("summary", {}).get("tests_failed", 1) == 0
+    is_pass = (
+        report.get("summary", {}).get("status") == "PASS" and report.get("summary", {}).get("tests_failed", 1) == 0
+    )
     next_agent = "parallel_audit" if is_pass else "developer"
 
     qa_attempt = state.get("qa_attempt_count", 0)
     new_feedback = feedback_history
     if not is_pass:
         qa_attempt += 1
-        print(f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---")
+        print(
+            f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---"
+        )
         no_tests_found = report.get("summary", {}).get("no_tests_found", False)
         failed_cnt = report.get("summary", {}).get("tests_failed", 1)
         stack = state.get("stack", "python")
@@ -198,7 +209,10 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
     from dataclasses import asdict
 
     from ...runner.harness.runner import TestHarnessRunner
-    target_dir = project_dir if (project_dir and os.path.exists(project_dir)) else output_dir
+
+    # Prefere o dir da run (output_dir) — o project_dir (".") sempre existe e
+    # fazia o harness coletar testes do repo real em vez dos do produto.
+    target_dir = output_dir if (output_dir and os.path.exists(output_dir)) else project_dir
 
     # Self-healing Go apenas quando a stack DECIDIDA é Go (evita rodar
     # 'go mod tidy' por causa de go.mod obsoleto de uma run anterior).
@@ -251,14 +265,21 @@ def _build_report_from_harness(
     no_tests_found = False
     if total == 0:
         if not errors:
-            # Nenhum teste coletado pelo harness sem erros reais de execução:
-            # sinaliza explicitamente para o developer ajustar tests/ da stack.
-            no_tests_found = True
-            command_display = command_used or "(comando não detectado)"
-            errors.append(
-                f"Nenhum teste foi coletado pelo harness (comando {command_display}). "
-                "Verifique se tests/ existe, importa corretamente e contém testes da stack decidida."
-            )
+            if harness_result.get("command_missing"):
+                # Comando de teste não encontrado no PATH: não é "nenhum teste
+                # coletado", é harness ausente (ex.: pytest fora do venv).
+                errors.append(
+                    "Harness: comando de teste não encontrado no PATH (pytest). Verifique a instalação do venv."
+                )
+            else:
+                # Nenhum teste coletado pelo harness sem erros reais de execução:
+                # sinaliza explicitamente para o developer ajustar tests/ da stack.
+                no_tests_found = True
+                command_display = command_used or "(comando não detectado)"
+                errors.append(
+                    f"Nenhum teste foi coletado pelo harness (comando {command_display}). "
+                    "Verifique se tests/ existe, importa corretamente e contém testes da stack decidida."
+                )
         else:
             errors.append("Nenhum teste foi executado ou nenhum harness/compilador foi encontrado.")
         failed = len(errors)
@@ -305,6 +326,7 @@ def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> 
     """Tenta auto-corrigir erros de incompatibilidade de versão de dependências (Cargo.toml e package.json)."""
     import re
     import subprocess
+
     errors_str = " ".join(str(e) for e in harness_result.get("errors", []))
     output_str = str(harness_result.get("output", "")) + " " + errors_str
 
@@ -316,7 +338,13 @@ def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> 
             crate_name, target_ver = m.group(1), m.group(2)
             print(f"--- INFO: Self-Healing Cargo: executando cargo update -p {crate_name} --precise {target_ver} ---")
             try:
-                subprocess.run(f"cargo update -p {crate_name} --precise {target_ver}", shell=True, cwd=project_dir, capture_output=True, timeout=30)
+                subprocess.run(
+                    f"cargo update -p {crate_name} --precise {target_ver}",
+                    shell=True,
+                    cwd=project_dir,
+                    capture_output=True,
+                    timeout=30,
+                )
                 return True
             except Exception:
                 pass
@@ -337,7 +365,9 @@ def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> 
     if package_json.exists() and ("peer dependency" in output_str.lower() or "eresolve" in output_str.lower()):
         print("--- INFO: Self-Healing NPM: executando npm install com --legacy-peer-deps ---")
         try:
-            subprocess.run("npm install --legacy-peer-deps", shell=True, cwd=project_dir, capture_output=True, timeout=30)
+            subprocess.run(
+                "npm install --legacy-peer-deps", shell=True, cwd=project_dir, capture_output=True, timeout=30
+            )
             return True
         except Exception:
             pass

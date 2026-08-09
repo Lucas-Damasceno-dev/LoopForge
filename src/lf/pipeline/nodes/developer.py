@@ -2,6 +2,7 @@
 Nó Developer: recebe a stack decidida pelo Tech Lead e gera um projeto MULTI-ARQUIVO completo
 (código principal, manifesto de dependências e testes unitários).
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -66,8 +67,13 @@ def _log_telemetry_event(event_type: str, details: dict) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(db_path), timeout=5.0)
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("CREATE TABLE IF NOT EXISTS telemetry_events (id TEXT PRIMARY KEY, event_type TEXT, details TEXT, timestamp TEXT)")
-        conn.execute("INSERT INTO telemetry_events VALUES (?, ?, ?, ?)", (str(uuid.uuid4()), event_type, json.dumps(details), datetime.now(UTC).isoformat()))
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS telemetry_events (id TEXT PRIMARY KEY, event_type TEXT, details TEXT, timestamp TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO telemetry_events VALUES (?, ?, ?, ?)",
+            (str(uuid.uuid4()), event_type, json.dumps(details), datetime.now(UTC).isoformat()),
+        )
         conn.commit()
         conn.close()
     except Exception as exc:
@@ -81,7 +87,17 @@ def _clean_code(raw: str) -> str:
     if code.endswith("```"):
         code = code[:-3].strip()
     first_line = code.split("\n", 1)[0].strip()
-    if not first_line.startswith(("{", "[")) and first_line.lower() in ("java", "python", "javascript", "go", "rust", "typescript", "xml", "toml", "json"):
+    if not first_line.startswith(("{", "[")) and first_line.lower() in (
+        "java",
+        "python",
+        "javascript",
+        "go",
+        "rust",
+        "typescript",
+        "xml",
+        "toml",
+        "json",
+    ):
         code = code.split("\n", 1)[-1] if "\n" in code else code
     return code.strip()
 
@@ -134,7 +150,9 @@ def _parse_multi_file_response(raw_text: str, default_filename: str = "main.py")
     return files
 
 
-def _extract_failing_snippets(test_report: dict, project_dir: str, previous_code: str, max_chars: int = 1200) -> list[str]:
+def _extract_failing_snippets(
+    test_report: dict, project_dir: str, previous_code: str, max_chars: int = 1200
+) -> list[str]:
     snippets: list[str] = []
     if not isinstance(test_report, dict):
         return snippets
@@ -142,7 +160,14 @@ def _extract_failing_snippets(test_report: dict, project_dir: str, previous_code
     output_dir = Path(".").resolve()
     base_dirs = [Path(project_dir).resolve(), output_dir]
 
-    main_file_names = {"generated_code.py", "main.py", "generated_code.js", "main.go", "src/main.rs", "src/main/java/Main.java"}
+    main_file_names = {
+        "generated_code.py",
+        "main.py",
+        "generated_code.js",
+        "main.go",
+        "src/main.rs",
+        "src/main/java/Main.java",
+    }
     previous_code_normalized = (previous_code or "").strip()
 
     seen_paths: set[str] = set()
@@ -238,6 +263,7 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: 
     import ast
     import shutil
     import subprocess
+
     errors = []
     s = stack.lower()
 
@@ -264,7 +290,9 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: 
             pass
     elif "go" in s and (Path(project_dir) / "go.mod").exists() and shutil.which("go"):
         try:
-            res = subprocess.run("go vet ./...", shell=True, cwd=project_dir, capture_output=True, text=True, timeout=15)
+            res = subprocess.run(
+                "go vet ./...", shell=True, cwd=project_dir, capture_output=True, text=True, timeout=15
+            )
             if res.returncode != 0:
                 errors.append(f"Go vet error: {res.stderr.strip()[:300]}")
         except Exception:
@@ -299,13 +327,15 @@ def developer(state: GraphState) -> dict:
             # ser retomada via resume após POST /cost/override (que aplica o
             # novo limite ao CircuitBreaker do estado). Ao retomar, o nó
             # re-executa do topo com o CB atualizado e segue o fluxo normal.
-            interrupt({
-                "paused_budget": True,
-                "reason": "budget_exceeded",
-                "node": "developer",
-                "max_usd": cb.max_total_cost,
-                "spent_usd": cb.total_cost,
-            })
+            interrupt(
+                {
+                    "paused_budget": True,
+                    "reason": "budget_exceeded",
+                    "node": "developer",
+                    "max_usd": cb.max_total_cost,
+                    "spent_usd": cb.total_cost,
+                }
+            )
 
     if state.get("mock_llm"):
         print(f"--- INFO: Developer modo MOCK (stack decidida pelo TL: {stack}) ---")
@@ -314,7 +344,9 @@ def developer(state: GraphState) -> dict:
         if contract_tests:
             mock_files, skipped_tests_count = _filter_test_paths_from_file_map(mock_files)
             if skipped_tests_count > 0:
-                print(f"--- INFO: Developer pulou {skipped_tests_count} arquivo(s) tests/ (contrato de testes ativo) ---")
+                print(
+                    f"--- INFO: Developer pulou {skipped_tests_count} arquivo(s) tests/ (contrato de testes ativo) ---"
+                )
         _write_project_files(mock_files, [output_dir, project_dir])
         return {
             **state,
@@ -368,18 +400,25 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     if importlib.util.find_spec("genome") is not None:
         try:
             from genome import GenomeScanner, render_markdown
+
             genome_scanner = GenomeScanner(project_dir or ".")
             genome_data = genome_scanner.scan()
             genome_prompt = render_markdown(genome_data)
             if genome_prompt:
                 keywords = set(w.lower().strip() for w in f"{idea} {stack}".split() if len(w) > 3)
                 filtered_lines = [
-                    line for line in genome_prompt.splitlines()
-                    if not keywords or any(kw in line.lower() for kw in keywords) or line.startswith("#") or line.startswith("-")
+                    line
+                    for line in genome_prompt.splitlines()
+                    if not keywords
+                    or any(kw in line.lower() for kw in keywords)
+                    or line.startswith("#")
+                    or line.startswith("-")
                 ]
                 selective_genome = "\n".join(filtered_lines[:40])
                 if selective_genome:
-                    prompt_parts.append(f"\n\n=== CODEBASE GENOME SELETIVO (DNA do Repositório) ===\n{selective_genome}")
+                    prompt_parts.append(
+                        f"\n\n=== CODEBASE GENOME SELETIVO (DNA do Repositório) ===\n{selective_genome}"
+                    )
         except Exception as exc:
             print(f"--- INFO: Genome scanner não utilizado nesta etapa: {exc} ---")
             _log_telemetry_event("hook_error", {"hook": "GenomeScanner", "error": str(exc), "node": "developer"})
@@ -387,6 +426,7 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     # 🧠 Consulta MemoryManager para obter lições aprendidas passadas relevantes
     try:
         from ...memory.manager import MemoryManager
+
         mem = MemoryManager()
         relevant = mem.search_relevant_lessons(query=f"{idea} {stack}", stack=stack, limit=3)
         formatted_lessons = mem.format_lessons_for_prompt(relevant)
@@ -420,18 +460,22 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
             prompt_parts.extend(feedback_lines)
 
         if previous_code:
-            prompt_parts.append(f"\n\nCódigo anterior que apresentou falha:\n```\n{previous_code[:1500]}\n```\nCorrija os problemas apontados acima.")
+            prompt_parts.append(
+                f"\n\nCódigo anterior que apresentou falha:\n```\n{previous_code[:1500]}\n```\nCorrija os problemas apontados acima."
+            )
             failing_snippets = _extract_failing_snippets(test_report, project_dir, previous_code)
             if failing_snippets:
-                prompt_parts.append(
-                    "\n\nTrechos dos arquivos citados nas falhas:\n" + "\n".join(failing_snippets)
-                )
+                prompt_parts.append("\n\nTrechos dos arquivos citados nas falhas:\n" + "\n".join(failing_snippets))
 
     complexity = state.get("complexity_level", "standard")
     if complexity == "mvp":
-        prompt_parts.append("\n=== NÍVEL DE COMPLEXIDADE: MVP ===\nFoque em código funcional e enxuto. Priorize os fluxos principais e mantenha a estrutura direta e sem complexidade desnecessária.")
+        prompt_parts.append(
+            "\n=== NÍVEL DE COMPLEXIDADE: MVP ===\nFoque em código funcional e enxuto. Priorize os fluxos principais e mantenha a estrutura direta e sem complexidade desnecessária."
+        )
     elif complexity == "advanced":
-        prompt_parts.append("\n=== NÍVEL DE COMPLEXIDADE: AVANÇADO ===\nImplemente uma solução completa e robusta, incluindo módulos organizados, tratamento extensivo de erros, funções auxiliares e testes unitários completos.")
+        prompt_parts.append(
+            "\n=== NÍVEL DE COMPLEXIDADE: AVANÇADO ===\nImplemente uma solução completa e robusta, incluindo módulos organizados, tratamento extensivo de erros, funções auxiliares e testes unitários completos."
+        )
 
     user_prompt = "\n".join(prompt_parts)
 
@@ -445,21 +489,23 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
             mock=state.get("mock_llm", False),
             cache=True,
             circuit_breaker=state.get("circuit_breaker"),
+            project_root=output_dir,
         )
         if not isinstance(raw, str):
             raw = str(raw)
     except Exception as e:
         err_msg = f"LLM Engine falhou: {e}"
         print(f"--- AVISO: {err_msg} ---")
-        new_feedback = list(feedback_history) + [
-            {"from": "developer", "message": err_msg, "attempt": attempt_count}
-        ]
+        new_feedback = list(feedback_history) + [{"from": "developer", "message": err_msg, "attempt": attempt_count}]
+        # ABORT: erro de LLM (ex.: modelo inválido) NÃO deve seguir para QA com
+        # código vazio — o QA reportaria "nenhum teste coletado" e o Developer
+        # entraria em loop de retentativa. FINISH é mapeado para END no router.
         return {
             **state,
             "code": "",
             "attempt_count": attempt_count,
             "feedback_history": new_feedback,
-            "next_agent": "qa",
+            "next_agent": "FINISH",
             "error": err_msg,
         }
 
@@ -490,10 +536,13 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     if importlib.util.find_spec("registry") is not None:
         try:
             from registry import RegistryChecker
+
             reg_checker = RegistryChecker(project_dir or ".")
             breaking_changes = reg_checker.check(agent="developer")
             if breaking_changes:
-                print(f"--- AVISO: Agentic Registry detectou {len(breaking_changes)} quebras de contrato no nó Developer! ---")
+                print(
+                    f"--- AVISO: Agentic Registry detectou {len(breaking_changes)} quebras de contrato no nó Developer! ---"
+                )
         except Exception as exc:
             print(f"--- INFO: Agentic Registry hook ignorado: {exc} ---")
 
@@ -527,7 +576,7 @@ def _generate_mock_project(stack: str) -> dict[str, str]:
         return {
             "Cargo.toml": '[package]\nname = "generated-app"\nversion = "0.1.0"\nedition = "2021"\n[dependencies]\n',
             "src/main.rs": 'fn main() {\n    println!("Hello from Rust");\n}',
-            "tests/test_main.rs": '#[test]\nfn test_baseline() {\n    assert_eq!(2 + 2, 4);\n}',
+            "tests/test_main.rs": "#[test]\nfn test_baseline() {\n    assert_eq!(2 + 2, 4);\n}",
         }
     elif "javascript" in s or "node" in s or "js" in s:
         return {
@@ -539,11 +588,11 @@ def _generate_mock_project(stack: str) -> dict[str, str]:
         return {
             "pom.xml": '<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><groupId>com.lf</groupId><artifactId>app</artifactId><version>1.0</version></project>',
             "src/main/java/Main.java": 'public class Main { public static void main(String[] args) { System.out.println("Java app"); } }',
-            "src/test/java/MainTest.java": 'import org.junit.jupiter.api.Test;\npublic class MainTest { @Test public void testPass() {} }',
+            "src/test/java/MainTest.java": "import org.junit.jupiter.api.Test;\npublic class MainTest { @Test public void testPass() {} }",
         }
     elif "go" in s:
         return {
-            "go.mod": 'module generated-app\n\ngo 1.21\n',
+            "go.mod": "module generated-app\n\ngo 1.21\n",
             "main.go": 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Go app")\n}',
             "main_test.go": 'package main\n\nimport "testing"\n\nfunc TestOk(t *testing.T) {\n}',
         }
@@ -551,7 +600,7 @@ def _generate_mock_project(stack: str) -> dict[str, str]:
         return {
             "pyproject.toml": '[build-system]\nrequires = ["setuptools"]\nbuild-backend = "setuptools.build_meta"\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
             "generated_code.py": 'def main():\n    print("Python app")\n\nif __name__ == "__main__":\n    main()',
-            "tests/test_main.py": 'def test_ok():\n    assert True',
+            "tests/test_main.py": "def test_ok():\n    assert True",
         }
 
 
@@ -611,22 +660,19 @@ def _is_foreign_file(rel_path: Path, stack: str) -> bool:
 
     # Manifesto de outra stack (ex: go.mod presente numa run de stack python)
     is_foreign_manifest = (
-        name in {m for m_list in _OWN_MANIFESTS.values() for m in m_list}
-        and name not in own_manifests
+        name in {m for m_list in _OWN_MANIFESTS.values() for m in m_list} and name not in own_manifests
     )
     # Fonte de outra linguagem em qualquer nível sob o target
     is_foreign_source = suffix in _FOREIGN_SOURCE_EXTS.get(s, set())
     # Teste estrangeiro dentro de tests/
-    is_foreign_test = (
-        "tests" in rel_path.parts
-        and suffix in _FOREIGN_TESTS.get(s, set())
-    )
+    is_foreign_test = "tests" in rel_path.parts and suffix in _FOREIGN_TESTS.get(s, set())
     return is_foreign_manifest or is_foreign_source or is_foreign_test
 
 
 def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "") -> None:
     """Limpa diretórios de código de tentativas anteriores para evitar colisões entre arquiteturas diferentes."""
     import shutil
+
     stale_dirs = {"cmd", "internal", "src", "pkg", "migrations"}
     unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
     for base_dir in unique_dirs:
@@ -669,7 +715,9 @@ def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> N
         # caso, pula a escrita inteira — o projeto só deve ser gravado em output_dir.
         is_loopforge_repo = _find_loopforge_repo_root(base_path) is not None
         if is_loopforge_repo:
-            print(f"--- INFO: Diretório dentro do repo LoopForge protegido: {base_dir} (escrita apenas em output_dir) ---")
+            print(
+                f"--- INFO: Diretório dentro do repo LoopForge protegido: {base_dir} (escrita apenas em output_dir) ---"
+            )
             continue
 
         for rel_path, content in files_map.items():
@@ -677,7 +725,9 @@ def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> N
             # Defesa extra (PROTECTED_ROOT_FILES): nunca sobrescrever arquivos
             # críticos do repo, mesmo se a detecção de raiz falhar por estrutura.
             if is_loopforge_repo and (norm_rel in PROTECTED_ROOT_FILES or norm_rel.startswith(".github")):
-                print(f"--- AVISO: Dogfooding Protection ativado: Bloqueada sobrescrita do arquivo do repositório '{rel_path}' ---")
+                print(
+                    f"--- AVISO: Dogfooding Protection ativado: Bloqueada sobrescrita do arquivo do repositório '{rel_path}' ---"
+                )
                 continue
 
             full_path = os.path.join(base_dir, rel_path)

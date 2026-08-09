@@ -10,7 +10,7 @@
     "package_manager": "pip"
   },
   "llm_provider": "openrouter",
-  "llm_model": "deepseek-v4-flash-free",
+  "llm_model": "oc/deepseek-v4-flash-free",
   "budget_limit_usd": 10.0,
   "max_parallel_tasks": 2,
   "plan": {

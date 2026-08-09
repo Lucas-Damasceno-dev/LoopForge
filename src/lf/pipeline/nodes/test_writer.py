@@ -1,6 +1,7 @@
 """
 Nó Test Writer: gera suíte de testes-contrato a partir de user stories e critérios de aceitação.
 """
+
 from __future__ import annotations
 
 import os
@@ -59,6 +60,7 @@ def test_writer(state: GraphState) -> dict:
             user_prompt=user_prompt,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
+            project_root=output_dir,
         )
         if not isinstance(raw, str):
             raw = str(raw)

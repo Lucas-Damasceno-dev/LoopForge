@@ -111,3 +111,27 @@ def test_create_plan_from_epic(tmp_path):
     plan = create_plan_from_epic(epic, output_dir=str(tmp_path))
     assert len(plan.tasks) == 4
     assert plan.tasks[0]["persona"] == "pm"
+
+
+def test_developer_llm_error_aborts_with_finish(tmp_path):
+    """C2: erro de LLM no Developer → next_agent == 'FINISH' (não segue para QA com código vazio)."""
+    state = {
+        "idea": "Calc app",
+        "tech_spec": "# Spec\nImplement code",
+        "user_stories": [{"id": "US-001", "title": "Implement feature", "acceptance_criteria": ["c1"]}],
+        "project_dir": str(tmp_path),
+        "output_dir": str(tmp_path),
+        "mock_llm": False,
+        "feedback_history": [],
+        "attempt_count": 1,
+    }
+
+    with patch(
+        "lf.pipeline.nodes.developer.call_llm_via_opencode",
+        side_effect=RuntimeError("LLM Engine falhou: resposta contém erro de modelo/servidor"),
+    ):
+        res = developer(state)
+        assert res["next_agent"] == "FINISH"
+        assert res["code"] == ""
+        assert "LLM Engine falhou" in res["error"]
+        assert res["feedback_history"][-1]["from"] == "developer"

@@ -15,6 +15,22 @@ class TestHarnessResult:
     output: str
     success: bool
     command: str = ""
+    # True quando o comando de teste não foi encontrado no PATH (ex.: pytest
+    # fora do venv). O QA usa isso para diferenciar "nenhum teste" real de
+    # "não há harness instalado" — evita o relatório enganoso de 0 testes.
+    command_missing: bool = False
+
+
+def _find_venv_bin(cwd: str | Path) -> Path | None:
+    """Procura .venv/bin (ou venv/bin) em cwd e até 3 níveis de pai."""
+    current = Path(cwd).resolve()
+    for _ in range(4):  # cwd + 3 pais
+        for name in (".venv", "venv"):
+            candidate = current / name / "bin"
+            if candidate.is_dir():
+                return candidate
+        current = current.parent
+    return None
 
 
 class TestHarnessRunner:
@@ -48,6 +64,7 @@ class TestHarnessRunner:
     def run_auto_formatter(self, cwd: str | Path = ".") -> None:
         """Executa auto-formatador nativo da linguagem (cargo fmt, ruff format, gofmt) antes dos testes."""
         import shutil
+
         cmd = self._detect_command(cwd)
         try:
             if "cargo" in cmd and shutil.which("cargo"):
@@ -76,6 +93,17 @@ class TestHarnessRunner:
             except ValueError:
                 pass
         try:
+            env = os.environ.copy()
+            venv_bin = _find_venv_bin(cwd)
+            if venv_bin is not None:
+                env["PATH"] = str(venv_bin) + os.pathsep + env["PATH"]
+            if self.stack and "python" in self.stack.lower():
+                # Testes do projeto importam `lf...` do src gerado: expõe o src
+                # no PYTHONPATH além do cwd do projeto testado.
+                cwd_path = Path(cwd).resolve()
+                env["PYTHONPATH"] = os.pathsep.join(
+                    filter(None, [env.get("PYTHONPATH", ""), str(cwd_path), str(cwd_path / "src")])
+                )
             res = subprocess.run(
                 cmd,
                 shell=True,
@@ -83,9 +111,21 @@ class TestHarnessRunner:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                env=env,
             )
             parsed = parse_test_output(res.stdout + "\n" + res.stderr)
             success = res.returncode == 0
+            stderr_text = res.stderr or ""
+            # Comando não encontrado: o shell retorna 127 (ou "not recognized"
+            # no Windows). NÃO tratar como "0 testes coletados" — preserva o
+            # stderr original e sinaliza command_missing para o QA reportar a
+            # causa real (venv/harness não instalado).
+            command_missing = (
+                res.returncode == 127
+                or "command not found" in stderr_text.lower()
+                or "no such file or directory" in stderr_text.lower()
+                or "not recognized" in stderr_text.lower()
+            )
             return TestHarnessResult(
                 total=parsed["total"],
                 passed=parsed["passed"],
@@ -93,6 +133,7 @@ class TestHarnessRunner:
                 output=res.stdout + "\n" + res.stderr,
                 success=success,
                 command=cmd,
+                command_missing=command_missing,
             )
         except Exception as exc:
             return TestHarnessResult(
