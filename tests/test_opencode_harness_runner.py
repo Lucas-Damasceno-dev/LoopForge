@@ -95,25 +95,26 @@ def test_extract_json_from_text():
 def test_opencode_runner_subprocess_uses_run_dir(tmp_path):
     """O subprocesso deve rodar com cwd=run_dir, comando com --dir e env PWD no dir da run."""
     run_dir = tmp_path / "runs" / "proj-001"
-    with patch("shutil.which", return_value="/usr/bin/opencode"), patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
-        with patch("lf.runner.opencode.runner.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="opencode output", stderr=""
-            )
-            runner = OpenCodeRunner(timeout_seconds=10)
-            res = runner.run("create app", project_root=run_dir)
-            assert res.success is True
-            # C3: dir da run criado (cwd do subprocess precisa existir)
-            assert run_dir.is_dir()
+    with (
+        patch("shutil.which", return_value="/usr/bin/opencode"),
+        patch.dict(os.environ, {"OPENCODE_MOCK": "0"}),
+        patch("lf.runner.opencode.runner.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="opencode output", stderr="")
+        runner = OpenCodeRunner(timeout_seconds=10)
+        res = runner.run("create app", project_root=run_dir)
+        assert res.success is True
+        # C3: dir da run criado (cwd do subprocess precisa existir)
+        assert run_dir.is_dir()
 
-            call_args = mock_run.call_args
-            assert call_args.kwargs["cwd"] == run_dir.resolve()
-            # C3: --dir presente no comando do script -c
-            cmd_str = " ".join(call_args.args[0])
-            assert "--dir" in cmd_str
-            assert str(run_dir.resolve()) in cmd_str
-            # C3: PWD no env do subprocess
-            assert call_args.kwargs["env"]["PWD"] == str(run_dir.resolve())
+        call_args = mock_run.call_args
+        assert call_args.kwargs["cwd"] == run_dir.resolve()
+        # C3: --dir presente no comando do script -c
+        cmd_str = " ".join(call_args.args[0])
+        assert "--dir" in cmd_str
+        assert str(run_dir.resolve()) in cmd_str
+        # C3: PWD no env do subprocess
+        assert call_args.kwargs["env"]["PWD"] == str(run_dir.resolve())
 
 
 # ─── C4: harness — command_missing + PATH venv + PYTHONPATH ──────────────
