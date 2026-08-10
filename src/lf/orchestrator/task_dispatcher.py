@@ -47,6 +47,24 @@ def _default_budget_usd() -> float:
         return 10.0
 
 
+def _task_dir_suffix(task: TaskSchema, project_id: str) -> str:
+    """Sufixo de diretório único por task, sanitizado para um nome de pasta seguro.
+
+    P1-4: o workdir era compartilhado entre todas as tasks de um projeto
+    (`/tmp/loopforge/{project_id}`), permitindo contaminação cross-run (ex.:
+    pom.xml/target/ de um run Java sobrevivendo num run Python). O id da task
+    costuma embutir o prefixo do projeto (ex.: 'proj-x/task-run-abc'); esse
+    prefixo é removido para evitar duplicação, e qualquer '/' remanescente vira
+    '-'. Id vazio → '' (fallback: diretório do projeto, sem sufixo extra).
+    """
+    task_id = str(getattr(task, "id", "") or "")
+    if not task_id:
+        return ""
+    if project_id and task_id.startswith(f"{project_id}/"):
+        task_id = task_id[len(project_id) + 1 :]
+    return task_id.replace("/", "-")
+
+
 def _send_notification(title: str, message: str, webhook_url: str | None = None):
     """Envia notificação desktop e/ou webhook para Slack/Discord."""
     with contextlib.suppress(Exception):
@@ -129,7 +147,12 @@ class TaskDispatcher:
 
         state = {
             "idea": task.title,
-            "output_dir": f"/tmp/loopforge/{project_id}",
+            # P1-4: isolamento cross-run — diretório único por task para impedir
+            # que artefatos de um run (pom.xml, target/, test_reports/) contaminem o
+            # workdir do próximo. Fallback: diretório do projeto quando o id é vazio.
+            "output_dir": "/".join(
+                part for part in ("/tmp/loopforge", project_id, _task_dir_suffix(task, project_id)) if part
+            ),
             "epic": {},
             "user_stories": [],
             "tech_spec": "",

@@ -686,7 +686,24 @@ def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "") -> None
     """Limpa diretórios de código de tentativas anteriores para evitar colisões entre arquiteturas diferentes."""
     import shutil
 
-    stale_dirs = {"cmd", "internal", "src", "pkg", "migrations"}
+    # P1-4: além do código de tentativas anteriores, remove artefatos de
+    # build/cache regeneráveis (target/, build/, dist/, test_reports/,
+    # .pytest_cache/, htmlcov/) que sobreviviam entre runs de stacks diferentes.
+    # .venv/ e node_modules ficam de fora: podem conter deps válidas instaladas
+    # pelo harness (pip install etc.).
+    stale_dirs = {
+        "cmd",
+        "internal",
+        "src",
+        "pkg",
+        "migrations",
+        "target",
+        "build",
+        "dist",
+        "test_reports",
+        ".pytest_cache",
+        "htmlcov",
+    }
     unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
     for base_dir in unique_dirs:
         base_path = Path(base_dir).resolve()

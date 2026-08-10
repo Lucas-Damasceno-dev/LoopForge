@@ -9,20 +9,55 @@ class ParsedTestOutput(TypedDict):
     errors: list[str]
 
 
-def _extract_collection_errors(output: str) -> list[str]:
-    """Extrai módulos com erro de coleta das linhas 'ERROR ... .py' do pytest.
+_EXCEPTION_LINE_RE = re.compile(
+    r"(?:ModuleNotFoundError|ImportError|AttributeError|NameError|SyntaxError|TypeError|"
+    r"ValueError|OSError|RuntimeError|RecursionError|fixture)\S*:\s*.*",
+    re.IGNORECASE,
+)
 
-    Captura tanto 'ERROR collecting tests/x.py' quanto 'ERROR tests/x.py - ...'.
-    Deduplica preservando a ordem de aparição (um mesmo módulo pode aparecer
-    nas duas formas no mesmo run).
+
+def _find_exception_line(output: str, start: int) -> str:
+    """Retorna a 1ª linha de exceção/fixture entre `start` e a próxima linha 'ERROR' (ou o fim).
+
+    P1-3: a mensagem real do erro de coleta (ex.: 'ModuleNotFoundError: No module
+    named ...') fica logo abaixo do bloco 'ERROR collecting tests/x.py'; o trecho
+    entre esse match e o próximo 'ERROR' contém o traceback do pytest.
     """
-    raw_matches = re.findall(r"ERROR(?:\s+collecting)?\s+(\S+\.py)", output, re.IGNORECASE)
+    next_error = output.find("ERROR", start)
+    window = output[start:] if next_error == -1 else output[start:next_error]
+    for line in window.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if _EXCEPTION_LINE_RE.match(line):
+            return line
+    return ""
+
+
+def _extract_collection_errors(output: str) -> list[str]:
+    """Extrai erros de coleta do pytest com a mensagem real (ex.: ModuleNotFoundError).
+
+    Para cada linha 'ERROR ... .py':
+    1. usa a mensagem inline quando presente (após o '-', ex.: 'ERROR tests/x.py - Msg');
+    2. senão, procura a 1ª linha de exceção/fixture logo abaixo no traceback.
+    Deduplica por módulo (1ª mensagem vence), preservando a ordem de aparição, e
+    trunca cada mensagem em ~200 chars.
+    """
+    pattern = re.compile(r"ERROR(?:\s+collecting)?\s+(\S+\.py)(?:\s*-\s*(.+))?", re.IGNORECASE)
     seen: set[str] = set()
     errors: list[str] = []
-    for module in raw_matches:
-        if module not in seen:
-            seen.add(module)
+    for match in pattern.finditer(output):
+        module = match.group(1)
+        if module in seen:
+            continue
+        message = match.group(2)
+        if message is None or not message.strip():
+            message = _find_exception_line(output, match.end())
+        if message.strip():
+            errors.append(f"{module}: {message.strip()[:200]}")
+        else:
             errors.append(module)
+        seen.add(module)
     return errors
 
 

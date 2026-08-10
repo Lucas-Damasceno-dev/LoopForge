@@ -156,6 +156,11 @@ def qa(state: GraphState) -> dict:
                 f"crie/ajuste tests/ para a stack {stack}; verifique imports e estrutura. "
                 f"Comando do harness: {harness_cmd}"
             )
+            # P1-3: anexa o que o harness realmente disse (stderr/stdout) para o
+            # Developer enxergar a causa (ex.: ImportError) em vez do texto genérico.
+            if raw_output:
+                output_snippet = raw_output[-500:].replace("\n", " ").strip()
+                msg = f"{msg}\nSaída do harness:\n{output_snippet}"
         else:
             # Extrai os detalhes reais do erro do compilador/harness
             err_list = harness_result.get("errors", [])

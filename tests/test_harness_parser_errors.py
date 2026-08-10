@@ -10,6 +10,7 @@ que cada erro de coleta conte como falha.
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
+from lf.pipeline.nodes import qa as qa_module
 from lf.pipeline.nodes.qa import _run_harness
 from lf.runner.harness.parser import parse_test_output
 from lf.runner.harness.runner import TestHarnessRunner
@@ -25,12 +26,25 @@ ERROR tests/test_balances.py - ModuleNotFoundError: No module named 'app.service
 
 
 def test_parse_detecta_erro_de_coleta_e_dedup():
-    """Linhas 'ERROR collecting' e 'ERROR tests/...' do MESMO módulo viram 1 erro."""
+    """Linhas 'ERROR collecting' e 'ERROR tests/...' do MESMO módulo viram 1 erro com a mensagem real."""
     res = parse_test_output(COLETA_FALHANDO)
 
-    assert res["errors"] == ["tests/test_balances.py"]
+    assert res["errors"] == ["tests/test_balances.py: ModuleNotFoundError: No module named 'app.services.balance'"]
     assert res["failed"] >= 1
     assert res["total"] >= 1
+
+
+def test_parse_erro_inline_e_bloco_collecting_dedup_uma_entrada():
+    """Forma inline ('ERROR tests/x.py - Msg') + bloco 'ERROR collecting tests/x.py' no MESMO output → 1 entrada com a msg."""
+    output = """\
+ERROR tests/test_a.py - ModuleNotFoundError: No module named 'x'
+ERROR collecting tests/test_a.py
+============================ 1 error in 0.30s ============================
+"""
+    res = parse_test_output(output)
+
+    assert res["errors"] == ["tests/test_a.py: ModuleNotFoundError: No module named 'x'"]
+    assert res["failed"] >= 1
 
 
 def test_parse_conta_erro_do_resumo_sem_linha_error():
@@ -67,7 +81,7 @@ def test_parse_saida_mista_failed_mais_errors():
 
 
 def test_runner_popula_errors_e_marca_success_false(tmp_path):
-    """Runner-level: returncode != 0 + erro de coleta → errors populado e success False."""
+    """Runner-level: returncode != 0 + erro de coleta → errors com a msg real e success False."""
     with patch("lf.runner.harness.runner.subprocess.run") as mock_run:
         mock_run.return_value = CompletedProcess(
             args=[],
@@ -79,7 +93,7 @@ def test_runner_popula_errors_e_marca_success_false(tmp_path):
         runner = TestHarnessRunner(command="pytest")
         res = runner.run(cwd=tmp_path)
 
-        assert res.errors == ["tests/test_x.py"]
+        assert res.errors == ["tests/test_x.py: ModuleNotFoundError: No module named 'app.services.x'"]
         assert res.success is False
         assert res.total >= 1
         assert res.failed >= 1
@@ -100,3 +114,40 @@ def test_qa_run_harness_repassa_errors(tmp_path, monkeypatch):
         assert harness_res["errors"] == ["tests/test_y.py"]
         assert harness_res["success"] is False
         assert harness_res["failed"] >= 1
+
+
+def test_qa_no_tests_found_inclui_output_real_no_feedback(monkeypatch, tmp_path):
+    """P1-3: ramo no_tests_found anexa trecho do output bruto do harness ao feedback do Developer."""
+    monkeypatch.setattr(
+        qa_module,
+        "_run_harness",
+        lambda *_args, **_kwargs: {
+            "success": False,
+            "passed": 0,
+            "failed": 0,
+            "total": 0,
+            "errors": [],
+            "duration_ms": 10,
+            "output": "no tests ran\ncollecting ... \nERROR: no tests found\n",
+            "command": "pytest",
+            "command_missing": False,
+        },
+    )
+
+    state = {
+        "code": "code",
+        "mock_llm": False,
+        "project_dir": str(tmp_path),
+        "output_dir": str(tmp_path),
+        "feedback_history": [],
+        "qa_attempt_count": 0,
+        "max_retries": 2,
+        "user_stories": [],
+    }
+
+    result = qa_module.qa(state)
+
+    assert result["next_agent"] == "developer"
+    msg = result["feedback_history"][-1]["message"]
+    assert "NENHUM TESTE COLETADO" in msg
+    assert "no tests ran" in msg
