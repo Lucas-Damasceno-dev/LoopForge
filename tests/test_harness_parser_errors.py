@@ -29,13 +29,14 @@ def test_parse_detecta_erro_de_coleta_e_dedup():
     """Linhas 'ERROR collecting' e 'ERROR tests/...' do MESMO módulo viram 1 erro com a mensagem real."""
     res = parse_test_output(COLETA_FALHANDO)
 
-    assert res["errors"] == ["tests/test_balances.py: ModuleNotFoundError: No module named 'app.services.balance'"]
+    expected = ["tests/test_balances.py: ModuleNotFoundError: No module named 'app.services.balance'"]
+    assert res["errors"] == expected
     assert res["failed"] >= 1
     assert res["total"] >= 1
 
 
 def test_parse_erro_inline_e_bloco_collecting_dedup_uma_entrada():
-    """Forma inline ('ERROR tests/x.py - Msg') + bloco 'ERROR collecting tests/x.py' no MESMO output → 1 entrada com a msg."""
+    """Forma inline + bloco 'ERROR collecting' do MESMO módulo → 1 entrada com a msg."""
     output = """\
 ERROR tests/test_a.py - ModuleNotFoundError: No module named 'x'
 ERROR collecting tests/test_a.py

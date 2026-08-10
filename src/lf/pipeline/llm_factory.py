@@ -20,6 +20,38 @@ DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "auto/best-free")
 DEFAULT_OPENROUTER_KEY = ""
 _DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# Default elevado para chamadas HTTP ao LLM: o antigo 60s fixo (P2-5) cortava
+# modelos de reasoning (deepseek-r1, o1/o3, etc.), que pensam por minutos.
+# Override via env OPENROUTER_TIMEOUT. Nunca usar timeout None/infinito.
+DEFAULT_LLM_TIMEOUT = 300.0
+# Margem extra para modelos de reasoning (raciocínio longo em prompts grandes).
+REASONING_TIMEOUT = 600.0
+# Marcadores de nome de modelo de reasoning no OpenRouter (lowercase): ex.
+# deepseek-r1, openai o1/o3, kimi-k2, z-ai/glm-4.5, claude-3-7-sonnet (thinking).
+_REASONING_MODEL_MARKERS = frozenset(
+    {"reasoner", "reasoning", "thinking", "r1", "o1", "o3", "deepseek-r", "kimi", "glm-4.5"}
+)
+
+
+def _is_reasoning_model(model: str) -> bool:
+    """Detecta modelo de reasoning pelo nome (lowercase), ex.: deepseek-r1, o3-mini."""
+    lowered = model.lower()
+    return any(marker in lowered for marker in _REASONING_MODEL_MARKERS)
+
+
+def _resolve_timeout(model: str, env_timeout: str | None) -> float:
+    """Resolve o timeout de chamada LLM: env > reasoning > default (nunca None/infinito)."""
+    if env_timeout:
+        try:
+            parsed = float(env_timeout)
+            if parsed > 0:
+                return parsed
+        except ValueError:
+            pass
+    if _is_reasoning_model(model):
+        return REASONING_TIMEOUT
+    return DEFAULT_LLM_TIMEOUT
+
 
 def get_openrouter_model() -> str:
     return os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL)
@@ -60,22 +92,16 @@ def call_openrouter_api(
         "stream": False,
     }
 
-    # Timeout configurável via OPENROUTER_TIMEOUT (segundos). Vazio/0/negativo = sem timeout.
-    base_timeout: float | None = None
-    raw_timeout = os.environ.get("OPENROUTER_TIMEOUT")
-    if raw_timeout:
-        try:
-            parsed = float(raw_timeout)
-            if parsed > 0:
-                base_timeout = parsed
-        except ValueError:
-            base_timeout = None
+    # Timeout configurável via OPENROUTER_TIMEOUT (segundos). Sem a env, usa o
+    # default elevado (DEFAULT_LLM_TIMEOUT / REASONING_TIMEOUT p/ reasoning) —
+    # nunca sem timeout (P2-5).
+    base_timeout = _resolve_timeout(target_model, os.environ.get("OPENROUTER_TIMEOUT"))
     last_error: Exception | None = None
     empty_content = False
 
     for attempt in range(max_retries + 1):
         try:
-            timeout_val = None if base_timeout is None else base_timeout * (1.0 + attempt * 0.5)
+            timeout_val = base_timeout * (1.0 + attempt * 0.5)
             resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_val)
             if resp.status_code == 200:
                 raw_text = resp.text if hasattr(resp, "text") and isinstance(resp.text, str) else ""
@@ -114,11 +140,15 @@ def call_openrouter_api(
                         raise RuntimeError("OpenRouter API retornou content vazio")
                     return text, usage
             else:
-                last_error = RuntimeError(f"OpenRouter API request failed with status {resp.status_code}: {resp.text[:200]}")
+                last_error = RuntimeError(
+                    f"OpenRouter API request failed with status {resp.status_code}: {resp.text[:200]}"
+                )
         except Exception as err:
             last_error = err
             if attempt < max_retries:
-                print(f"--- AVISO: Chamada LLM API (tentativa {attempt + 1}/{max_retries + 1}) falhou ({err}). Retentando em {(attempt + 1) * 2}s... ---")
+                print(
+                    f"--- AVISO: Chamada LLM API (tentativa {attempt + 1}/{max_retries + 1}) falhou ({err}). Retentando em {(attempt + 1) * 2}s... ---"
+                )
                 time.sleep((attempt + 1) * 2)
 
     # Esgotou as retentativas: se o motivo foi content vazio, retorna '' (não
@@ -219,6 +249,7 @@ class CostTracker:
         """Conta tokens usando tiktoken (se disponível) ou fallback chars//4."""
         try:
             import tiktoken
+
             # Mapeamento aproximado de modelo → encoding
             enc_name = "cl100k_base"  # default para GPT-4, GPT-3.5
             if "gpt-4" in model or "gpt-3.5" in model:
@@ -266,6 +297,7 @@ class CostTracker:
 
 # --- LLM PROVIDER ABSTRACTION LAYER ---
 
+
 class BaseLLMProvider(ABC):
     @property
     @abstractmethod
@@ -304,6 +336,7 @@ class OpenCodeCLIProvider(BaseLLMProvider):
         circuit_breaker: Any = None,
     ) -> Any:
         from ..runner.opencode import call_llm_via_opencode
+
         return call_llm_via_opencode(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -386,12 +419,19 @@ class NativeLLMProvider(BaseLLMProvider):
     def provider_name(self) -> str:
         return "native"
 
-    def __init__(self, api_key: str | None = None, base_url: str | None = None, timeout: float = 60.0):
+    def __init__(self, api_key: str | None = None, base_url: str | None = None, timeout: float | None = None):
         import httpx
 
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
         self.base_url = base_url or _DEFAULT_OPENROUTER_BASE_URL
-        self.timeout = timeout
+        # Default fixo de 60s cortava modelos de reasoning (P2-5): agora o
+        # default é 300s (ou 600s se o modelo configurado for reasoning),
+        # override via env OPENROUTER_TIMEOUT.
+        self.timeout = (
+            timeout
+            if timeout is not None
+            else _resolve_timeout(DEFAULT_OPENROUTER_MODEL, os.environ.get("OPENROUTER_TIMEOUT"))
+        )
         self._client = httpx.Client(timeout=self.timeout)
         self._async_client = httpx.AsyncClient(timeout=self.timeout)
 
@@ -431,7 +471,9 @@ class NativeLLMProvider(BaseLLMProvider):
                 system_prompt, user_prompt, model=model, schema_model=schema_model, mock=True
             )
         if circuit_breaker is not None and not circuit_breaker.can_proceed():
-            return self._fallback_generate(system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker)
+            return self._fallback_generate(
+                system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker
+            )
         full_prompt = f"{system_prompt}\n{user_prompt}"
         llm_cache = SQLiteLLMCache()
         if cache:
@@ -449,7 +491,9 @@ class NativeLLMProvider(BaseLLMProvider):
             resp.raise_for_status()
             text = self._parse_sse(resp.text)
         except Exception:
-            return self._fallback_generate(system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker)
+            return self._fallback_generate(
+                system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker
+            )
         # Payload final consolidado -> cache (requisito: nunca deltas)
         if cache:
             llm_cache.set(full_prompt, text)
@@ -510,6 +554,7 @@ class NativeLLMProvider(BaseLLMProvider):
 
 class LLMProviderRegistry:
     """Registro desacoplado de provedores de LLM para orquestração heterogênea."""
+
     _providers: dict[str, BaseLLMProvider] = {}
     _default_provider: str = "opencode"
 
