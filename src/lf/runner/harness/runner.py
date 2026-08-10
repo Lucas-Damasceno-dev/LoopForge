@@ -1,6 +1,6 @@
 import os
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .parser import parse_test_output
@@ -19,6 +19,9 @@ class TestHarnessResult:
     # fora do venv). O QA usa isso para diferenciar "nenhum teste" real de
     # "não há harness instalado" — evita o relatório enganoso de 0 testes.
     command_missing: bool = False
+    # Módulos que falharam na coleta do pytest (ex.: ImportError). O QA usa
+    # para reportar a causa real em vez do genérico "nenhum teste executado".
+    errors: list[str] = field(default_factory=list)
 
 
 def _find_venv_bin(cwd: str | Path) -> Path | None:
@@ -114,7 +117,9 @@ class TestHarnessRunner:
                 env=env,
             )
             parsed = parse_test_output(res.stdout + "\n" + res.stderr)
-            success = res.returncode == 0
+            # Erro de coleta (pytest retorna exit code != 0) também invalida o run,
+            # mesmo que o shell não sinalize falha — defensivo.
+            success = res.returncode == 0 and not parsed["errors"]
             stderr_text = res.stderr or ""
             # Comando não encontrado: o shell retorna 127 (ou "not recognized"
             # no Windows). NÃO tratar como "0 testes coletados" — preserva o
@@ -134,6 +139,7 @@ class TestHarnessRunner:
                 success=success,
                 command=cmd,
                 command_missing=command_missing,
+                errors=parsed["errors"],
             )
         except Exception as exc:
             return TestHarnessResult(
@@ -143,4 +149,5 @@ class TestHarnessRunner:
                 output=str(exc),
                 success=False,
                 command=cmd,
+                errors=[],
             )

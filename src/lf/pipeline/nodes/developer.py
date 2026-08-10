@@ -389,11 +389,24 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     ]
     contract_tests = state.get("contract_tests", "")
     if contract_tests:
-        prompt_parts.append(
+        contract_block = (
             f"\n\n=== CONTRATO DE TESTES (suíte definida pelo Test Writer independente) ===\n"
             f"SEU CÓDIGO DEVE FAZER ESTES TESTES PASSAREM:\n{contract_tests[:2000]}\n"
             "NÃO modifique nem sobrescreva os arquivos em tests/ já fornecidos."
         )
+        # P0-2: lê a linha '### MODULES:' do string COMPLETO (antes do truncamento)
+        # e converte o inventário em obrigatoriedade explícita de nomenclatura.
+        modules_match = re.search(r"### MODULES:\s*(.+)", contract_tests)
+        if modules_match:
+            module_names = [name.strip() for name in modules_match.group(1).split(",") if name.strip()]
+            module_lines = "\n".join(f"- {name}" for name in module_names)
+            contract_block += (
+                f"\n\n=== MÓDULOS OBRIGATÓRIOS (contrato de testes) ===\n"
+                "Seu código DEVE definir estes módulos com estes nomes EXATOS (respeite singular/plural):\n"
+                f"{module_lines}\n"
+                "Os testes em tests/ importam destes módulos; nomes divergentes causam ModuleNotFoundError na coleta."
+            )
+        prompt_parts.append(contract_block)
 
     # 🧬 Injeta o genoma do repositório se disponível (<2s token-optimized summary)
     # Hook opcional: se o módulo 'genome' não existir, pula silenciosamente.

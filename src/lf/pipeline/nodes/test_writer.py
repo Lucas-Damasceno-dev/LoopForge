@@ -11,6 +11,88 @@ from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 from .developer import _parse_multi_file_response
 
+# Primeiro segmento de imports que NÃO representa módulo interno da aplicação:
+# stdlib e bibliotecas de terceiros comuns. Módulos fora desta denylist com >=2
+# segmentos (ex.: `app.services.payment`) são considerados internos e entram
+# no inventário declarado ao Developer via '### MODULES:'.
+_IMPORT_DENYLIST = frozenset(
+    {
+        "os",
+        "sys",
+        "json",
+        "re",
+        "pathlib",
+        "typing",
+        "datetime",
+        "uuid",
+        "pytest",
+        "unittest",
+        "fastapi",
+        "flask",
+        "django",
+        "numpy",
+        "pydantic",
+        "httpx",
+        "requests",
+        "time",
+        "collections",
+        "functools",
+        "itertools",
+        "enum",
+        "dataclasses",
+        "logging",
+        "math",
+        "random",
+        "string",
+        "secrets",
+        "hashlib",
+        "subprocess",
+        "contextlib",
+        "warnings",
+        "abc",
+        "inspect",
+    }
+)
+
+
+def _extract_module_inventory(files_map: dict[str, str]) -> list[str]:
+    """Extrai o inventário de módulos internos importados pelos testes-contrato.
+
+    Heurística: inclui imports com >=2 segmentos cujo primeiro segmento NÃO está
+    na denylist de stdlib/terceiros comuns; exclui imports relativos ('.').
+    Deduplica preservando a ordem de aparição. O Developer usa essa lista para
+    nomear módulos com os nomes EXATOS (evita plural/singular divergentes).
+    """
+    modules: list[str] = []
+    seen: set[str] = set()
+
+    def _add(module: str) -> None:
+        if module not in seen:
+            seen.add(module)
+            modules.append(module)
+
+    for content in files_map.values():
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("from "):
+                head = stripped[5:].split(None, 1)
+                module = head[0].strip() if head else ""
+            elif stripped.startswith("import "):
+                first = stripped[7:].strip().split(",", 1)[0].strip()
+                module = first.split(None, 1)[0].strip() if first else ""
+            else:
+                continue
+            if not module or module.startswith("."):
+                continue
+            segments = module.split(".")
+            if len(segments) < 2:
+                continue
+            if segments[0] in _IMPORT_DENYLIST:
+                continue
+            _add(module)
+
+    return modules
+
 
 def test_writer(state: GraphState) -> dict:
     """Gera testes-contrato independentes e grava em output_dir/tests/."""
@@ -81,6 +163,7 @@ def test_writer(state: GraphState) -> dict:
     tests_root = Path(output_dir) / "tests"
     tests_root.mkdir(parents=True, exist_ok=True)
 
+    written_files: dict[str, str] = {}
     written = 0
     for rel_path, content in files_map.items():
         normalized = os.path.normpath(rel_path).replace("\\", "/")
@@ -93,6 +176,7 @@ def test_writer(state: GraphState) -> dict:
         destination = Path(output_dir) / normalized
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(content, encoding="utf-8")
+        written_files[normalized] = content
         written += 1
         print(f"--- INFO: Test Writer salvou teste-contrato: {destination} ({len(content)} chars) ---")
 
@@ -100,7 +184,14 @@ def test_writer(state: GraphState) -> dict:
         print("--- AVISO: Test Writer não gravou nenhum arquivo válido de teste-contrato ---")
         return {**state, "next_agent": "developer", "contract_tests": ""}
 
-    return {**state, "next_agent": "developer", "contract_tests": raw}
+    # Declara o inventário de módulos internos importados pelos testes para o
+    # Developer nomear módulos com os nomes EXATOS (respeitando singular/plural).
+    modules = _extract_module_inventory(written_files)
+    contract_tests = raw
+    if modules:
+        contract_tests = raw + "\n\n### MODULES: " + ", ".join(modules)
+
+    return {**state, "next_agent": "developer", "contract_tests": contract_tests}
 
 
 test_writer.__test__ = False
