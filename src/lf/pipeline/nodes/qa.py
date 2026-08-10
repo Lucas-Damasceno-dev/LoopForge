@@ -225,7 +225,7 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
         with suppress(Exception):
             subprocess.run("go mod tidy", shell=True, cwd=target_dir, capture_output=True, timeout=60)
 
-    runner = TestHarnessRunner(stack=stack)
+    runner = TestHarnessRunner(stack=stack, auto_format=True)
     res = runner.run(target_dir)
     return asdict(res) if hasattr(res, "__dataclass_fields__") else res
 
@@ -374,6 +374,50 @@ def _attempt_dependency_self_healing(project_dir: str, harness_result: dict) -> 
                 "npm install --legacy-peer-deps", shell=True, cwd=project_dir, capture_output=True, timeout=30
             )
             return True
+        except Exception:
+            pass
+
+    # Onda 2 (2.4): Python (pip) — requirements.txt/pyproject.toml presente e erro
+    # de import/instalação → instala o pacote faltante (extraído do ModuleNotFoundError)
+    # ou o requirements.txt inteiro. Usa o python do venv do projeto quando existir.
+    pip_error = (
+        "modulenotfounderror" in output_str.lower()
+        or "no matching distribution" in output_str.lower()
+        or "could not find a version" in output_str.lower()
+    )
+    pip_manifest = Path(project_dir) / "requirements.txt"
+    if pip_error and (pip_manifest.exists() or (Path(project_dir) / "pyproject.toml").exists()):
+        missing_pkg = None
+        m = re.search(r"No module named ['\"]?(\w+)", output_str)
+        if m:
+            missing_pkg = m.group(1)
+        try:
+            venv_python = Path(project_dir) / ".venv" / "bin" / "python"
+            python_bin = str(venv_python) if venv_python.exists() else "python"
+            if missing_pkg:
+                pip_cmd = f"{python_bin} -m pip install {missing_pkg}"
+            elif pip_manifest.exists():
+                pip_cmd = f"{python_bin} -m pip install -r {pip_manifest}"
+            else:
+                pip_cmd = f"{python_bin} -m pip install -e ."
+            print(f"--- INFO: Self-Healing pip: {pip_cmd} ---")
+            res = subprocess.run(pip_cmd, shell=True, cwd=project_dir, capture_output=True, timeout=60)
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
+
+    # Onda 2 (2.4): Java/Maven — pom.xml presente e falha de resolução de
+    # dependências → mvn dependency:resolve (se mvn no PATH) baixa as deps.
+    maven_error = "could not resolve dependencies" in output_str.lower() or "build failure" in output_str.lower()
+    if (Path(project_dir) / "pom.xml").exists() and maven_error and shutil.which("mvn"):
+        print("--- INFO: Self-Healing Maven: executando mvn dependency:resolve -q ---")
+        try:
+            res = subprocess.run(
+                "mvn dependency:resolve -q", shell=True, cwd=project_dir, capture_output=True, timeout=120
+            )
+            if res.returncode == 0:
+                return True
         except Exception:
             pass
 

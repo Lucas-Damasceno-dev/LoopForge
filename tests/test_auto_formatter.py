@@ -1,6 +1,8 @@
 """Suíte de testes para o auto-formatador do TestHarnessRunner."""
+
 from unittest.mock import patch
 
+from lf.pipeline.nodes import qa as qa_module
 from lf.runner.harness.runner import TestHarnessRunner
 
 
@@ -55,3 +57,22 @@ def test_run_does_not_execute_auto_formatter_by_default(tmp_path):
         runner.run(tmp_path)
 
         mock_formatter.assert_not_called()
+
+
+def test_qa_harness_ativa_auto_formatter(tmp_path):
+    """Onda 2 (2.1): o QA deve construir o TestHarnessRunner com auto_format=True."""
+    fake_result = {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "output": "1 passed in 0.01s",
+        "success": True,
+        "command": "pytest",
+        "command_missing": False,
+        "errors": [],
+    }
+    with patch("lf.runner.harness.runner.TestHarnessRunner") as mock_cls:
+        mock_cls.return_value.run.return_value = fake_result
+        result = qa_module._run_harness(str(tmp_path), stack="python", output_dir=str(tmp_path))
+        mock_cls.assert_called_once_with(stack="python", auto_format=True)
+        assert result["passed"] == 1

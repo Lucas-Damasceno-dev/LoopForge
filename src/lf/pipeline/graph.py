@@ -2,6 +2,7 @@
 Grafo LangGraph: StateGraph, router condicional, build_graph.
 Centraliza toda a lógica de roteamento e suporte a auditoria simultânea (AppSec + DevOps paralelos).
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -80,6 +81,7 @@ def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "_
 
 class NodeRegistry:
     """Registro desacoplado de nós do pipeline LangGraph."""
+
     _nodes: dict[str, any] = {
         "cpo": cpo,
         "pm": product_manager,
@@ -103,12 +105,15 @@ class NodeRegistry:
 
 class EdgeRegistry:
     """Registro desacoplado de transições entre nós do grafo."""
+
     _conditional_edges: dict[str, dict[str, str]] = {
         "cpo": {"pm": "pm", "__end__": END},
         "pm": {"tech_lead": "tech_lead", "__end__": END},
         "tech_lead": {"test_writer": "test_writer", "__end__": END},
         "test_writer": {"developer": "developer", "__end__": END},
-        "developer": {"qa": "qa", "__end__": END},
+        # Onda 2 (2.3): self-edge developer→developer — o gate sintático do nó
+        # Developer retorna next_agent="developer" para auto-corrigir antes do QA.
+        "developer": {"qa": "qa", "developer": "developer", "__end__": END},
         "parallel_audit": {"developer": "developer", "__end__": END},
     }
 

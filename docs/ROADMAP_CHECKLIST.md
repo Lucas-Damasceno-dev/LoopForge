@@ -7,22 +7,22 @@
 
 ## 🚀 ONDA 1: Correções de Prompt & Prompt Templates (Ganho Imediato / Baixo Esforço)
 
-- [ ] **1.1 Diretriz Estrita de Tratamento de Erros no Prompt do Developer**
+- [x] **1.1 Diretriz Estrita de Tratamento de Erros no Prompt do Developer**
   - Prompt proíbe `unwrap()`, `expect()`, `panic!` em Rust (exige `anyhow`/`thiserror`).
   - Prompt proíbe `except Exception: pass` ou `try/except` vazios em Python.
   - *Arquivos*: `src/lf/pipeline/nodes/developer.py`
 
-- [ ] **1.2 Docstrings e Documentação Inline Obrigatórias no Prompt**
+- [x] **1.2 Docstrings e Documentação Inline Obrigatórias no Prompt**
   - Prompt exige que todas as funções e métodos públicos possuam docstrings estruturadas no padrão nativo da linguagem (`///` em Rust, `"""` em Python, `/** */` em TypeScript).
   - *Arquivos*: `src/lf/pipeline/nodes/developer.py`
 
-- [ ] **1.3 Clean Architecture Idiomática por Stack no Tech Lead**
+- [x] **1.3 Clean Architecture Idiomática por Stack no Tech Lead**
   - Prompts do Tech Lead incluem os templates de estrutura de diretórios esperados para cada stack:
     - Rust: `src/domain/`, `src/adapters/`, `src/ports/`, `src/entrypoints/`
     - Python: `src/core/`, `src/services/`, `src/api/`, `src/repositories/`
   - *Arquivos*: `src/lf/pipeline/nodes/tech_lead.py`
 
-- [ ] **1.4 Módulo de Configuração Tipado + `.env.example`**
+- [x] **1.4 Módulo de Configuração Tipado + `.env.example`**
   - Projetos gerados incluem automaticamente um módulo de configuração tipado (`pydantic-settings` / `dotenv`) e um arquivo `.env.example`.
   - *Arquivos*: `src/lf/pipeline/nodes/developer.py`
 

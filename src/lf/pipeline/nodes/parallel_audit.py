@@ -2,6 +2,7 @@
 Nó Parallel Audit: executa AppSec (Security Audit) e DevOps (CI/CD Deployability Analysis)
 de forma paralela e simultânea via ThreadPoolExecutor e gera o artefato final lessons.md.
 """
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -83,15 +84,12 @@ def parallel_audit(state: GraphState) -> dict:
     # Retries de QA esgotados com testes ainda falhando: registrar o erro aqui (no nó),
     # pois mutações no should_retry (aresta condicional) não propagam no LangGraph.
     test_report = state.get("test_report", {})
-    tests_failed = (
-        test_report.get("summary", {}).get("tests_failed", 1) if isinstance(test_report, dict) else 1
-    )
+    tests_failed = test_report.get("summary", {}).get("tests_failed", 1) if isinstance(test_report, dict) else 1
     qa_attempt = state.get("qa_attempt_count", 0)
     max_retries = state.get("max_retries", 3)
     if tests_failed and qa_attempt >= max_retries:
         retry_error = (
-            f"QA retries exhausted after {qa_attempt} attempt(s) with failing tests "
-            f"(max_retries={max_retries})."
+            f"QA retries exhausted after {qa_attempt} attempt(s) with failing tests (max_retries={max_retries})."
         )
         err = f"{err} | {retry_error}" if err else retry_error
 
@@ -106,6 +104,18 @@ def parallel_audit(state: GraphState) -> dict:
         "next_agent": next_agent if next_agent == "developer" else "FINISH",
         "error": err,
     }
+
+    # Onda 2 (2.2 — bug 1): quando o AppSec pede retry (next_agent == "developer"),
+    # propaga appsec_attempt_count e feedback_history do resultado do AppSec para o
+    # estado. Antes, o dict novo montado acima descartava esses campos: o contador
+    # nunca acumulava (loop infinito parallel_audit↔developer↔qa) e a mensagem de
+    # segurança sumia do feedback (bug 2 — o prompt do Developer JÁ renderiza
+    # "[APPSEC Feedback]" em developer.py, mas recebia feedback vazio e corrigia às cegas).
+    if res_appsec.get("next_agent") == "developer":
+        updated_state["appsec_attempt_count"] = res_appsec.get(
+            "appsec_attempt_count", state.get("appsec_attempt_count", 0)
+        )
+        updated_state["feedback_history"] = res_appsec.get("feedback_history", state.get("feedback_history", []))
 
     # Gera o artefato final lessons.md
     generate_lessons_md(updated_state)

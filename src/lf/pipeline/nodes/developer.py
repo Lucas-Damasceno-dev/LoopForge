@@ -298,6 +298,41 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: 
         except Exception:
             pass
 
+    # Onda 2 (2.3): cobertura Java — compila os .java gerados com javac num tempdir.
+    # Heurística de filtro: apenas erros de SINTAXE contam para o gate ("';' expected",
+    # "illegal start", etc.); erros de dependência ("package X does not exist",
+    # "cannot find symbol", "cannot access") são IGNORADOS para não gerar falso
+    # positivo — quem resolve dependências é o Maven no QA, não o gate.
+    java_files = [rel for rel in files_map if rel.endswith(".java")]
+    if java_files and shutil.which("javac"):
+        import tempfile
+
+        tmpdir = tempfile.mkdtemp(prefix="lf_javac_gate_")
+        try:
+            srcs = [str(Path(project_dir) / rel) for rel in java_files]
+            res = subprocess.run(
+                ["javac", "-d", tmpdir, "-proc:none", *srcs], capture_output=True, text=True, timeout=20
+            )
+            if res.returncode != 0:
+                syntax_patterns = (
+                    "illegal start",
+                    "unexpected type",
+                    "';' expected",
+                    "reached end of file while parsing",
+                    "class, interface, or enum expected",
+                    "')' expected",
+                    "not a statement",
+                )
+                syntax_lines = [
+                    line for line in (res.stderr or "").splitlines() if any(p in line.lower() for p in syntax_patterns)
+                ]
+                if syntax_lines:
+                    errors.append("Java syntax check error: " + " | ".join(syntax_lines[:3]))
+        except Exception:
+            pass
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
     return errors
 
 
@@ -561,10 +596,33 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
 
     primary_code = files_map.get(default_main) or list(files_map.values())[0]
 
+    # Onda 2 (2.3): gate sintático HARD. Com retries restantes, o nó retorna para
+    # si mesmo (developer→developer via EdgeRegistry) com o feedback do gate, para
+    # o LLM corrigir ANTES do QA. Esgotado max_retries, segue para o QA mesmo assim
+    # (erros registrados no feedback) — evita loop infinito.
+    if syntax_errors:
+        gate_feedback = {
+            "from": "developer",
+            "message": "Falha no gate sintático: " + "; ".join(syntax_errors[:5]),
+            "attempt": attempt_count,
+        }
+        max_retries = state.get("max_retries", 3)
+        if attempt_count < max_retries:
+            return {
+                **state,
+                "code": primary_code,
+                "attempt_count": attempt_count,
+                "feedback_history": feedback_history + [gate_feedback],
+                "next_agent": "developer",
+                "error": None,
+            }
+        feedback_history = feedback_history + [gate_feedback]
+
     return {
         **state,
         "code": primary_code,
         "attempt_count": attempt_count,
+        "feedback_history": feedback_history,
         "next_agent": "qa",
         "error": None,
     }
