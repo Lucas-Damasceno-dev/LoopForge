@@ -2,6 +2,7 @@
 Circuit Breaker com budget embutido (Oracle rec: budget_controller absorvido aqui).
 Três guardas: falhas consecutivas, iterações máximas, custo máximo ($).
 """
+
 from __future__ import annotations
 
 import time
@@ -10,8 +11,8 @@ import time
 class CircuitBreaker:
     """Protege contra loops infinitos e estouro de budget."""
 
-    STATE_CLOSED = "closed"      # Tudo ok
-    STATE_OPEN = "open"          # Circuito aberto (parou)
+    STATE_CLOSED = "closed"  # Tudo ok
+    STATE_OPEN = "open"  # Circuito aberto (parou)
     STATE_HALF_OPEN = "half-open"  # Tentando recuperar
 
     def __init__(
@@ -112,14 +113,11 @@ class CircuitBreaker:
         return cb
 
     def to_dict(self) -> dict:
-        return {
-            "state": self.state,
-            "consecutive_failures": self.consecutive_failures,
-            "total_iterations": self.total_iterations,
-            "total_cost": self.total_cost,
-            "max_cost": self.max_total_cost,
-            "max_iterations": self.max_iterations,
-        }
+        """Estado completo serializável — chaves idênticas às de snapshot()/__setstate__.
+
+        Garante round-trip: ``CircuitBreaker.from_snapshot(cb.to_dict())``.
+        """
+        return self.__getstate__()
 
     @property
     def budget_exceeded(self) -> bool:

@@ -39,22 +39,64 @@ class GitSandbox:
 
         return None
 
+    def _current_branch(self) -> str | None:
+        """Branch corrente do repo (None em detached HEAD)."""
+        res = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=str(self.repo_path),
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode != 0:
+            return None
+        branch = res.stdout.strip()
+        return branch if branch != "HEAD" else None
+
     def merge_worktree(self, task_id: str, target_branch: str = "main") -> bool:
-        """Faz o merge das alterações aprovadas na worktree para a branch principal."""
+        """Faz o merge das alterações aprovadas na worktree para a branch alvo.
+
+        Faz checkout de ``target_branch`` antes do merge (antes o parâmetro era
+        ignorado) e retorna à branch original ao final, preservando o estado do
+        workdir de trabalho. Em falha de merge não há retorno: o estado fica no
+        alvo para resolução manual/abort.
+        """
         branch_name = f"lf-worktree-{task_id}"
+        original_branch = self._current_branch()
+
+        if original_branch != target_branch:
+            checkout = subprocess.run(
+                ["git", "checkout", target_branch],
+                cwd=str(self.repo_path),
+                capture_output=True,
+                text=True,
+            )
+            if checkout.returncode != 0:
+                return False
+
         res = subprocess.run(
             ["git", "merge", branch_name, "--no-ff", "-m", f"feat: merge worktree {task_id}"],
             cwd=str(self.repo_path),
             capture_output=True,
             text=True,
         )
+
+        if res.returncode == 0 and original_branch is not None and original_branch != target_branch:
+            subprocess.run(
+                ["git", "checkout", original_branch],
+                cwd=str(self.repo_path),
+                capture_output=True,
+                text=True,
+            )
+
         return res.returncode == 0
 
     def cleanup_worktree(self, task_id: str) -> bool:
         """Remove a worktree isolada e sua branch temporária."""
         target_path = self.worktree_dir / task_id
         branch_name = f"lf-worktree-{task_id}"
-        subprocess.run(["git", "worktree", "remove", "--force", str(target_path)], cwd=str(self.repo_path), capture_output=True)
+        subprocess.run(
+            ["git", "worktree", "remove", "--force", str(target_path)], cwd=str(self.repo_path), capture_output=True
+        )
         subprocess.run(["git", "branch", "-D", branch_name], cwd=str(self.repo_path), capture_output=True)
         subprocess.run(["git", "worktree", "prune"], cwd=str(self.repo_path), capture_output=True)
         return not target_path.exists()

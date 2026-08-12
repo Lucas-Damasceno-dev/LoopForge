@@ -126,9 +126,19 @@ class EventBus:
         }
 
     def _broadcast(self, envelope: dict) -> None:
-        """Agenda o broadcast WS no loop ativo; sem loop ativo, apenas persiste."""
+        """Agenda o envio WS no loop ativo; sem loop ativo, apenas persiste.
+
+        Todo envelope carrega run_id (journal por run): o evento vai ao canal da
+        run via ``send_to_run`` (isolamento M-06 — só o canal daquela run
+        recebe) E ao stream global via ``broadcast``, que ignora sockets de
+        canal de run. Assim o canal de run não vaza eventos de outras runs em
+        multi-run.
+        """
         try:
             loop = asyncio.get_running_loop()
+            run_id = envelope.get("run_id")
+            if run_id:
+                loop.create_task(ws_manager.send_to_run(run_id, envelope))
             loop.create_task(ws_manager.broadcast(envelope))
         except RuntimeError:
             pass
