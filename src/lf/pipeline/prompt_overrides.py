@@ -49,16 +49,9 @@ def save_overrides(overrides: dict[str, str], path: str | Path | None = None) ->
             os.fsync(f.fileno())
         os.replace(tmp_name, p)
     except Exception:
-        with contextlib_suppress_exc():
+        with contextlib.suppress(Exception):
             os.unlink(tmp_name)
         raise
-
-
-def contextlib_suppress_exc():
-    """Pequeno helper para suprimir exceções no cleanup (evita import pesado no topo)."""
-    from contextlib import suppress
-
-    return suppress(Exception)
 
 
 def get_effective_prompt(node: str, default: str, path: str | Path | None = None) -> str:

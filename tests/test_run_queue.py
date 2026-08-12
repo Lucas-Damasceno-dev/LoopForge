@@ -25,8 +25,10 @@ async def setup_queue_env(tmp_path, monkeypatch):
     monkeypatch.setenv("LF_API_REQUIRE_AUTH", "false")
     # E3: este teste pinna a semântica antiga (1 run ativa) — o default do
     # config é 2 concorrentes (test_parallel_runs.py cobre o paralelismo real).
+    # Patching no módulo loader: create_app faz `from lf.config.loader import
+    # load_ade_config` em call-time, então o atributo do módulo é o alvo certo.
     monkeypatch.setattr(
-        "lf.api.app.load_ade_config",
+        "lf.config.loader.load_ade_config",
         lambda: AdeConfig(runner=AdeRunner(max_concurrent_runs=1)),
     )
     await init_db()

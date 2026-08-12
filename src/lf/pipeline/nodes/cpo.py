@@ -2,6 +2,7 @@
 Nó CPO: transforma ideia bruta em épico estruturado.
 Usa OpenCode via subprocesso + Pydantic para structured output.
 """
+
 from __future__ import annotations
 
 import json
@@ -10,12 +11,31 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
+from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 
 
+DEFAULT_PROMPT = """Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
+
+Preencha TODOS os campos obrigatórios:
+- id: gere E-001
+- title: título descritivo em português
+- description: problema de negócio
+- business_objectives: lista de objetivos
+- hypothesis: hipótese a ser validada
+- scope_in: itens dentro do escopo
+- scope_out: itens fora do escopo
+- success_metrics: métricas de sucesso
+- stakeholders: {"owner": "CPO", "consulted": ["Product Manager", "UX/UI Designer", "CTO"]}
+- dates: use a data atual
+
+Foque no valor de negócio. Não inclua implementação técnica."""
+
+
 class EpicSchema(BaseModel):
     """Schema Pydantic baseado em epic_schema.json do The Foundry."""
+
     id: str = Field(..., description="Identificador único no formato E-XXX")
     title: str = Field(..., description="Título descritivo do épico")
     description: str = Field(..., description="Problema de negócio a ser resolvido")
@@ -44,7 +64,6 @@ def cpo(state: GraphState) -> dict:
             "epic": _mock_epic(state.get("idea", "Mock idea")),
             "next_agent": "pm",
         }
-
 
     print("--- INFO: CPO usando OpenCode via subprocesso ---")
 
@@ -110,6 +129,5 @@ def _mock_epic(idea: str) -> dict:
         "scope_out": ["Recursos avançados"],
         "success_metrics": ["Métrica 1", "Métrica 2"],
         "stakeholders": {"owner": "CPO", "consulted": ["Product Manager", "UX/UI Designer", "CTO"]},
-        "dates": {"created_at": datetime.now(UTC).isoformat(),
-                  "started_at": datetime.now(UTC).isoformat()},
+        "dates": {"created_at": datetime.now(UTC).isoformat(), "started_at": datetime.now(UTC).isoformat()},
     }

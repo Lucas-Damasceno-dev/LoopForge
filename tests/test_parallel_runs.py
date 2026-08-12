@@ -87,8 +87,9 @@ async def test_parallel_runs_default_max_two():
 @pytest.mark.asyncio
 async def test_parallel_runs_custom_max_three(monkeypatch):
     """max_concurrent_runs=3 (ade.yaml): 3 runs juntas, a 4ª fica queued."""
+    # create_app lê load_ade_config em call-time — patch no módulo loader.
     monkeypatch.setattr(
-        "lf.api.app.load_ade_config",
+        "lf.config.loader.load_ade_config",
         lambda: AdeConfig(runner=AdeRunner(max_concurrent_runs=3)),
     )
     app = create_app()
