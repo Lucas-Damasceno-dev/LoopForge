@@ -9,7 +9,7 @@
 
 ## Test & Verify
 
-- Active test suite: `tests/` (96 files).
+- Active test suite: `tests/` (97 files).
 - Local & CI: `pytest tests/`. CI targets `tests/`.
 - CI pipeline order: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests/`.
 - CI matrix: Python 3.11 + 3.12.
