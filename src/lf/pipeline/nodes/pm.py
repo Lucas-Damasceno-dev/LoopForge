@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
-from ...runner.opencode import call_llm_via_opencode
+from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
 
 DEFAULT_PROMPT = """Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
 
@@ -53,7 +53,7 @@ class UserStoryList(BaseModel):
     stories: list[UserStorySchema]
 
 
-def product_manager(state: GraphState) -> dict:
+def product_manager(state: GraphState, config: dict | None = None) -> dict:
     """Recebe épico e gera user stories."""
     print("---EXECUTANDO NÓ: Product Manager---")
 
@@ -100,6 +100,7 @@ Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
             node="pm",
+            run_id=resolve_run_id(state, config),
         )
         stories = []
         for i, us in enumerate(result.get("stories", [])):

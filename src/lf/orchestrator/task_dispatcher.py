@@ -26,6 +26,7 @@ from lf.guardrails.circuit_breaker import CircuitBreaker
 from lf.ontology.state_machine.definition import TaskState
 from lf.ontology.state_machine.labels import get_git_label
 from lf.pipeline.graph import build_graph
+from lf.pipeline.llm_factory import resolve_default_model
 from lf.runner.git.checkpoint import GitCheckpointManager
 from lf.runner.git.pr import create_github_pr
 
@@ -198,10 +199,17 @@ class TaskDispatcher:
             "feedback_history": [],
             "mock_llm": self.mock_llm,
             "llm_provider": "openrouter" if os.getenv("OPENROUTER_API_KEY") else "google",
-            "llm_model_name": os.getenv("OPENROUTER_MODEL")
-            or os.getenv("OPENCODE_MODEL")
-            or ("inclusionai/ling-3.0-flash:free" if os.getenv("OPENROUTER_API_KEY") else "gemini-2.0-flash"),
+            # Fix 2: fonte única do modelo default (env → config → constante).
+            "llm_model_name": resolve_default_model(),
             "llm_temperature": 0.3,
+            # Fix 1: run_id/task_id preenchidos no dispatch (a thread canônica
+            # `run-{uuid}` só é derivada depois do _build_initial_state); o nó
+            # developer usa o run_id p/ dimensionar custos em llm_costs. O
+            # canal do TypedDict (state.py) pode não declarar run_id — nesse
+            # caso o LangGraph descarta a chave e os nós caem no fallback via
+            # config (resolve_run_id em lf/runner/opencode/llm.py).
+            "run_id": None,
+            "task_id": getattr(task, "id", None),
             "routing_mode": getattr(task, "routing_mode", "full"),
             "task_type": getattr(task, "task_type", "feature"),
             "complexity_level": getattr(task, "complexity_level", "standard"),
@@ -1133,6 +1141,13 @@ class TaskDispatcher:
         # A2/M-07: id da linha em pipeline_runs (1 por dispatch — CLI gera
         # uuid novo; API reusa o uuid da run) + duração da execução.
         pipeline_run_id = self._pipeline_run_id(thread_id)
+        # Fix 1: run_id/task_id no estado ANTES da primeira chamada de nó —
+        # o run_id é o MESMO id da linha em pipeline_runs que o GET
+        # /api/v1/runs/{id}/cost usa para somar llm_costs. Se o canal não for
+        # declarado no GraphState (state.py), o LangGraph descarta a chave e
+        # os nós derivam o run_id do thread via resolve_run_id(config).
+        initial_state["run_id"] = pipeline_run_id
+        initial_state["task_id"] = task_id
         start_time = time.monotonic()
 
         try:
@@ -1247,6 +1262,10 @@ class TaskDispatcher:
         task_id = task.id
         # A2/M-07: mesmo id de linha por dispatch (1 por execução).
         pipeline_run_id = self._pipeline_run_id(thread_id)
+        # Fix 1: run_id/task_id no estado antes da primeira chamada de nó
+        # (mesma lógica do _dispatch_async — ver comentário lá).
+        initial_state["run_id"] = pipeline_run_id
+        initial_state["task_id"] = task_id
         start_time = time.monotonic()
 
         self._upsert_pipeline_run(

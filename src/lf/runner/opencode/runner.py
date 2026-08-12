@@ -4,9 +4,13 @@ import subprocess
 import time
 from pathlib import Path
 
+from lf.pipeline.llm_factory import resolve_default_model
+
 from .models import OpenCodeResult
 
-DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_MODEL") or os.environ.get("OPENROUTER_MODEL") or "auto/best-free"
+# Fix 2: fonte única do modelo default (env OPENROUTER_MODEL → OPENCODE_MODEL
+# → config .loopforge.json → constante canônica em llm_factory).
+DEFAULT_OPENCODE_MODEL = resolve_default_model()
 
 
 class OpenCodeRunner:

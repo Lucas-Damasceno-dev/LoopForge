@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
-from ...runner.opencode import call_llm_via_opencode
+from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
 
 DEFAULT_PROMPT = """Você é um Tech Lead. Revise as user stories e recomende a melhor stack.
 
@@ -99,7 +99,7 @@ def _extract_stack_from_text(text: str) -> str:
     return "python"
 
 
-def tech_lead(state: GraphState) -> dict:
+def tech_lead(state: GraphState, config: dict | None = None) -> dict:
     """Valida user stories, decide a stack do projeto e gera tech spec."""
     print("---EXECUTANDO NÓ: Tech Lead---")
 
@@ -151,6 +151,7 @@ def tech_lead(state: GraphState) -> dict:
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
             node="tech_lead",
+            run_id=resolve_run_id(state, config),
         )
 
         if not decided_stack:
@@ -216,6 +217,7 @@ Template (use como guia):
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
             node="tech_lead",
+            run_id=resolve_run_id(state, config),
         )
     except Exception as e:
         print(f"--- ERRO TL tech spec: {e} ---")

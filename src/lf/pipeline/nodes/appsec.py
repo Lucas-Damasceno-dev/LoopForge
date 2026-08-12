@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from ...guardrails.security_scanner import SecurityScanner
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
-from ...runner.opencode.llm import call_llm_via_opencode
+from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
 
 DEFAULT_PROMPT = "Você é um engenheiro de AppSec sênior especializado em segurança de código."
 
@@ -33,7 +33,7 @@ class SecurityReviewReport(BaseModel):
     execution_timestamp: str = Field(...)
 
 
-def appsec(state: GraphState) -> dict:
+def appsec(state: GraphState, config: dict | None = None) -> dict:
     """Nó AppSec: Executa scanner estático e revisão contextual via LLM."""
     print("---EXECUTANDO NÓ: AppSec (Security Review)---")
 
@@ -94,6 +94,7 @@ def appsec(state: GraphState) -> dict:
                     user_prompt=prompt,
                     mock=state.get("mock_llm", False),
                     node="appsec",
+                    run_id=resolve_run_id(state, config),
                 )
                 recommendations.append(f"Análise LLM AppSec: {str(llm_res)[:150]}")
             except Exception as e:

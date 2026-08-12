@@ -1,10 +1,12 @@
 """Comando CLI 'lf export' para exportar pacotes de auditoria do LoopForge v6."""
+
 from __future__ import annotations
 
 import hashlib
 import json
 import os
 import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -42,17 +44,21 @@ def export_cmd(project_dir: str, output: str | None, fmt: str):
             try:
                 content = full_file.read_bytes()
                 sha256 = hashlib.sha256(content).hexdigest()
-                manifest_entries.append({
-                    "path": str(rel_file),
-                    "size_bytes": len(content),
-                    "sha256": sha256,
-                })
+                manifest_entries.append(
+                    {
+                        "path": str(rel_file),
+                        "size_bytes": len(content),
+                        "sha256": sha256,
+                    }
+                )
                 files_to_pack.append((full_file, rel_file))
             except Exception as e:
                 console.print(f"[yellow]Aviso ao ler {rel_file}: {e}[/yellow]")
 
     manifest_data = {
-        "export_timestamp": json.dumps(str(Path(project_dir))),
+        # Fix 3: antes gravava o PATH do projeto JSON-encoded como se fosse
+        # timestamp; agora usa o timestamp UTC ISO-8601 real.
+        "export_timestamp": datetime.now(UTC).isoformat(),
         "total_files": len(manifest_entries),
         "manifest": manifest_entries,
     }
@@ -71,4 +77,6 @@ def export_cmd(project_dir: str, output: str | None, fmt: str):
         # Adiciona manifesto de auditoria assinado
         zf.writestr("audit_manifest.json", json.dumps(manifest_data, indent=2))
 
-    console.print(f"[bold green]✓ Pacote de auditoria zip exportado com sucesso para {out_file} ({len(files_to_pack)} arquivos)[/bold green]")
+    console.print(
+        f"[bold green]✓ Pacote de auditoria zip exportado com sucesso para {out_file} ({len(files_to_pack)} arquivos)[/bold green]"
+    )

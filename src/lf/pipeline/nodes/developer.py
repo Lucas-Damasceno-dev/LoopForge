@@ -23,7 +23,7 @@ from ...config.workdir import is_within
 from ...guardrails.circuit_breaker import CircuitBreaker
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
-from ...runner.opencode import call_llm_via_opencode
+from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
 from ...runner.opencode.runner import DEFAULT_OPENCODE_MODEL
 
 logger = logging.getLogger(__name__)
@@ -573,6 +573,7 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
             project_root=output_dir,
             on_token_delta=on_token_delta,
             node="developer",
+            run_id=resolve_run_id(state, config),
         )
         if not isinstance(raw, str):
             raw = str(raw)

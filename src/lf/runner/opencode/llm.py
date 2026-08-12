@@ -19,7 +19,7 @@ _console = Console()
 _LLM_ERROR_MARKERS = ("Model not found", "UnknownError", "Unexpected server error", "model_not_found")
 
 
-def resolve_run_id(state: dict | None = None, config: dict | None = None) -> str | None:
+def resolve_run_id(state: Any = None, config: Any = None) -> str | None:
     """Deriva o run_id da run para dimensionar custos (Fix 1, coluna llm_costs.run_id).
 
     Precedência:

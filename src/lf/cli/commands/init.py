@@ -1,10 +1,9 @@
-import os
-
 import click
 from rich.console import Console
 
 from lf.config.loader import save_config
 from lf.config.schema import LoopForgeConfig, resolve_tech_stack
+from lf.pipeline.llm_factory import resolve_default_model
 
 console = Console()
 
@@ -27,15 +26,12 @@ def init_cmd(
     ontology: str,
 ):
     """Initialize a new LoopForge v6 project configuration."""
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    openrouter_model = (
-        os.getenv("OPENROUTER_MODEL")
-        or os.getenv("OPENCODE_MODEL")
-        or "inclusionai/ling-3.0-flash:free"
-    )
-
+    # Fix 2: fonte única do modelo default — resolve_default_model() aplica a
+    # precedência env (OPENROUTER_MODEL → OPENCODE_MODEL) → config
+    # .loopforge.json → constante canônica (antes havia default divergente
+    # hardcoded aqui).
     provider_to_use = llm_provider or "openrouter"
-    model_to_use = llm_model or (openrouter_model if openrouter_key else "oc/deepseek-v4-flash-free")
+    model_to_use = llm_model or resolve_default_model()
 
     resolved_stack = resolve_tech_stack(stack, framework)
 
@@ -50,7 +46,9 @@ def init_cmd(
     )
     p = save_config(cfg)
     console.print(f"[bold green]Initialized LoopForge project config at {p}[/bold green]")
-    console.print(f"  [cyan]Stack:[/cyan] {resolved_stack.language}/{resolved_stack.framework} ({resolved_stack.testing_harness}/{resolved_stack.package_manager})")
+    console.print(
+        f"  [cyan]Stack:[/cyan] {resolved_stack.language}/{resolved_stack.framework} ({resolved_stack.testing_harness}/{resolved_stack.package_manager})"
+    )
     console.print(f"  [cyan]LLM:[/cyan] {provider_to_use}/{model_to_use}")
     console.print(f"  [cyan]Budget:[/cyan] ${budget:.2f} USD")
     console.print(f"  [cyan]Ontology:[/cyan] {ontology}")

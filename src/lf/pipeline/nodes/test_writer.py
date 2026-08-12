@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
-from ...runner.opencode import call_llm_via_opencode
+from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
 from .developer import _parse_multi_file_response
 
 DEFAULT_PROMPT = (
@@ -104,7 +104,7 @@ def _extract_module_inventory(files_map: dict[str, str]) -> list[str]:
     return modules
 
 
-def test_writer(state: GraphState) -> dict:
+def test_writer(state: GraphState, config: dict | None = None) -> dict:
     """Gera testes-contrato independentes e grava em output_dir/tests/."""
     print("---EXECUTANDO NÓ: Test Writer---")
 
@@ -146,6 +146,7 @@ def test_writer(state: GraphState) -> dict:
             circuit_breaker=state.get("circuit_breaker"),
             project_root=output_dir,
             node="test_writer",
+            run_id=resolve_run_id(state, config),
         )
         if not isinstance(raw, str):
             raw = str(raw)
