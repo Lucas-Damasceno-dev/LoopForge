@@ -1,13 +1,13 @@
 # 📋 LoopForge Execution Lessons & Report
 
-**Data de Execução:** 2026-08-12 04:08:31 UTC
-**Projeto / Ideia:** Two Sum & Array Manipulation
-**Stack Decidida pelo Tech Lead:** `python`
+**Data de Execução:** 2026-08-12 04:08:32 UTC
+**Projeto / Ideia:** String Anagram & Palindrome Validator
+**Stack Decidida pelo Tech Lead:** `javascript`
 
 ---
 
 ## 🎯 Resumo Executivo
-- **Decisão do Tech Lead:** Stack `python` selecionada com base nos requisitos do projeto.
+- **Decisão do Tech Lead:** Stack `javascript` selecionada com base nos requisitos do projeto.
 - **Tentativas do Developer:** 1 ciclo(s) de geração.
 - **Resultado do QA:** **PASS** (10/10 testes aprovados).
 - **Custo Estimado da Pipeline:** ~$0.0015 USD (OpenCode Runner / llm_factory).
@@ -21,8 +21,8 @@
 
 ## 🚀 Como Rodar e Testar o Projeto Gerado
 ```bash
-pytest
-python3 generated_code.py
+mvn clean test
+mvn compile
 ```
 
 ---
