@@ -339,7 +339,7 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: 
     return errors
 
 
-def developer(state: GraphState, config: "Optional[RunnableConfig]" = None) -> dict:
+def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:
     """Gera projeto completo multi-arquivo na stack decidida pelo Tech Lead.
 
     ``config`` (injetado pelo LangGraph) carrega o ``thread_id`` canônico
