@@ -1,13 +1,13 @@
 # 📋 LoopForge Execution Lessons & Report
 
-**Data de Execução:** 2026-08-12 08:13:20 UTC
-**Projeto / Ideia:** Run java
-**Stack Decidida pelo Tech Lead:** `java`
+**Data de Execução:** 2026-08-12 08:13:22 UTC
+**Projeto / Ideia:** Run python
+**Stack Decidida pelo Tech Lead:** `python`
 
 ---
 
 ## 🎯 Resumo Executivo
-- **Decisão do Tech Lead:** Stack `java` selecionada com base nos requisitos do projeto.
+- **Decisão do Tech Lead:** Stack `python` selecionada com base nos requisitos do projeto.
 - **Tentativas do Developer:** 1 ciclo(s) de geração.
 - **Resultado do QA:** **PASS** (10/10 testes aprovados).
 - **Custo Estimado da Pipeline:** ~$0.0015 USD (OpenCode Runner / llm_factory).
@@ -21,8 +21,8 @@
 
 ## 🚀 Como Rodar e Testar o Projeto Gerado
 ```bash
-mvn clean test
-mvn compile
+pytest
+python3 generated_code.py
 ```
 
 ---
