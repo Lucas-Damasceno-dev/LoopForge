@@ -11,32 +11,92 @@ arquivo direto (resolvido em call-time, mesmo padrão do CostTracker), enquanto
 a existência da run vem do ORM (session).
 """
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import DateTime, Float, String
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Mapped, mapped_column
 
+from lf.api import database
 from lf.api.auth import verify_authentication
-from lf.api.database import get_session
+from lf.api.database import Base, get_session
 from lf.api.models import PipelineRun
 from lf.api.schemas import BudgetOverrideRequest, CostBudget, CostNode, CostResponse
 from lf.config.loader import load_budget_usd
 
 costs_router = APIRouter(prefix="/api/v1", tags=["Costs"])
 
-# Override de budget efetivo por run (run_id -> max_usd). Tabela SIMPLES em
-# memória (decisão documentada): o objetivo é permitir retomar uma run pausada
-# por budget com limite maior — o override é aplicado também ao CircuitBreaker
-# do checkpoint (trajectories.db) para que o resume use o novo limite.
-# Persistir em SQLite exigiria migração de schema no banco único (fora do
-# escopo A6); para o fluxo pausa→override→resume em um processo (API/CLI) a
-# memória é suficiente.
-_BUDGET_OVERRIDES: dict[str, float] = {}
+
+def _now_utc() -> datetime:
+    return datetime.now(UTC)
 
 
-def get_budget_override(run_id: str) -> float | None:
-    """Retorna o override ativo da run, se houver."""
-    return _BUDGET_OVERRIDES.get(run_id)
+class BudgetOverride(Base):
+    """Modelo ORM da tabela 'budget_overrides' — override de budget por run.
+
+    Persistido no Banco Único da API (database.py): o override sobrevive a
+    restart do servidor. O antigo dict em memória (_BUDGET_OVERRIDES) era
+    perdido no restart e a run pausada por budget perdia o novo limite. PK =
+    run_id (1 linha por run; POST /cost/override faz upsert).
+    """
+
+    __tablename__ = "budget_overrides"
+
+    run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    budget_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String(50), default="api")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc, onupdate=_now_utc)
+
+
+async def get_budget_override(run_id: str, session: AsyncSession | None = None) -> float | None:
+    """Retorna o override persistido da run, se houver.
+
+    Consulta a tabela ``budget_overrides`` do Banco Único da API
+    (telemetry.sqlite; test_api.sqlite em LF_API_TEST). Com ``session`` injetada
+    (endpoints) usa a sessão da request; sem ela abre sessão própria via
+    ``session_factory`` (callers fora de request). Sem DB inicializado → None
+    (nenhum override ativo).
+    """
+    if session is None:
+        if database.session_factory is None:
+            return None
+        async with database.session_factory() as s:
+            row = await s.get(BudgetOverride, run_id)
+            return float(row.budget_usd) if row else None
+    row = await session.get(BudgetOverride, run_id)
+    return float(row.budget_usd) if row else None
+
+
+async def set_budget_override(
+    run_id: str,
+    budget_usd: float,
+    source: str = "api",
+    session: AsyncSession | None = None,
+) -> None:
+    """Upsert do override da run em ``budget_overrides`` (persistente pós-restart).
+
+    Cria a linha se não existir; atualiza ``budget_usd``/``source`` e o
+    ``updated_at`` (onupdate) caso já exista. Com ``session`` injetada commit
+    na sessão da request; sem ela, sessão própria via session_factory.
+    """
+
+    async def _upsert(s: AsyncSession) -> None:
+        row = await s.get(BudgetOverride, run_id)
+        if row is None:
+            s.add(BudgetOverride(run_id=run_id, budget_usd=budget_usd, source=source))
+        else:
+            row.budget_usd = budget_usd
+            row.source = source
+        await s.commit()
+
+    if session is not None:
+        await _upsert(session)
+    elif database.session_factory is not None:
+        async with database.session_factory() as s:
+            await _upsert(s)
 
 
 def _telemetry_db() -> Path:
@@ -154,9 +214,9 @@ async def _apply_override_to_checkpoint(run_id: str, thread_id: str, max_usd: fl
         return False
 
 
-def _effective_max_usd(run_id: str) -> float:
-    """Budget efetivo: override > ade.yaml (fonte única)."""
-    override = get_budget_override(run_id)
+async def _effective_max_usd(run_id: str, session: AsyncSession | None = None) -> float:
+    """Budget efetivo: override persistido > ade.yaml (fonte única M-08)."""
+    override = await get_budget_override(run_id, session)
     if override is not None:
         return override
     return load_budget_usd()

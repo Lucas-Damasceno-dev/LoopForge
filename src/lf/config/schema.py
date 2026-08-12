@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TechStack(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     language: str = "python"
     framework: str = "fastapi"
     testing_harness: str = "pytest"
@@ -83,6 +85,10 @@ class PlanSchema(BaseModel):
 
 
 class LoopForgeConfig(BaseModel):
+    # Typos em .loopforge.json (ex.: "budjet_limit_usd") devem falhar alto em
+    # vez de serem silenciosamente ignorados — erro de validação claro.
+    model_config = ConfigDict(extra="forbid")
+
     project_id: str = "loopforge_project"
     project_name: str = "LoopForge Project"
     version: str = "6.0.0"
