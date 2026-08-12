@@ -1,5 +1,6 @@
 import json
 import os
+from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 
