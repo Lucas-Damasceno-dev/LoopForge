@@ -14,6 +14,18 @@ from pathlib import Path
 from ..config.paths import TELEMETRY_DB_PATH
 
 
+def cross_project_enabled(config=None) -> bool:
+    """True quando a memória cross-project está ligada (AdeConfig.memory.cross_project).
+
+    Fonte única de verdade para os nós do pipeline e endpoints de memória:
+    quando ativa, a busca de lições ignora o filtro de stack.
+    """
+    from ..config.loader import load_ade_config
+
+    cfg = config if config is not None else load_ade_config()
+    return bool(getattr(getattr(cfg, "memory", None), "cross_project", False))
+
+
 class MemoryManager:
     """Gerenciador de memória persistente e lições aprendidas do LoopForge."""
 
@@ -72,14 +84,20 @@ class MemoryManager:
             row = conn.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
         return dict(row) if row else None
 
-    def list_lessons(self, stack: str | None = None, limit: int = 50) -> list[dict]:
+    def list_lessons(
+        self,
+        stack: str | None = None,
+        limit: int = 50,
+        cross_project: bool = False,
+    ) -> list[dict]:
         """Lista as lições mais recentes, opcionalmente filtradas por stack.
 
         Ordenadas por created_at DESC (mais recentes primeiro). O valor de stack
-        é normalizado em minúsculas antes do filtro.
+        é normalizado em minúsculas antes do filtro. Com ``cross_project=True``
+        o filtro de stack é ignorado (todas as stacks entram no contexto).
         """
         with self._get_connection() as conn:
-            if stack:
+            if stack and not cross_project:
                 rows = conn.execute(
                     "SELECT * FROM lessons WHERE stack = ? ORDER BY created_at DESC LIMIT ?",
                     (stack.lower().strip(), limit),
