@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from click.testing import CliRunner
 
@@ -47,9 +48,10 @@ def test_release_patch_bump_e_agrupamento_conventional(tmp_path):
     assert "### 🐛 Correções" in res.output
     assert "- corrige timeout do runner" in res.output
     assert "### 🧹 Tarefas internas" in res.output
-    # Commit sem prefixo conventional cai na lista plana.
+    # Commits sem prefixo conventional caem na lista plana (com short-hash).
     assert "### 📦 Commits" in res.output
-    assert "- checkpoint: loopforge/task-run-abc" in res.output
+    assert "checkpoint: loopforge/task-run-abc" in res.output
+    assert "v1.2.0: base" in res.output
 
 
 def test_release_sem_tag_usa_default_0_1_0_e_ultimos_commits(tmp_path):
@@ -81,11 +83,11 @@ def test_release_escreve_changelog(tmp_path):
     _init_repo(tmp_path, ["feat: funcionalidade nova"], tag="v2.0.0")
 
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
         res = runner.invoke(release_cmd, [])
 
     assert res.exit_code == 0
-    changelog = tmp_path / "CHANGELOG.md"
+    changelog = Path(td) / "CHANGELOG.md"
     assert changelog.exists()
     content = changelog.read_text(encoding="utf-8")
     assert "## [2.0.1] -" in content

@@ -78,11 +78,16 @@ def resolve_version(version: str | None) -> str:
     return DEFAULT_VERSION
 
 
+def _commit_subject(line: str) -> str:
+    """Remove o short-hash do git log --oneline (ex.: 'a1b2c3d feat: x' -> 'feat: x')."""
+    return re.sub(r"^[0-9a-f]{7,40}\s+", "", line)
+
+
 def group_commits(commits: list[str]) -> dict[str, list[str]]:
     """Agrupa commits por tipo conventional-commit; demais caem em 'commits'."""
     groups: dict[str, list[str]] = {}
     for line in commits:
-        m = _CONVENTIONAL_RE.match(line)
+        m = _CONVENTIONAL_RE.match(_commit_subject(line))
         if m:
             groups.setdefault(m.group(1), []).append(f"- {m.group(3)}")
         else:

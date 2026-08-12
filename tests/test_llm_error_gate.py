@@ -126,3 +126,76 @@ def test_raise_if_llm_error_marker_direct():
             "stdout ok",
             OpenCodeResult(exit_code=0, stdout="ok", stderr="Unexpected server error"),
         )
+
+
+# --- Fix 2: marcadores de erro ampliados (padrões reais de falha opencode/CLI) ---
+
+
+def test_gate_raises_on_new_error_patterns():
+    """Fix 2: padrões reais de falha do opencode/CLI agora detectados."""
+    bad_outputs = [
+        "Error: failed to run the session",
+        "FATAL: something exploded",
+        "Invalid API key provided",
+        "Request failed with 401 Unauthorized",
+        "Rate limit exceeded, retry later",
+        "This model's maximum context length is 128000 tokens",
+        "the model is not a valid model",
+        "Command failed: exit status 1",
+        "You exceeded your current quota",
+        "error: unknown option --xyz",
+        "ProviderError: UnknownError upstream",
+    ]
+    for bad in bad_outputs:
+        with pytest.raises(RuntimeError, match="LLM Engine falhou"):
+            _raise_if_llm_error_marker(bad)
+
+
+def test_gate_error_marker_detected_in_stdout_with_success_true():
+    """Fix 2: novo marcador em stdout com success=True (exit 0) DEVE levantar."""
+    with (
+        patch.dict("os.environ", {"OPENROUTER_API_KEY": ""}, clear=True),
+        patch("lf.runner.opencode.llm.OpenCodeRunner") as mock_runner_cls,
+    ):
+        mock_runner = MagicMock()
+        mock_runner.run.return_value = OpenCodeResult(
+            exit_code=0,  # exit mascarado pelo script
+            stdout="Invalid API key: sk-test-...",
+            stderr="",
+        )
+        mock_runner_cls.return_value = mock_runner
+
+        with pytest.raises(RuntimeError, match="LLM Engine falhou"):
+            call_llm_via_opencode(system_prompt="sys", user_prompt="usr", cache=False, mock=False)
+
+
+def test_gate_line_prefix_error_matches_only_line_start():
+    """'error:' no INÍCIO da linha dispara; no meio de código legítimo NÃO."""
+    with pytest.raises(RuntimeError, match="LLM Engine falhou"):
+        _raise_if_llm_error_marker("error: unknown option --xyz")
+    with pytest.raises(RuntimeError, match="LLM Engine falhou"):
+        _raise_if_llm_error_marker("Error: model 'x' not found")
+
+    # Conteúdo legítimo: "error" no meio / indentado / identificador NÃO dispara
+    _raise_if_llm_error_marker("def handle(error):\n    return error")
+    _raise_if_llm_error_marker('raise ValueError("error: something")')
+    _raise_if_llm_error_marker("test_handle_error_passes")
+
+
+def test_gate_traceback_only_in_stderr():
+    """Traceback em stderr → erro; em stdout (conteúdo LLM) → OK."""
+    _raise_if_llm_error_marker("Traceback (most recent call last):\n  File ...")
+
+    with pytest.raises(RuntimeError, match="LLM Engine falhou"):
+        _raise_if_llm_error_marker(
+            "ok",
+            OpenCodeResult(exit_code=0, stdout="ok", stderr="Traceback (most recent call last): boom"),
+        )
+
+
+def test_gate_success_output_with_error_words_passes():
+    """Saída de sucesso contendo a palavra 'error' (ex.: nome de teste) passa."""
+    _raise_if_llm_error_marker(
+        "def test_error_handling():\n    assert True\n",
+        OpenCodeResult(exit_code=0, stdout="def test_error_handling():\n    pass", stderr=""),
+    )

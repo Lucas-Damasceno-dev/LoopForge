@@ -1,8 +1,9 @@
 import os
-import signal
 import shutil
+import signal
 import subprocess
 import time
+from contextlib import suppress
 from pathlib import Path
 
 from lf.pipeline.llm_factory import resolve_default_model
@@ -133,21 +134,28 @@ class OpenCodeRunner:
             timed_out_stdout = (
                 exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
             )
-            # Mata o GRUPO de processos (start_new_session=True criou grupo
-            # próprio com pgid == pid do líder), não só o `script`. Fallback:
-            # se o grupo já não existe (ProcessLookupError), mata o líder.
+            # Mata a árvore inteira no timeout:
+            # 1. killpg no grupo do `script` (start_new_session=True cria grupo
+            #    próprio com pgid == pid do líder) — mata o `script` e quem
+            #    estiver no grupo dele;
+            # 2. mata os DESCENDENTES do `script` explicitamente: o `script`
+            #    spawna o filho em sessão própria (forkpty→login_tty faz setsid),
+            #    então a árvore opencode (sh → opencode → node → agentes) vive
+            #    em OUTRO grupo, fora do alcance do killpg — sem isso ficariam
+            #    órfãos.
             if proc is not None:
+                descendants = _collect_descendants(proc.pid)
                 try:
                     os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                 except (ProcessLookupError, PermissionError, OSError):
-                    try:
+                    # Fallback: grupo já não existe → mata só o líder.
+                    with suppress(OSError):
                         proc.kill()
-                    except OSError:
-                        pass
-                try:
+                for child_pid in descendants:
+                    with suppress(OSError):
+                        os.kill(child_pid, signal.SIGKILL)
+                with suppress(subprocess.TimeoutExpired):
                     proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    pass
             return OpenCodeResult(
                 exit_code=124,
                 stdout=timed_out_stdout,
@@ -162,6 +170,40 @@ class OpenCodeRunner:
                 stderr=str(exc),
                 duration_seconds=duration,
             )
+
+
+def _collect_descendants(root_pid: int) -> list[int]:
+    """Coleta pids cuja cadeia de PPID parte de `root_pid` (via /proc).
+
+    Necessário porque o `script` spawna o filho em sessão própria
+    (forkpty→login_tty faz setsid no filho): a árvore opencode não fica no
+    grupo do `script`, então killpg sozinho não a alcança. A varredura pega a
+    árvore real ANTES de matar o `script` (depois de morto, os filhos são
+    reparentados para o init e o rastro por PPID se perde).
+    """
+    try:
+        entries = os.listdir("/proc")
+    except OSError:
+        return []
+    children: dict[int, list[int]] = {}
+    for entry in entries:
+        if not entry.isdigit():
+            continue
+        try:
+            with open(f"/proc/{entry}/stat", encoding="utf-8", errors="replace") as f:
+                rest = f.read().rsplit(")", 1)[1]
+            ppid = int(rest.split()[1])
+            children.setdefault(ppid, []).append(int(entry))
+        except (OSError, ValueError, IndexError):
+            continue
+    found: list[int] = []
+    stack = [root_pid]
+    while stack:
+        parent = stack.pop()
+        for child in children.get(parent, []):
+            found.append(child)
+            stack.append(child)
+    return found
 
 
 def detect_changed_files(project_root: str | Path, start_time: float) -> list[str]:

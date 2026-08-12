@@ -1,10 +1,12 @@
-"""Fix: timeout do OpenCodeRunner mata o GRUPO de processos, não só o `script`.
+"""Fix: timeout do OpenCodeRunner mata a ÁRVORE de processos, não só o `script`.
 
 Reproduz a falha real: com subprocess.run, o timeout matava apenas o líder
-(`script`); os filhos (sh → opencode → agentes) ficavam órfãos. O teste usa um
+(`script`); os filhos (sh → opencode → agentes) ficavam órfãos. O runner agora
+mata o grupo do `script` (killpg) + descendentes via /proc (a árvore opencode
+vive em sessão própria, criada pelo forkpty/setsid do `script`). O teste usa um
 binário `opencode` FAKE (script bash real) que grava o próprio PID e dorme,
 exercitando o caminho REAL do runner (script + Popen + start_new_session +
-killpg no TimeoutExpired) — nada do mecanismo de kill é mockado.
+killpg + descendants no TimeoutExpired) — nada do mecanismo de kill é mockado.
 """
 
 import os
@@ -14,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from lf.runner.opencode.runner import OpenCodeRunner
 from lf.runner.opencode.models import OpenCodeResult
+from lf.runner.opencode.runner import OpenCodeRunner
 
 
 def _make_fake_opencode(tmp_path: Path) -> tuple[Path, Path]:
@@ -49,7 +51,17 @@ def _child_alive(pidfile: Path) -> bool:
     return True
 
 
-def _run_with_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, timeout: int) -> tuple[Path, Path]:
+def _wait_child_dead(pidfile: Path, timeout: float = 5.0) -> bool:
+    """Espera (com poll) o filho morrer; entrega de SIGKILL é assíncrona."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _child_alive(pidfile):
+            return True
+        time.sleep(0.05)
+    return not _child_alive(pidfile)
+
+
+def _run_with_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, timeout: int) -> tuple[OpenCodeResult, Path]:
     """Sobe o runner com o opencode fake no PATH e executa até o timeout."""
     bin_path, pidfile = _make_fake_opencode(tmp_path)
     run_root = tmp_path / f"run_{timeout}_{int(time.time() * 1000)}"
@@ -76,7 +88,7 @@ def test_timeout_kills_process_group(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert res.exit_code == 124
     assert "timed out" in res.stderr
     assert pidfile.exists(), "fake opencode não chegou a gravar o pidfile"
-    assert not _child_alive(pidfile), "processo filho ficou órfão após o timeout"
+    assert _wait_child_dead(pidfile), "processo filho ficou órfão após o timeout"
 
 
 def test_timeout_killpg_stability_3x(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -85,4 +97,4 @@ def test_timeout_killpg_stability_3x(tmp_path: Path, monkeypatch: pytest.MonkeyP
         res, pidfile = _run_with_timeout(tmp_path, monkeypatch, timeout=2)
         assert res.exit_code == 124
         assert pidfile.exists(), f"iteração {i}: pidfile não gravado"
-        assert not _child_alive(pidfile), f"iteração {i}: filho órfão sobreviveu"
+        assert _wait_child_dead(pidfile), f"iteração {i}: filho órfão sobreviveu"

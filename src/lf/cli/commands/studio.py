@@ -64,7 +64,8 @@ def fetch_runs(db_path: str, limit: int = 10) -> list[dict[str, Any]]:
             ).fetchall()
         elif "runs" in tables:
             rows = conn.execute(
-                "SELECT id, task_id, node, status, duration_seconds, created_at FROM runs ORDER BY id DESC LIMIT ?",
+                "SELECT id, task_id, node, status, duration_seconds, "
+                "timestamp AS created_at FROM runs ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
         else:
@@ -94,13 +95,15 @@ def _build_stats(runs: list[dict[str, Any]]) -> dict[str, str]:
         "Falhas (failed)": str(failed),
         "Em execução/pendente": str(running),
         "Duração média (s)": f"{avg_duration:.1f}",
-        "Última execução": f"{last.get('id', '')[:8]} · {last.get('status', '')} · {str(last.get('idea', ''))[:30]}",
+        "Última execução": (
+            f"{str(last.get('id') or '')[:8]} · {last.get('status', '')} · {str(last.get('idea', ''))[:30]}"
+        ),
     }
 
 
 def _run_line(run: dict[str, Any]) -> str:
     """Formata uma execução como linha de log."""
-    run_id = str(run.get("id", ""))[:8]
+    run_id = str(run.get("id") or "")[:8]
     idea = str(run.get("idea") or run.get("task_id") or "")[:40]
     status = str(run.get("status", ""))
     stack = str(run.get("stack") or run.get("node") or "-")

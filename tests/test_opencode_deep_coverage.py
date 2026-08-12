@@ -43,10 +43,12 @@ def test_opencode_runner_circuit_breaker_open():
 def test_opencode_runner_real_subprocess_success(tmp_path):
     runner = OpenCodeRunner(timeout_seconds=10)
     with patch("shutil.which", return_value="/usr/bin/opencode"), patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=[], returncode=0, stdout="opencode output", stderr=""
-            )
+        with patch("subprocess.Popen") as mock_popen:
+            proc = MagicMock()
+            proc.pid = 1 << 30
+            proc.returncode = 0
+            proc.communicate.return_value = ("opencode output", "")
+            mock_popen.return_value = proc
             res = runner.run("create app", project_root=tmp_path)
             assert res.success is True
             assert res.stdout == "opencode output"
@@ -55,8 +57,11 @@ def test_opencode_runner_real_subprocess_success(tmp_path):
 def test_opencode_runner_timeout_expired(tmp_path):
     runner = OpenCodeRunner(timeout_seconds=5)
     with patch("shutil.which", return_value="/usr/bin/opencode"), patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
-        with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.TimeoutExpired(cmd="opencode", timeout=5, output="partial")
+        with patch("subprocess.Popen") as mock_popen:
+            proc = MagicMock()
+            proc.pid = 1 << 30  # pid inexistente → killpg cai no fallback proc.kill()
+            proc.communicate.side_effect = subprocess.TimeoutExpired(cmd="opencode", timeout=5, output="partial")
+            mock_popen.return_value = proc
             res = runner.run("slow task", project_root=tmp_path)
             assert res.exit_code == 124
             assert "timed out" in res.stderr
@@ -65,8 +70,7 @@ def test_opencode_runner_timeout_expired(tmp_path):
 def test_opencode_runner_general_exception(tmp_path):
     runner = OpenCodeRunner(timeout_seconds=5)
     with patch("shutil.which", return_value="/usr/bin/opencode"), patch.dict(os.environ, {"OPENCODE_MOCK": "0"}):
-        with patch("subprocess.run") as mock_run:
-            mock_run.side_effect = Exception("OS Subprocess Error")
+        with patch("subprocess.Popen", side_effect=Exception("OS Subprocess Error")):
             res = runner.run("failing task", project_root=tmp_path)
             assert res.exit_code == 1
             assert "OS Subprocess Error" in res.stderr

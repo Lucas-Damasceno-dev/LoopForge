@@ -40,8 +40,11 @@ def test_studio_lê_pipeline_runs(tmp_path):
 
     res = _run_studio(str(db_file))
     assert res.exit_code == 0
-    assert "API REST FastAPI" in res.output
+    # TUI renderiza com wrap (stdout não-tty): assert em fragmentos curtos.
     assert "DONE" in res.output
+    assert "stack=python" in res.output
+    assert "FastAPI" in res.output
+    assert "12.5s" in res.output
 
 
 def test_studio_fallback_tabela_runs_do_telemetry_store(tmp_path):
@@ -63,7 +66,8 @@ def test_studio_fallback_tabela_runs_do_telemetry_store(tmp_path):
     res = _run_studio(str(db_file))
     assert res.exit_code == 0
     assert "DONE" in res.output
-    assert "developer" in res.output
+    assert "stack=developer" in res.output
+    assert "3.2s" in res.output
 
 
 def test_studio_footer_mostra_so_atalhos_funcionais(tmp_path):

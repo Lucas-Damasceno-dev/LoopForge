@@ -120,7 +120,10 @@ def test_call_llm_via_opencode_repassa_on_token_delta(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
 
     cb = lambda s: None  # noqa: E731
-    out = llm_mod.call_llm_via_opencode("sys", "user-unique-forward", on_token_delta=cb)
+    # cache=False: o cache SQLite é compartilhado (.loopforge/llm_cache.sqlite)
+    # e o teste anterior polui a própria entrada → hit de cache na 2ª execução
+    # faria o fake nunca ser chamado (KeyError 'cb').
+    out = llm_mod.call_llm_via_opencode("sys", "user-unique-forward", on_token_delta=cb, cache=False)
 
     assert captured["cb"] is cb
     assert out == "resposta"

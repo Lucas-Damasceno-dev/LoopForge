@@ -98,16 +98,20 @@ def test_opencode_runner_subprocess_uses_run_dir(tmp_path):
     with (
         patch("shutil.which", return_value="/usr/bin/opencode"),
         patch.dict(os.environ, {"OPENCODE_MOCK": "0"}),
-        patch("lf.runner.opencode.runner.subprocess.run") as mock_run,
+        patch("lf.runner.opencode.runner.subprocess.Popen") as mock_popen,
     ):
-        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="opencode output", stderr="")
+        proc = MagicMock()
+        proc.pid = 1 << 30
+        proc.returncode = 0
+        proc.communicate.return_value = ("opencode output", "")
+        mock_popen.return_value = proc
         runner = OpenCodeRunner(timeout_seconds=10)
         res = runner.run("create app", project_root=run_dir)
         assert res.success is True
         # C3: dir da run criado (cwd do subprocess precisa existir)
         assert run_dir.is_dir()
 
-        call_args = mock_run.call_args
+        call_args = mock_popen.call_args
         assert call_args.kwargs["cwd"] == run_dir.resolve()
         # C3: --dir presente no comando do script -c
         cmd_str = " ".join(call_args.args[0])
