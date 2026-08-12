@@ -2,6 +2,7 @@
 Módulo Lessons: gera o artefato final lessons.md com resumo executivo, stack do TL,
 métricas de QA, relatórios de AppSec e instruções de execução do projeto.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -34,6 +35,7 @@ def generate_lessons_md(state: GraphState) -> str:
     # Salva a lição aprendida no MemoryManager para consultas futuras cross-project
     try:
         from ...memory.manager import MemoryManager
+
         mem = MemoryManager()
         lesson_prefix = f"Resultado QA: {qa_status} ({tests_passed}/{total_tests} testes). Ideia: {idea}"
         failures_summary: list[str] = []
@@ -75,9 +77,13 @@ def generate_lessons_md(state: GraphState) -> str:
         v_list = sec_report.get("vulnerabilities_found", [])
         for v in v_list:
             if isinstance(v, dict):
-                vulns.append(f"- [{v.get('severity', 'WARN')}] {v.get('type', 'Security Warning')}: {v.get('description', '')}")
+                vulns.append(
+                    f"- [{v.get('severity', 'WARN')}] {v.get('type', 'Security Warning')}: {v.get('description', '')}"
+                )
 
-    sec_warnings_txt = "\n".join(vulns) if vulns else "- Nenhuma vulnerabilidade crítica detectada no escaneamento estático."
+    sec_warnings_txt = (
+        "\n".join(vulns) if vulns else "- Nenhuma vulnerabilidade crítica detectada no escaneamento estático."
+    )
 
     # Run/Test commands based on stack
     run_cmds = _get_run_commands_by_stack(stack)
@@ -164,8 +170,11 @@ graph TD
     # Salva a lição aprendida no MemoryManager SQLite
     try:
         from ...memory.manager import MemoryManager
+
         mem = MemoryManager()
-        run_id = state.get("run_id", "run_latest")
+        # GraphState (TypedDict total=True) não declara `run_id`; `.get` devolve
+        # object. str() preserva o valor em runtime (str de str é identidade).
+        run_id = str(state.get("run_id", "run_latest"))
         mem.save_lesson(run_id=run_id, stack=stack, idea=idea, lesson_text=content[:500])
     except Exception as exc:
         logger.warning("Falha ao persistir no MemoryManager: %s", exc)
@@ -175,9 +184,10 @@ graph TD
     if importlib.util.find_spec("retro") is not None:
         try:
             from retro import AgDRParser, RetroStore
+
             retro_parser = AgDRParser()
             session_rec = retro_parser.parse_events([])
-            session_rec.session_id = state.get("run_id", "run_latest")
+            session_rec.session_id = str(state.get("run_id", "run_latest"))
             session_rec.goal = idea
             session_rec.status = qa_status
             session_rec.attempts = attempts

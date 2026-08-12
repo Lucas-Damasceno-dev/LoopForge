@@ -110,8 +110,7 @@ def test_writer(state: GraphState) -> dict:
 
     user_stories = state.get("user_stories", [])
     has_acceptance_criteria = any(
-        isinstance(us.get("acceptance_criteria"), list) and len(us.get("acceptance_criteria")) > 0
-        for us in user_stories
+        isinstance((criteria := us.get("acceptance_criteria")), list) and len(criteria) > 0 for us in user_stories
     )
 
     if not user_stories or not has_acceptance_criteria:
@@ -197,4 +196,6 @@ def test_writer(state: GraphState) -> dict:
     return {**state, "next_agent": "developer", "contract_tests": contract_tests}
 
 
-test_writer.__test__ = False
+# Marca a função como não-teste pro pytest (nome começa com `test_`); o mypy
+# não conhece atributo dinâmico em Callable — setattr evita o type: ignore.
+setattr(test_writer, "__test__", False)

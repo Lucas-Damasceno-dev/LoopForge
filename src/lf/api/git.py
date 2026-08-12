@@ -119,10 +119,15 @@ def _parse_log(repo: Repo, limit: int = _LOG_LIMIT) -> list[GitLogEntry]:
     entries: list[GitLogEntry] = []
     for commit in commits:
         when = commit.committed_datetime.isoformat() if commit.committed_datetime else ""
+        # GitPython tipa summary como str | bytes; na prática é str — decode
+        # defensivo preserva o conteúdo sem alterar runtime.
+        commit_summary = commit.summary or ""
+        if isinstance(commit_summary, bytes):
+            commit_summary = commit_summary.decode(errors="replace")
         entries.append(
             GitLogEntry(
                 hash=commit.hexsha[:7],
-                subject=commit.summary or "",
+                subject=commit_summary,
                 author=commit.author.name or commit.author.email or "",
                 when=when,
             )

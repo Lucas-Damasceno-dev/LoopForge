@@ -8,7 +8,7 @@ class SessionAnalyzer:
     def analyze(self, session: SessionRecord) -> List[PatternItem]:
         patterns: List[PatternItem] = []
 
-        error_counts = {}
+        error_counts: dict[str, int] = {}
         for ev in session.events:
             if ev.type in ("node_error", "node_retry") and ev.error:
                 err_text = ev.error.lower()

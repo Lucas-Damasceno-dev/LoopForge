@@ -265,7 +265,7 @@ class TaskDispatcher:
             except Exception as exc:
                 logger.warning("Falha ao publicar evento via EventBus: %s", exc)
 
-    def _get_input_with_timeout(self, prompt_text: str, timeout: int = 300) -> str:
+    def _get_input_with_timeout(self, prompt_text: str, timeout: float = 300) -> str:
         """Lê input com suporte a timeout no Unix/Linux."""
         print(prompt_text, end="", flush=True)
         try:

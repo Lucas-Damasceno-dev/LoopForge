@@ -2,9 +2,11 @@
 
 Unifica a persistência REST e Telemetria em `.loopforge/telemetry.sqlite`.
 """
+
 import contextlib
 import os
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -41,7 +43,7 @@ async def init_db(settings: APISettings | None = None) -> None:
     if is_sqlite and not os.getenv("LF_API_TEST"):
         os.makedirs(".loopforge", exist_ok=True)
 
-    kwargs = {"echo": settings.debug}
+    kwargs: dict[str, Any] = {"echo": settings.debug}
     if not is_sqlite:
         kwargs["pool_size"] = settings.db_pool_size
         kwargs["max_overflow"] = settings.db_max_overflow

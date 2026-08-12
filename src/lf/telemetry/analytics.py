@@ -1,4 +1,5 @@
 """Analytics e Relatórios de Custo de Telemetria por Agente/Persona."""
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,7 @@ COST_PER_1K_INPUT_TOKENS = 0.00015
 COST_PER_1K_OUTPUT_TOKENS = 0.0006
 
 
-def render_analytics_summary(store: TelemetryStore = None):
+def render_analytics_summary(store: TelemetryStore | None = None):
     """Exibe painel de métricas e tabela de custos por persona e por nó."""
     store = store or TelemetryStore()
     events = store.fetch_all()
@@ -70,7 +71,7 @@ def render_analytics_summary(store: TelemetryStore = None):
     )
 
 
-def export_analytics_json(output_path: str | Path = ".loopforge/analytics.json", store: TelemetryStore = None):
+def export_analytics_json(output_path: str | Path = ".loopforge/analytics.json", store: TelemetryStore | None = None):
     """Exporta todas as telemetrias em formato JSON."""
     store = store or TelemetryStore()
     events = store.fetch_all()

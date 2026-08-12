@@ -1,6 +1,7 @@
 import sys
 import time
 import uuid
+from typing import Literal
 
 import click
 from rich.console import Console
@@ -20,8 +21,12 @@ def _run_interactive_wizard() -> dict:
     console.print("\n[bold cyan]🧙 Bem-vindo ao Wizard Interativo do LoopForge![/bold cyan]")
     console.print("[dim]Defina os parâmetros do seu pipeline de IA agente em poucos passos.[/dim]\n")
 
-    idea = Prompt.ask("🤖 Qual o objetivo / ideia da funcionalidade?", default="Implementar serviço REST com autenticação")
-    stack = Prompt.ask("📦 Stack de tecnologia (opcional, Pressione Enter para deixar o Tech Lead decidir)?", default="")
+    idea = Prompt.ask(
+        "🤖 Qual o objetivo / ideia da funcionalidade?", default="Implementar serviço REST com autenticação"
+    )
+    stack = Prompt.ask(
+        "📦 Stack de tecnologia (opcional, Pressione Enter para deixar o Tech Lead decidir)?", default=""
+    )
     mode = Prompt.ask("⚡ Modo de roteamento?", choices=["full-path", "fast-path"], default="full-path")
     interactive = Confirm.ask("👤 Ativar revisão humana (HITL) entre os nós?", default=True)
     review_mode = Confirm.ask("🔍 Ativar Modo Revisão (pausa no final antes de salvar em disco)?", default=False)
@@ -40,7 +45,7 @@ def _run_interactive_wizard() -> dict:
 def _build_wizard_task_schema(
     idea: str,
     stack: str | None = None,
-    complexity: str = "standard",
+    complexity: Literal["mvp", "standard", "advanced"] = "standard",
     interactive: bool = False,
 ) -> TaskSchema:
     """Constrói o objeto TaskSchema a partir dos parâmetros coletados no wizard ou CLI."""
@@ -58,12 +63,21 @@ def _build_wizard_task_schema(
 @click.option("--pr", is_flag=True, default=False, help="Criar commit e Pull Request no GitHub após a conclusão")
 @click.option("--mock", is_flag=True, default=False, help="Usar modo LLM mock")
 @click.option("--interactive", "-i", is_flag=True, default=False, help="Pausar após nós para aprovação humana (HITL)")
-@click.option("--review-mode", is_flag=True, default=False, help="Modo Revisão: executa tudo e pausa antes de salvar no disco")
+@click.option(
+    "--review-mode", is_flag=True, default=False, help="Modo Revisão: executa tudo e pausa antes de salvar no disco"
+)
 @click.option("--notify", is_flag=True, default=False, help="Enviar notificação desktop ao pausar ou finalizar")
 @click.option("--webhook-url", default=None, help="URL de Webhook (Slack/Discord) para notificações")
 @click.option("--resume", "resume_id", default=None, help="Retomar pipeline interrompida pelo ID da tarefa")
-@click.option("--mvp", is_flag=True, default=False, help="Modo MVP: escopo enxuto, prototipagem rápida e requisitos essenciais")
-@click.option("--advanced", is_flag=True, default=False, help="Modo Avançado: escopo completo, múltiplos módulos e alta complexidade")
+@click.option(
+    "--mvp", is_flag=True, default=False, help="Modo MVP: escopo enxuto, prototipagem rápida e requisitos essenciais"
+)
+@click.option(
+    "--advanced",
+    is_flag=True,
+    default=False,
+    help="Modo Avançado: escopo completo, múltiplos módulos e alta complexidade",
+)
 @click.option("--wizard", is_flag=True, default=False, help="Forçar o wizard interativo de inicialização")
 def run_cmd(
     idea: str | None,
@@ -81,7 +95,9 @@ def run_cmd(
 ):
     """Executa a pipeline de tarefas dos agentes autônomos do LoopForge."""
     session_id = str(uuid.uuid4())[:8]
-    complexity_level = "mvp" if mvp else ("advanced" if advanced else "standard")
+    complexity_level: Literal["mvp", "standard", "advanced"] = (
+        "mvp" if mvp else ("advanced" if advanced else "standard")
+    )
 
     if resume_id:
         cfg = load_config()
@@ -112,11 +128,21 @@ def run_cmd(
 
     tasks_to_run = []
     if idea:
-        tasks_to_run = [TaskSchema(id="task-1", title=idea, agent_id="cpo", stack=stack, complexity_level=complexity_level)]
+        tasks_to_run = [
+            TaskSchema(id="task-1", title=idea, agent_id="cpo", stack=stack, complexity_level=complexity_level)
+        ]
     elif cfg.plan.tasks:
         tasks_to_run = cfg.plan.tasks
     else:
-        tasks_to_run = [TaskSchema(id="task-1", title="Build application features", agent_id="cpo", stack=stack, complexity_level=complexity_level)]
+        tasks_to_run = [
+            TaskSchema(
+                id="task-1",
+                title="Build application features",
+                agent_id="cpo",
+                stack=stack,
+                complexity_level=complexity_level,
+            )
+        ]
 
     console.print(f"[bold green]⚡ Iniciando LoopForge Run (Sessão ID: {session_id})...[/bold green]")
     if complexity_level != "standard":

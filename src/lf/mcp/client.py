@@ -12,7 +12,9 @@ class MCPClient:
     def __init__(self, spec: AdeMcpServer):
         self.spec = spec
         self._session: ClientSession | None = None
-        self._ctx = None
+        # Handle opaco do context manager do stdio_client (tipagem do SDK é
+        # genérica demais pra valer a pena importar); usado só em connect/disconnect.
+        self._ctx: Any = None
 
     async def connect(self) -> None:
         params = StdioServerParameters(command=self.spec.command, args=self.spec.args)
@@ -34,10 +36,7 @@ class MCPClient:
             raise RuntimeError("MCPClient não conectado")
         resp = await self._session.list_tools()
         # mcp 2.x expõe input_schema (SDK); o contrato ADE usa a chave inputSchema.
-        return [
-            {"name": t.name, "description": t.description, "inputSchema": t.input_schema}
-            for t in resp.tools
-        ]
+        return [{"name": t.name, "description": t.description, "inputSchema": t.input_schema} for t in resp.tools]
 
     async def call_tool(self, name: str, args: dict[str, Any]) -> Any:
         if self._session is None:

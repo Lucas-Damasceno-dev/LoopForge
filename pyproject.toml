@@ -61,10 +61,12 @@ ignore = ["E501", "SIM117", "E402", "F401"]
 [tool.mypy]
 python_version = "3.11"
 mypy_path = ["packages/genome", "packages/registry", "packages/retro"]
+# Imports externos sem stubs tipados (langgraph, mcp SDK, gitpython, tiktoken,
+# yaml, etc.) não devem floodar o check — erros reais do código src/lf são
+# corrigidos, não suprimidos.
 ignore_missing_imports = true
 warn_redundant_casts = false
 warn_unused_ignores = false
-# mypy desabilitado de propósito (M-17): `mypy_path` aponta para `packages/`
-# (genome/registry/retro) que não tem stubs locais, e a suíte ativa de
-# verificação é o pytest (241 testes). Meta: reativação gradual no V2.
-ignore_errors = true
+# Mypy re-habilitado (M-17): `mypy src/lf` passa com 0 erros.
+# Correções de tipos mantêm semântica runtime; `packages/*` (genome/registry/
+# retro) ficam no mypy_path e são checados quando importados por src/lf.

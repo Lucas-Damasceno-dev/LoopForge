@@ -14,7 +14,7 @@ import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
@@ -119,7 +119,7 @@ def _clean_code(raw: str) -> str:
     return code.strip()
 
 
-def _extract_generated_code(res: any, output_dir: str, duration: float = 0.0) -> str:
+def _extract_generated_code(res: Any, output_dir: str, duration: float = 0.0) -> str:
     """Helper de extração mantido para compatibilidade de testes."""
     if hasattr(res, "changed_files") and res.changed_files:
         for file_path in res.changed_files:

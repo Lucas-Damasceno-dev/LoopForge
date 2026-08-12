@@ -13,6 +13,7 @@ from collections import deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal, cast
 
 from fastapi import (
     Depends,
@@ -391,7 +392,9 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         result = await session.execute(query)
         runs = result.scalars().all()
 
-        return RunListResponse(items=list(runs), total=total)
+        # Converte ORM -> RunResponse (from_attributes) explicitamente; o
+        # response_model do FastAPI faria o mesmo em runtime.
+        return RunListResponse(items=[RunResponse.model_validate(run) for run in runs], total=total)
 
     @app.get(
         "/api/v1/runs",
@@ -914,7 +917,9 @@ async def _run_pipeline(
         title=idea,
         agent_id="cpo",
         stack=stack,
-        routing_mode=routing_mode,
+        # routing_mode chega como str dos params da fila (payload da API); o
+        # próprio TaskSchema valida o Literal em runtime — cast só tipográfico.
+        routing_mode=cast(Literal["full", "fast", "patch", "review-only", "explore"], routing_mode),
     )
 
     project_dir = f"/tmp/loopforge/run_{run_id}"

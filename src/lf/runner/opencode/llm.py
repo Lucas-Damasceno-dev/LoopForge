@@ -3,7 +3,9 @@ import os
 from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
+from typing import Any, TypeVar, overload
 
+from pydantic import BaseModel
 from rich.console import Console
 
 from ...pipeline.cache import SQLiteLLMCache
@@ -36,18 +38,51 @@ def _raise_if_llm_error_marker(raw_response_text: str, result=None) -> None:
             )
 
 
+T = TypeVar("T", bound=BaseModel)
+
+
+@overload
 def call_llm_via_opencode(
     system_prompt: str,
     user_prompt: str,
-    schema_model=None,
+    schema_model: type[T],
     model: str | None = None,
     temperature: float = 0.3,
     mock: bool = False,
     cache: bool = True,
-    circuit_breaker=None,
+    circuit_breaker: Any = None,
     project_root: str | Path | None = None,
     on_token_delta: Callable[[str], None] | None = None,
-) -> str | dict | list:
+) -> dict[str, Any]: ...
+
+
+@overload
+def call_llm_via_opencode(
+    system_prompt: str,
+    user_prompt: str,
+    schema_model: None = None,
+    model: str | None = None,
+    temperature: float = 0.3,
+    mock: bool = False,
+    cache: bool = True,
+    circuit_breaker: Any = None,
+    project_root: str | Path | None = None,
+    on_token_delta: Callable[[str], None] | None = None,
+) -> str: ...
+
+
+def call_llm_via_opencode(
+    system_prompt: str,
+    user_prompt: str,
+    schema_model: type[BaseModel] | None = None,
+    model: str | None = None,
+    temperature: float = 0.3,
+    mock: bool = False,
+    cache: bool = True,
+    circuit_breaker: Any = None,
+    project_root: str | Path | None = None,
+    on_token_delta: Callable[[str], None] | None = None,
+) -> str | dict[str, Any]:
     """Chama OpenCode como LLM para geração de texto/estruturado.
 
     Args:
@@ -293,7 +328,7 @@ def _mock_response(schema_model) -> dict:
     from datetime import datetime
 
     now = datetime.now(UTC).isoformat()
-    mock = {}
+    mock: dict[str, Any] = {}
     for name, field in schema_model.model_fields.items():
         ann = field.annotation
         if ann is None:

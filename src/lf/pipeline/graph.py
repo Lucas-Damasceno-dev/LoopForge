@@ -5,7 +5,9 @@ Centraliza toda a lógica de roteamento e suporte a auditoria simultânea (AppSe
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from collections.abc import Hashable
+from typing import Any, Literal, cast
+
 from langgraph.graph import END, StateGraph
 
 from .nodes.appsec import appsec
@@ -82,7 +84,7 @@ def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "_
 class NodeRegistry:
     """Registro desacoplado de nós do pipeline LangGraph."""
 
-    _nodes: dict[str, any] = {
+    _nodes: dict[str, Any] = {
         "cpo": cpo,
         "pm": product_manager,
         "tech_lead": tech_lead,
@@ -95,11 +97,11 @@ class NodeRegistry:
     }
 
     @classmethod
-    def register(cls, name: str, node_func: any) -> None:
+    def register(cls, name: str, node_func: Any) -> None:
         cls._nodes[name] = node_func
 
     @classmethod
-    def get_all(cls) -> dict[str, any]:
+    def get_all(cls) -> dict[str, Any]:
         return dict(cls._nodes)
 
 
@@ -163,7 +165,9 @@ def build_graph(
         else:
             edges = EdgeRegistry.get_edges(source_node)
             if edges:
-                workflow.add_conditional_edges(source_node, router, edges)
+                # dict[str, str] → dict[Hashable, str]: dict é invariante no key
+                # type; LangGraph aceita qualquer chave Hashable em runtime.
+                workflow.add_conditional_edges(source_node, router, cast(dict[Hashable, str], edges))
 
     gates = list(interrupt_after) if interrupt_after else []
     if human_gate_enabled:

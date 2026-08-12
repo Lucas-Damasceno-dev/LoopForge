@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -8,13 +9,15 @@ import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 
 from lf.pipeline.providers.ollama import OllamaProvider
 
 from .cache import SQLiteLLMCache, _connect_sqlite, _semantic_normalize_prompt
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["SQLiteLLMCache", "_semantic_normalize_prompt"]
 
@@ -450,12 +453,14 @@ class OpenCodeCLIProvider(BaseLLMProvider):
     ) -> Any:
         from ..runner.opencode import call_llm_via_opencode
 
+        # schema_model aqui é `type[BaseModel] | None` (não narrowed) — cast p/
+        # casar com os overloads de call_llm_via_opencode; retorno é Any mesmo.
         return call_llm_via_opencode(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             model=model,
             temperature=temperature,
-            schema_model=schema_model,
+            schema_model=cast(Any, schema_model),
             mock=mock,
             cache=cache,
             circuit_breaker=circuit_breaker,
@@ -720,7 +725,10 @@ LLMProviderRegistry.register(OpenCodeCLIProvider())
 LLMProviderRegistry.register(OpenRouterProvider())
 LLMProviderRegistry.register(MockLLMProvider())
 LLMProviderRegistry.register(NativeLLMProvider())
-LLMProviderRegistry.register(OllamaProvider())
+# OllamaProvider é um client HTTP standalone (usado pela API em api/providers.py),
+# não implementa generate() do BaseLLMProvider — o registro só usa `provider_name`
+# para chavear o dict. Cast apenas tipográfico; comportamento runtime preservado.
+LLMProviderRegistry.register(cast(BaseLLMProvider, OllamaProvider()))
 
 
 def execute_llm(

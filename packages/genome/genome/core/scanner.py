@@ -60,7 +60,9 @@ class GenomeScanner:
         file_paths: List[str] = []
 
         for root, dirs, files in os.walk(self.repo_root):
-            dirs[:] = [d for d in dirs if not self._should_ignore(os.path.relpath(os.path.join(root, d), self.repo_root))]
+            dirs[:] = [
+                d for d in dirs if not self._should_ignore(os.path.relpath(os.path.join(root, d), self.repo_root))
+            ]
             for f in files:
                 full_path = os.path.join(root, f)
                 rel_path = os.path.relpath(full_path, self.repo_root)
@@ -85,8 +87,8 @@ class GenomeScanner:
                 continue
 
             try:
-                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                    code = f.read()
+                with open(full_path, "r", encoding="utf-8", errors="ignore") as fh:
+                    code = fh.read()
             except Exception:
                 continue
 

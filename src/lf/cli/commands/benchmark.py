@@ -1,4 +1,5 @@
 """Comando CLI 'lf benchmark' para executar a suíte de benchmarks ELO do LoopForge."""
+
 import time
 
 import click
@@ -24,7 +25,9 @@ def benchmark_cmd(limit: int, runs: int | None, mock: bool, storage_dir: str):
         limit = runs
 
     problems = CURATED_BENCHMARK_PROBLEMS[:limit]
-    console.print(f"[bold cyan]⚡ Executando LoopForge ELO Benchmark Suite ({len(problems)} problemas curados)...[/bold cyan]\n")
+    console.print(
+        f"[bold cyan]⚡ Executando LoopForge ELO Benchmark Suite ({len(problems)} problemas curados)...[/bold cyan]\n"
+    )
 
     suite = BenchmarkSuite(storage_dir=storage_dir)
     dispatcher = TaskDispatcher(mock_llm=mock)
@@ -39,7 +42,6 @@ def benchmark_cmd(limit: int, runs: int | None, mock: bool, storage_dir: str):
             title=prob.title,
             agent_id="cpo",
             stack=prob.stack,
-            user_stories=prob.user_stories,
         )
 
         res = dispatcher.dispatch(task=task, project_id=f"bench-{prob.id}")

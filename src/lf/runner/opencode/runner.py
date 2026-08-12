@@ -116,9 +116,14 @@ class OpenCodeRunner:
             )
         except subprocess.TimeoutExpired as exc:
             duration = time.time() - start_time
+            # TimeoutExpired.stdout é `bytes | str` na tipagem; com text=True é
+            # str em runtime — decode defensivo preserva o conteúdo.
+            timed_out_stdout = (
+                exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+            )
             return OpenCodeResult(
                 exit_code=124,
-                stdout=exc.stdout or "",
+                stdout=timed_out_stdout,
                 stderr=f"OpenCode execution timed out after {self.timeout}s",
                 duration_seconds=duration,
             )

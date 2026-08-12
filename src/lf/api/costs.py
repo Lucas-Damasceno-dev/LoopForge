@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lf.api.auth import verify_authentication
 from lf.api.database import get_session
 from lf.api.models import PipelineRun
-from lf.api.schemas import BudgetOverrideRequest, CostNode, CostResponse
+from lf.api.schemas import BudgetOverrideRequest, CostBudget, CostNode, CostResponse
 from lf.config.loader import load_budget_usd
 
 costs_router = APIRouter(prefix="/api/v1", tags=["Costs"])
@@ -181,10 +181,10 @@ async def get_run_cost(
         run_id=run_id,
         spent_usd=round(spent, 6),
         estimated=estimated,
-        budget={
-            "max_usd": max_usd,
-            "percent_used": round(percent_used, 4),
-        },
+        budget=CostBudget(
+            max_usd=max_usd,
+            percent_used=round(percent_used, 4),
+        ),
         budget_warning=budget_warning,
         nodes=_node_cost_breakdown(run_id),
     )
@@ -225,10 +225,10 @@ async def override_run_budget(
         run_id=run_id,
         spent_usd=round(spent, 6),
         estimated=estimated,
-        budget={
-            "max_usd": max_usd,
-            "percent_used": round(percent_used, 4),
-        },
+        budget=CostBudget(
+            max_usd=max_usd,
+            percent_used=round(percent_used, 4),
+        ),
         budget_warning=budget_warning,
         nodes=_node_cost_breakdown(run_id),
     )

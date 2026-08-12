@@ -2,6 +2,7 @@
 Validador de artefatos contra schemas do The Foundry.
 Compila schemas JSON em Pydantic models dinâmicos.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -80,12 +81,15 @@ class ArtifactValidator:
             return list[item_type]  # type: ignore
         elif json_type == "object":
             if "properties" in prop:
+                # mypy (plugin pydantic) não casa o **dict literal de
+                # tuple[type, EllipsisType] com os overloads de create_model —
+                # anotar dict[str, Any] resolve sem alterar runtime.
+                field_defs: dict[str, Any] = {
+                    k: (self._resolve_type(v), ...) for k, v in prop.get("properties", {}).items()
+                }
                 return create_model(
                     f"Nested_{prop.get('title', 'Object')}",
-                    **{
-                        k: (self._resolve_type(v), ...)
-                        for k, v in prop.get("properties", {}).items()
-                    },
+                    **field_defs,
                 )
             return dict
         return str

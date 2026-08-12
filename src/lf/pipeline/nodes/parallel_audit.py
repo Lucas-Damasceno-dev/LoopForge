@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import os
+from typing import cast
 
 from ...pipeline.state import GraphState
 from .appsec import appsec
@@ -118,6 +119,8 @@ def parallel_audit(state: GraphState) -> dict:
         updated_state["feedback_history"] = res_appsec.get("feedback_history", state.get("feedback_history", []))
 
     # Gera o artefato final lessons.md
-    generate_lessons_md(updated_state)
+    # `{**state, ...}` deixa o tipo como dict[str, Any]; updated_state É o
+    # GraphState (spread do estado original + campos de auditoria) — cast honesto.
+    generate_lessons_md(cast(GraphState, updated_state))
 
     return updated_state

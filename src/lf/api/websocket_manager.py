@@ -3,7 +3,8 @@
 Suporta broadcast global (conexões de /ws/streaming) e canais por run
 (conexões de /ws/runs/{run_id}, que só recebem eventos do próprio run).
 """
-from typing import Any
+
+from typing import Any, cast
 
 from fastapi import WebSocket
 
@@ -26,7 +27,10 @@ class WebSocketConnectionManager:
         ``connect(run_id, websocket)`` (canal filtrado por run).
         """
         if websocket is None:
-            websocket, run_id = run_id, None  # type: ignore[assignment]
+            # Forma legada: primeiro arg carrega o WebSocket.
+            assert run_id is not None
+            websocket = cast(WebSocket, run_id)
+            run_id = None
         await websocket.accept()
         self.active_connections.append(websocket)
         if run_id:
@@ -39,7 +43,10 @@ class WebSocketConnectionManager:
         ``disconnect(run_id, websocket)``.
         """
         if websocket is None:
-            websocket, run_id = run_id, None  # type: ignore[assignment]
+            # Forma legada: primeiro arg carrega o WebSocket.
+            assert run_id is not None
+            websocket = cast(WebSocket, run_id)
+            run_id = None
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         if run_id:
@@ -68,7 +75,7 @@ class WebSocketConnectionManager:
             except Exception:
                 disconnected.append(connection)
         for conn in disconnected:
-            self.disconnect(conn)
+            self.disconnect(None, conn)
 
     async def send_to_run(self, run_id: str, message: dict[str, Any]):
         """Envia para as conexões daquele run, removendo as desconectadas."""

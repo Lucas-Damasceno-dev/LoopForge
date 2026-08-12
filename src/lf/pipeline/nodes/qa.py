@@ -13,7 +13,7 @@ import time
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from ...pipeline.state import GraphState
 
@@ -317,7 +317,7 @@ def _build_report_from_harness(
         failed = len(errors)
         status = "PASS" if failed == 0 and passed > 0 else "FAIL"
 
-    report = {
+    report: dict[str, Any] = {
         "id": report_id,
         "user_story_id": user_story_id,
         "commit_hash": "local_head",

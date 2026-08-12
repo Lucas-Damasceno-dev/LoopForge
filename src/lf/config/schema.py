@@ -51,7 +51,7 @@ class TaskSchema(BaseModel):
     attempts: int = 0
     max_retries: int = 3
     depends_on: list[str] = Field(default_factory=list)
-    stack: str | None = Field(None, description="Stack tecnológica opcional")
+    stack: str | None = Field(default=None, description="Stack tecnológica opcional")
     routing_mode: Literal["full", "fast", "patch", "review-only", "explore"] = "full"
     task_type: Literal["feature", "bugfix", "patch", "review", "explore", "fast", "simple"] = "feature"
     complexity_level: Literal["mvp", "standard", "advanced"] = "standard"
@@ -90,8 +90,8 @@ class LoopForgeConfig(BaseModel):
     stack: TechStack = Field(default_factory=TechStack)
     llm_provider: str = "openrouter"
     llm_model: str = "oc/deepseek-v4-flash-free"
-    budget_limit_usd: float = Field(10.0, ge=0)
-    max_parallel_tasks: int = Field(2, gt=0)
+    budget_limit_usd: float = Field(default=10.0, ge=0)
+    max_parallel_tasks: int = Field(default=2, gt=0)
     plan: PlanSchema = Field(default_factory=PlanSchema)
 
 
@@ -106,7 +106,7 @@ class AdeMcpServer(BaseModel):
 class AdeBudget(BaseModel):
     """Fonte única do budget (M-08): alimenta o CircuitBreaker do dispatcher."""
 
-    max_usd: float = Field(10.0, ge=0, description="Limite de custo em USD por run (fonte única via ade.yaml)")
+    max_usd: float = Field(default=10.0, ge=0, description="Limite de custo em USD por run (fonte única via ade.yaml)")
 
 
 class AdeProviders(BaseModel):
@@ -132,10 +132,10 @@ class AdeRunner(BaseModel):
     """
 
     subprocess_timeout_seconds: int = Field(
-        300, ge=0, description="Timeout do subprocesso opencode em segundos (0 = sem timeout)"
+        default=300, ge=0, description="Timeout do subprocesso opencode em segundos (0 = sem timeout)"
     )
     max_concurrent_runs: int = Field(
-        2, ge=1, description="Runs executando em paralelo (E3); excedente fica enfileirado"
+        default=2, ge=1, description="Runs executando em paralelo (E3); excedente fica enfileirado"
     )
 
 
@@ -159,21 +159,21 @@ class AdeMemory(BaseModel):
     comportamento atual (busca restrita à stack do run).
     """
 
-    cross_project: bool = Field(False, description="Busca de lições ignora o filtro de stack (todas as stacks)")
+    cross_project: bool = Field(default=False, description="Busca de lições ignora o filtro de stack (todas as stacks)")
 
 
 class AdeConfig(BaseModel):
-    budget: AdeBudget = Field(default_factory=AdeBudget)
+    budget: AdeBudget = Field(default_factory=lambda: AdeBudget())
     mcp_servers: list[AdeMcpServer] = Field(default_factory=list)
-    providers: AdeProviders = Field(default_factory=AdeProviders)
-    hitl: AdeHITL = Field(default_factory=AdeHITL)
-    runner: AdeRunner = Field(default_factory=AdeRunner)
+    providers: AdeProviders = Field(default_factory=lambda: AdeProviders())
+    hitl: AdeHITL = Field(default_factory=lambda: AdeHITL())
+    runner: AdeRunner = Field(default_factory=lambda: AdeRunner())
     genome_injection: bool = Field(
-        False,
+        default=False,
         description="Injeta seção 'GENOMA DE PROJETO' nos prompts de cpo/pm/tech_lead (env LF_GENOME_INJECTION)",
     )
     memory: AdeMemory = Field(
-        default_factory=AdeMemory,
+        default_factory=lambda: AdeMemory(),
         description="Configuração da memória (ex.: cross_project)",
     )
     api_keys: list[AdeApiKey] = Field(

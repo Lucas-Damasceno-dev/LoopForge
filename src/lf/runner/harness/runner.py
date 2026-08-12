@@ -182,9 +182,9 @@ class TestHarnessRunner:
         raw_timeout = os.environ.get("LF_TEST_TIMEOUT")
         if raw_timeout:
             try:
-                parsed = int(raw_timeout)
-                if parsed > 0:
-                    timeout = parsed
+                parsed_timeout = int(raw_timeout)
+                if parsed_timeout > 0:
+                    timeout = parsed_timeout
             except ValueError:
                 pass
         try:
@@ -208,10 +208,10 @@ class TestHarnessRunner:
                 timeout=timeout,
                 env=env,
             )
-            parsed = parse_test_output(res.stdout + "\n" + res.stderr)
+            parsed_output = parse_test_output(res.stdout + "\n" + res.stderr)
             # Erro de coleta (pytest retorna exit code != 0) também invalida o run,
             # mesmo que o shell não sinalize falha — defensivo.
-            success = res.returncode == 0 and not parsed["errors"]
+            success = res.returncode == 0 and not parsed_output["errors"]
             stderr_text = res.stderr or ""
             # Comando não encontrado: o shell retorna 127 (ou "not recognized"
             # no Windows). NÃO tratar como "0 testes coletados" — preserva o
@@ -224,14 +224,14 @@ class TestHarnessRunner:
                 or "not recognized" in stderr_text.lower()
             )
             return TestHarnessResult(
-                total=parsed["total"],
-                passed=parsed["passed"],
-                failed=parsed["failed"],
+                total=parsed_output["total"],
+                passed=parsed_output["passed"],
+                failed=parsed_output["failed"],
                 output=res.stdout + "\n" + res.stderr,
                 success=success,
                 command=cmd,
                 command_missing=command_missing,
-                errors=parsed["errors"],
+                errors=parsed_output["errors"],
             )
         except Exception as exc:
             return TestHarnessResult(

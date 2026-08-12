@@ -55,7 +55,7 @@ class EvalsSummary(BaseModel):
     )
     current_elo: float = Field(..., description="Rating ELO atual do LoopForge")
     status: Literal["ok", "empty", "error"] = Field(..., description="Estado da leitura de telemetria")
-    message: str = Field("", description="Mensagem descritiva (erros/estado vazio)")
+    message: str = Field(default="", description="Mensagem descritiva (erros/estado vazio)")
 
 
 class EvalsLeaderboardEntry(BaseModel):
@@ -74,7 +74,7 @@ class EvalsLeaderboard(BaseModel):
 
     entries: list[EvalsLeaderboardEntry] = Field(default_factory=list)
     status: Literal["ok", "empty", "error"] = Field(..., description="Estado da leitura de telemetria")
-    message: str = Field("", description="Mensagem descritiva (erros/estado vazio)")
+    message: str = Field(default="", description="Mensagem descritiva (erros/estado vazio)")
 
 
 def _telemetry_db() -> Path:
@@ -184,7 +184,7 @@ def _benchmark_metrics() -> tuple[int, float]:
     return total, round(avg_pass_rate, 4)
 
 
-def _leaderboard_entries() -> list[dict]:
+def _leaderboard_entries() -> list[EvalsLeaderboardEntry]:
     """Lê run_*.json e monta o ranking (sucesso primeiro, depois mais rápido).
 
     Ordenação: runs bem-sucedidas antes de falhas; entre as do mesmo grupo,
@@ -197,24 +197,24 @@ def _leaderboard_entries() -> list[dict]:
         files = sorted(f for f in bdir.iterdir() if f.name.startswith("run_") and f.suffix == ".json")
     except OSError:
         return []
-    entries: list[dict] = []
+    entries: list[EvalsLeaderboardEntry] = []
     for f in files:
         try:
             with f.open(encoding="utf-8") as fh:
                 data = json.load(fh)
             entries.append(
-                {
-                    "run_id": str(data.get("run_id", f.stem.removeprefix("run_"))),
-                    "stack": str(data.get("stack", "python")),
-                    "success": bool(data.get("success", True)),
-                    "duration_seconds": round(float(data.get("total_duration_seconds", 0.0)), 2),
-                    "estimated_cost_usd": round(float(data.get("estimated_cost_usd", 0.0)), 6),
-                    "timestamp": str(data.get("timestamp", "")),
-                }
+                EvalsLeaderboardEntry(
+                    run_id=str(data.get("run_id", f.stem.removeprefix("run_"))),
+                    stack=str(data.get("stack", "python")),
+                    success=bool(data.get("success", True)),
+                    duration_seconds=round(float(data.get("total_duration_seconds", 0.0)), 2),
+                    estimated_cost_usd=round(float(data.get("estimated_cost_usd", 0.0)), 6),
+                    timestamp=str(data.get("timestamp", "")),
+                )
             )
         except (OSError, ValueError, TypeError):
             continue
-    entries.sort(key=lambda e: (not e["success"], e["duration_seconds"]))
+    entries.sort(key=lambda e: (not e.success, e.duration_seconds))
     return entries
 
 
@@ -226,7 +226,7 @@ async def get_evals_summary() -> EvalsSummary:
         total_cost = _db_total_cost()
         benchmark_runs, avg_pass_rate = _benchmark_metrics()
         current_elo = _load_elo_rating()
-        status = "ok" if (total_runs > 0 or benchmark_runs > 0) else "empty"
+        status: Literal["ok", "empty", "error"] = "ok" if (total_runs > 0 or benchmark_runs > 0) else "empty"
         return EvalsSummary(
             total_runs=total_runs,
             pass_rate=pass_rate,
@@ -256,7 +256,7 @@ async def get_evals_leaderboard() -> EvalsLeaderboard:
     """Ranking de runs de benchmark (sucesso primeiro, mais rápidas primeiro)."""
     try:
         entries = _leaderboard_entries()
-        status = "ok" if entries else "empty"
+        status: Literal["ok", "empty", "error"] = "ok" if entries else "empty"
         return EvalsLeaderboard(entries=entries, status=status)
     except Exception as e:  # pragma: no cover — guarda defensiva, rotas internas já tratam erros
         return EvalsLeaderboard(
