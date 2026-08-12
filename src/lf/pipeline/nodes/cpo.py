@@ -47,7 +47,7 @@ class EpicSchema(BaseModel):
     dates: dict = Field(..., description="created_at, started_at, completed_at")
 
 
-def cpo(state: GraphState) -> dict:
+def cpo(state: GraphState, config: dict | None = None) -> dict:
     """Recebe a ideia e gera um épico estruturado."""
     print("---EXECUTANDO NÓ: CPO---")
 
@@ -95,6 +95,7 @@ def cpo(state: GraphState) -> dict:
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
             node="cpo",
+            run_id=resolve_run_id(state, config),
         )
         epic["dates"] = {"created_at": now_iso, "started_at": now_iso}
     except Exception as e:
