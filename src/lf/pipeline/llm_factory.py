@@ -116,34 +116,35 @@ def call_openrouter_api(
                 assert on_token_delta is not None
                 chunks: list[str] = []
                 usage = None
-                with httpx.Client(timeout=timeout_val) as client:
-                    with client.stream("POST", url, headers=headers, json=payload) as resp:
-                        if resp.status_code != 200:
-                            last_error = RuntimeError(
-                                f"OpenRouter API request failed with status {resp.status_code}: "
-                                f"{(resp.text or '')[:200]}"
-                            )
+                with (
+                    httpx.Client(timeout=timeout_val) as client,
+                    client.stream("POST", url, headers=headers, json=payload) as resp,
+                ):
+                    if resp.status_code != 200:
+                        last_error = RuntimeError(
+                            f"OpenRouter API request failed with status {resp.status_code}: {(resp.text or '')[:200]}"
+                        )
+                        continue
+                    for line in resp.iter_lines():
+                        line = line.strip()
+                        if not line.startswith("data: "):
                             continue
-                        for line in resp.iter_lines():
-                            line = line.strip()
-                            if not line.startswith("data: "):
-                                continue
-                            data_line = line[6:]
-                            if data_line == "[DONE]":
-                                break
-                            try:
-                                cdata = json.loads(data_line)
-                            except Exception:
-                                continue
-                            choices = cdata.get("choices", [])
-                            if choices:
-                                delta = choices[0].get("delta", {})
-                                content = delta.get("content") or choices[0].get("message", {}).get("content")
-                                if content:
-                                    chunks.append(content)
-                                    on_token_delta(content)
-                            if cdata.get("usage"):
-                                usage = cdata["usage"]
+                        data_line = line[6:]
+                        if data_line == "[DONE]":
+                            break
+                        try:
+                            cdata = json.loads(data_line)
+                        except Exception:
+                            continue
+                        choices = cdata.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content") or choices[0].get("message", {}).get("content")
+                            if content:
+                                chunks.append(content)
+                                on_token_delta(content)
+                        if cdata.get("usage"):
+                            usage = cdata["usage"]
                 text = "".join(chunks)
                 if not text:
                     empty_content = True
@@ -387,10 +388,8 @@ class TokenDeltaPublisher:
         loop = asyncio.get_running_loop()
         while True:
             content = await loop.run_in_executor(None, self._queue.get)
-            try:
+            with contextlib.suppress(Exception):
                 await self._publish(content)
-            except Exception:
-                pass
 
     async def _publish(self, content: str) -> None:
         # Import tardio evita ciclo api↔pipeline (llm_factory não importa fastapi).
