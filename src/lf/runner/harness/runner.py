@@ -81,6 +81,98 @@ class TestHarnessRunner:
         except Exception as exc:
             print(f"--- AVISO: Falha na execução do auto-formatador: {exc} ---")
 
+    def run_format_check(self, cwd: str | Path = ".") -> list[str]:
+        """Onda 2 (2.1): verifica formatação com o formatador nativo em modo --check.
+
+        Retorna lista de arquivos/trechos que precisam de formatação (vazia = OK).
+        Guarda silenciosa quando a ferramenta não está no PATH (o gate vira no-op
+        em ambientes sem ruff/cargo/gofmt/prettier). Usa o PATH do venv do projeto
+        quando presente, igual ao run().
+        """
+        import re as _re
+        import shutil
+
+        cmd = self._detect_command(cwd)
+        env = os.environ.copy()
+        venv_bin = _find_venv_bin(cwd)
+        if venv_bin is not None:
+            env["PATH"] = str(venv_bin) + os.pathsep + env["PATH"]
+
+        try:
+            if "pytest" in cmd and shutil.which("ruff"):
+                res = subprocess.run(
+                    "ruff format --check .",
+                    shell=True,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env=env,
+                )
+                if res.returncode == 0:
+                    return []
+                summary_re = _re.compile(r"^\d+\s+files?\s+would\s+be\s+reformatted", _re.IGNORECASE)
+                issues: list[str] = []
+                for line in (res.stdout or "").splitlines():
+                    stripped = line.strip()
+                    if not stripped or summary_re.match(stripped) or "oh no" in stripped.lower():
+                        continue
+                    # ruff recente: "1 file would be reformatted: path1, path2"
+                    if "would be reformatted:" in stripped:
+                        paths = stripped.split(":", 1)[1].split(",")
+                        issues.extend(p.strip() for p in paths if p.strip())
+                    else:
+                        issues.append(stripped)
+                if not issues:
+                    issues.append((res.stdout or res.stderr or "").strip()[:200])
+                return issues
+            if "cargo" in cmd and shutil.which("cargo"):
+                res = subprocess.run(
+                    "cargo fmt --check",
+                    shell=True,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env=env,
+                )
+                if res.returncode == 0:
+                    return []
+                return ["cargo fmt --check: diferenças de formatação (rode cargo fmt)"]
+            if "go" in cmd and shutil.which("gofmt"):
+                # gofmt -l não falha: lista os arquivos não formatados na stdout.
+                res = subprocess.run(
+                    "gofmt -l .",
+                    shell=True,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env=env,
+                )
+                return [ln.strip() for ln in (res.stdout or "").splitlines() if ln.strip()]
+            if ("npm" in cmd or "npx" in cmd or "vitest" in cmd) and shutil.which("npx"):
+                res = subprocess.run(
+                    "npx prettier --check .",
+                    shell=True,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env=env,
+                )
+                if res.returncode == 0:
+                    return []
+                issues = [
+                    ln.strip()
+                    for ln in (res.stdout or "").splitlines()
+                    if ln.strip() and not ln.strip().startswith("Checking formatting")
+                ]
+                return issues or ["prettier --check: diferenças de formatação (rode npx prettier --write .)"]
+        except Exception as exc:
+            print(f"--- AVISO: Falha no gate de formatação: {exc} ---")
+        return []
+
     def run(self, cwd: str | Path = ".") -> TestHarnessResult:
         if self.auto_format:
             self.run_auto_formatter(cwd)

@@ -72,6 +72,22 @@ def qa(state: GraphState) -> dict:
         print("--- INFO: Re-executando Test Harness após Self-Healing de dependências ---")
         harness_result = _run_harness(product_dir, state.get("stack", ""), output_dir=state.get("output_dir", "."))
 
+    # Onda 2 (2.1): gate de auto-formatação — arquivos fora do padrão do formatador
+    # da stack (ruff format --check, cargo fmt --check, gofmt, prettier) viram erro
+    # de QA com feedback corrigível pro Developer. O auto-fix do runner formata em
+    # memória p/ os testes rodarem, mas a entrega ainda conta como FAIL (o código
+    # deve chegar formatado; formatar por fora é vício que o Developer precisa corrigir).
+    format_issues = harness_result.get("format_issues")
+    if isinstance(format_issues, list) and format_issues:
+        sample = "; ".join(str(f) for f in format_issues[:5])
+        format_err = (
+            f"Auto-formatação pendente: {len(format_issues)} arquivo(s) não formatados "
+            f"({sample}). Rode o formatador da stack (ruff format, cargo fmt, gofmt, "
+            "prettier) antes de entregar — o código deve chegar formatado no QA."
+        )
+        harness_result.setdefault("errors", []).append(format_err)
+        print(f"--- AVISO: Gate de formatação falhou ({len(format_issues)} arquivo(s)) ---")
+
     print(
         f"--- INFO: Harness executado (passou={harness_result.get('passed')}, erros={len(harness_result.get('errors', []))}) ---"
     )
@@ -226,8 +242,15 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
             subprocess.run("go mod tidy", shell=True, cwd=target_dir, capture_output=True, timeout=60)
 
     runner = TestHarnessRunner(stack=stack, auto_format=True)
+    # Onda 2 (2.1): gate de formatação ANTES dos testes — o código deve chegar
+    # formatado no QA. O auto-fix do runner continua como salvaguarda pro teste
+    # rodar limpo, mas a checagem --check vira feedback corrigível pro Developer.
+    format_issues = runner.run_format_check(target_dir)
     res = runner.run(target_dir)
-    return asdict(res) if hasattr(res, "__dataclass_fields__") else res
+    result = asdict(res) if hasattr(res, "__dataclass_fields__") else res
+    if format_issues:
+        result["format_issues"] = format_issues
+    return result
 
 
 def _exec_cmd(cmd: list[str], cwd: str, name: str, result: dict) -> None:
