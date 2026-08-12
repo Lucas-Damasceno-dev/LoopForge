@@ -722,6 +722,7 @@ def execute_llm(
     mock: bool = False,
     cache: bool = True,
     circuit_breaker: Any = None,
+    on_token_delta: TokenDeltaCallback | None = None,
 ) -> Any:
     """Ponto de entrada unificado que consome o LLMProviderRegistry."""
     target_provider = LLMProviderRegistry.get(provider_name)
@@ -733,4 +734,5 @@ def execute_llm(
         mock=mock,
         cache=cache,
         circuit_breaker=circuit_breaker,
+        on_token_delta=on_token_delta,
     )
