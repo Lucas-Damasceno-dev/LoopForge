@@ -62,17 +62,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 class RunQueueState:
-    """Estado da fila de execução E3 (M-21): 1 run ativa + FIFO de runs `queued`.
+    """Estado da fila de execução E3 (M-21): N runs ativas + FIFO de runs `queued`.
 
-    ``pending`` guarda os run_ids na ordem de chegada; ``active`` é a run em
-    execução (ou None); ``params`` guarda os parâmetros de execução (idea,
-    stack, mock_llm, routing_mode, interactive) — o PipelineRun não persiste
-    esses campos, então são retidos em memória até a promoção.
+    ``pending`` guarda os run_ids na ordem de chegada; ``active`` é o conjunto
+    das runs em execução (até ``max_concurrent``); ``params`` guarda os
+    parâmetros de execução (idea, stack, mock_llm, routing_mode, interactive) —
+    o PipelineRun não persiste esses campos, então são retidos em memória até a
+    promoção.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_concurrent: int = 1) -> None:
+        self.max_concurrent = max_concurrent
         self.pending: deque[str] = deque()
-        self.active: str | None = None
+        self.active: set[str] = set()
         self.lock = asyncio.Lock()
         self.params: dict[str, dict] = {}
 
@@ -133,8 +135,12 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Estado da fila E3 (M-21) — 1 run ativa + fila FIFO (por instância da app)
-    app.state.run_queue = RunQueueState()
+    # Estado da fila E3 (M-21) — N runs ativas + fila FIFO (por instância da app).
+    # max_concurrent_runs vem de ade.yaml (AdeRunner.max_concurrent_runs, default 2);
+    # runs além do limite nascem `queued` e promovem quando um slot liberar.
+    from lf.config.loader import load_ade_config
+
+    app.state.run_queue = RunQueueState(max_concurrent=load_ade_config().runner.max_concurrent_runs)
 
     # ─── Middleware: CORS (M-04) ───────────────────────────────────
     # Origens de LF_CORS_ORIGINS (vírgula) ou default ["*"]. Wildcard não
@@ -788,39 +794,42 @@ async def _set_run_status(run_id: str, status: str, **extra) -> None:
 
 
 async def _promote_next(app: FastAPI) -> None:
-    """Promove a próxima run da fila (FIFO) para `running` e dispara a execução.
+    """Promove runs enfileiradas (FIFO) para `running` enquanto houver vaga.
 
-    M-21 (E3): no máximo 1 run ativa. A execução roda em background e, no
-    término (finally em `_run_pipeline`), chama `_promote_next` de novo.
+    M-21 (E3): até ``max_concurrent`` runs ativas em paralelo — promove de uma
+    vez todas as que couberem no limite. A execução roda em background e, no
+    término (finally em `_run_pipeline`), chama `_promote_next` de novo para
+    liberar o próximo slot.
     """
     q = app.state.run_queue
+    promoted: list[tuple[str, dict]] = []
     async with q.lock:
-        if q.active is not None or not q.pending:
-            return
-        run_id = q.pending.popleft()
-        q.active = run_id
-        params = q.params.pop(run_id, {})
+        while len(q.active) < q.max_concurrent and q.pending:
+            run_id = q.pending.popleft()
+            q.active.add(run_id)
+            promoted.append((run_id, q.params.pop(run_id, {})))
 
-    idea = params.get("idea", "")
-    stack = params.get("stack", "python")
-    mock_llm = params.get("mock_llm", False)
-    routing_mode = params.get("routing_mode", "full")
-    interactive = params.get("interactive", False)
+    for run_id, params in promoted:
+        idea = params.get("idea", "")
+        stack = params.get("stack", "python")
+        mock_llm = params.get("mock_llm", False)
+        routing_mode = params.get("routing_mode", "full")
+        interactive = params.get("interactive", False)
 
-    # M-02/ADR-0003: thread canônica `run-{id}` persistida junto da promoção.
-    await _set_run_status(run_id, "running", thread_id=f"run-{run_id}", parent_run_id=run_id)
+        # M-02/ADR-0003: thread canônica `run-{id}` persistida junto da promoção.
+        await _set_run_status(run_id, "running", thread_id=f"run-{run_id}", parent_run_id=run_id)
 
-    asyncio.create_task(
-        _run_pipeline(
-            app,
-            run_id=run_id,
-            idea=idea,
-            stack=stack,
-            mock_llm=mock_llm,
-            routing_mode=routing_mode,
-            interactive=interactive,
+        asyncio.create_task(
+            _run_pipeline(
+                app,
+                run_id=run_id,
+                idea=idea,
+                stack=stack,
+                mock_llm=mock_llm,
+                routing_mode=routing_mode,
+                interactive=interactive,
+            )
         )
-    )
 
 
 async def _execute_pipeline_in_background(

@@ -127,11 +127,15 @@ class AdeRunner(BaseModel):
 
     ``subprocess_timeout_seconds`` substitui o timeout hardcoded (120s era
     insuficiente para modelos de reasoning — default sobe para 300s).
-    0 = sem timeout.
+    0 = sem timeout. ``max_concurrent_runs`` controla quantas runs rodam em
+    paralelo (E3); as demais ficam `queued` na fila FIFO da API.
     """
 
     subprocess_timeout_seconds: int = Field(
         300, ge=0, description="Timeout do subprocesso opencode em segundos (0 = sem timeout)"
+    )
+    max_concurrent_runs: int = Field(
+        2, ge=1, description="Runs executando em paralelo (E3); excedente fica enfileirado"
     )
 
 

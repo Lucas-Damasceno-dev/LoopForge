@@ -537,6 +537,60 @@ async def get_checkpoint(thread_id: str, checkpoint_id: str):
     }
 
 
+@trajectories_router.get("/{thread_id}/diff")
+async def diff_checkpoints(
+    thread_id: str,
+    from_checkpoint: str = Query(alias="from", description="Checkpoint de origem (estado anterior)"),
+    to_checkpoint: str = Query(alias="to", description="Checkpoint de destino (estado posterior)"),
+):
+    """Diff estruturado entre dois checkpoints da thread (time-travel profundo).
+
+    Compara o ``channel_values`` de ``from`` e ``to`` e devolve:
+
+    - ``added``: chaves só no destino ``{key: preview}``;
+    - ``removed``: chaves só na origem ``{key: preview}``;
+    - ``changed``: chaves em ambos com valores diferentes (before/after).
+
+    Os valores são previews JSON-safe truncados (500 chars, ``_preview_value``)
+    para não estourar o payload — o estado pode conter valores não-serializáveis
+    e campos sensíveis (mascarados). 404 se a thread ou um dos checkpoints não
+    existir; 422 se from/to ausentes (query obrigatória).
+    """
+    from lf.pipeline.checkpointer import create_async_checkpointer
+
+    saver = create_async_checkpointer(_trajectories_db())
+    try:
+        await saver.setup()
+        if not await _thread_exists(saver, thread_id):
+            raise HTTPException(status_code=404, detail=f"Run {thread_id} não encontrada (sem trajetória)")
+        from_state = await _load_checkpoint_state(saver, thread_id, from_checkpoint)
+        if from_state is None:
+            raise HTTPException(status_code=404, detail=f"Checkpoint {from_checkpoint} não encontrado")
+        to_state = await _load_checkpoint_state(saver, thread_id, to_checkpoint)
+        if to_state is None:
+            raise HTTPException(status_code=404, detail=f"Checkpoint {to_checkpoint} não encontrado")
+    finally:
+        await saver.conn.close()
+
+    from_keys = set(from_state)
+    added = {k: _preview_value(k, v) for k, v in to_state.items() if k not in from_keys}
+    removed = {k: _preview_value(k, v) for k, v in from_state.items() if k not in to_state}
+    # Ordem determinística: itera o estado destino na ordem de inserção.
+    changed = [
+        {"key": k, "before": _preview_value(k, from_state[k]), "after": _preview_value(k, to_state[k])}
+        for k in to_state
+        if k in from_state and from_state[k] != to_state[k]
+    ]
+    return {
+        "thread_id": thread_id,
+        "from": from_checkpoint,
+        "to": to_checkpoint,
+        "added": added,
+        "removed": removed,
+        "changed": changed,
+    }
+
+
 @trajectories_router.post("/export/{run_id}")
 async def export_trajectory(run_id: str):
     """Export enriquecido da run (M-14): thread canônica ``run-{run_id}`` (ADR-0003)."""
