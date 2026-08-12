@@ -2,6 +2,7 @@
 Nó Product Manager: quebra épico em user stories estruturadas.
 Usa Pydantic structured output com schema do The Foundry.
 """
+
 from __future__ import annotations
 
 import json
@@ -34,6 +35,7 @@ Responda APENAS com o JSON. NÃO inclua texto explicativo."""
 
 class UserStorySchema(BaseModel):
     """Schema baseado em user_story_schema.json do The Foundry."""
+
     id: str = Field(..., description="Identificador E-XXX-USXXX")
     title: str = Field(..., description="Título descritivo")
     epic_id: str = Field(..., description="ID do épico pai")
@@ -48,6 +50,7 @@ class UserStorySchema(BaseModel):
 
 class UserStoryList(BaseModel):
     """Wrapper para lista de user stories."""
+
     stories: list[UserStorySchema]
 
 
@@ -64,7 +67,6 @@ def product_manager(state: GraphState) -> dict:
     if not epic:
         raise ValueError("Épico não encontrado no estado")
 
-
     now_iso = datetime.now(UTC).isoformat()
 
     if state.get("mock_llm"):
@@ -77,9 +79,9 @@ def product_manager(state: GraphState) -> dict:
     system_prompt = f"""Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
 
 Cada user story DEVE ter TODOS os campos:
-- id: {epic.get('id', 'E-001')}-USXXX (sequencial)
+- id: {epic.get("id", "E-001")}-USXXX (sequencial)
 - title: descritivo
-- epic_id: {epic.get('id', 'E-001')}
+- epic_id: {epic.get("id", "E-001")}
 - as_a: persona (ex: "motorista de van", "pai de aluno")
 - i_want_to: funcionalidade concreta
 - so_that: benefício
@@ -91,11 +93,11 @@ Cada user story DEVE ter TODOS os campos:
 Responda APENAS com o JSON. NÃO inclua texto explicativo."""
 
     epic_context = f"""Épico:
-Título: {epic.get('title', '')}
-Descrição: {epic.get('description', '')}
-Objetivos: {', '.join(epic.get('business_objectives', []))}
-Escopo IN: {', '.join(epic.get('scope_in', []))}
-Escopo OUT: {', '.join(epic.get('scope_out', []))}"""
+Título: {epic.get("title", "")}
+Descrição: {epic.get("description", "")}
+Objetivos: {", ".join(epic.get("business_objectives", []))}
+Escopo IN: {", ".join(epic.get("scope_in", []))}
+Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
 
     try:
         result = call_llm_via_opencode(
@@ -107,7 +109,7 @@ Escopo OUT: {', '.join(epic.get('scope_out', []))}"""
         )
         stories = []
         for i, us in enumerate(result.get("stories", [])):
-            us["id"] = f"{epic.get('id', 'E-001')}-US{i+1:03d}"
+            us["id"] = f"{epic.get('id', 'E-001')}-US{i + 1:03d}"
             us["epic_id"] = epic.get("id", "E-001")
             us["dates"] = us.get("dates", {})
             us["dates"]["created_at"] = now_iso
