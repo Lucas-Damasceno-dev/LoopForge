@@ -16,7 +16,51 @@ _console = Console()
 # Marcadores de erro de modelo/servidor que NÃO são resposta LLM válida. O
 # wrapper `script` mascara o exit code do subprocesso (success=True mesmo com
 # falha), então o gate precisa checar o TEXTO da resposta, não o código de saída.
-_LLM_ERROR_MARKERS = ("Model not found", "UnknownError", "Unexpected server error", "model_not_found")
+#
+# Critério anti-falso-positivo (conteúdo LLM legítimo NÃO pode disparar o gate):
+# - Substring EXATA (case-sensitive) apenas em "registro de erro" do
+#   engine/provedor/CLI: capitalização específica de mensagem de erro
+#   ("Invalid API key", "Unauthorized") vs. código gerado que usa identificador
+#   minúsculo ("api_key", "unauthorized") ou docstring em minúsculas;
+# - Prefixos de linha ("error:", "Error:", "fatal:") casam apenas no INÍCIO da
+#   linha — a palavra "error" no MEIO de conteúdo legítimo (ex.: teste com nome
+#   "error", código com `raise ValueError("error: x")` indentado) não dispara;
+# - "Traceback (most recent call last)" só conta quando cai no stderr do
+#   subprocesso: no stdout pode ser conteúdo legítimo (ex.: exemplo de código
+#   Python gerado); em stderr é quase sempre crash do runtime.
+_LLM_ERROR_MARKERS = (
+    # Erros de modelo
+    "Model not found",
+    "model_not_found",
+    "is not a valid model",
+    # Erros de API/servidor/auth
+    "UnknownError",
+    "Unexpected server error",
+    "401 Unauthorized",
+    "Unauthorized",
+    "Invalid API key",
+    "API key is invalid",
+    "No auth credentials",
+    "Missing Bearer token",
+    # Rate limit / contexto (frases específicas; "exceeded" sozinho é genérico
+    # demais e apareceria em conteúdo legítimo)
+    "Rate limit exceeded",
+    "rate_limit",
+    "exceeded your current quota",
+    "maximum context length",
+    "context length exceeded",
+    "maximum context",
+    # Falhas do CLI/runner
+    "Command failed",
+    "failed to run",
+    "FATAL",
+)
+
+# Prefixos que casam apenas no INÍCIO da linha (erros de CLI).
+_LLM_ERROR_LINE_PREFIXES = ("error:", "Error:", "fatal:")
+
+# Marcadores que só contam no stderr do subprocesso (ver comentário acima).
+_LLM_STDERR_ONLY_MARKERS = ("Traceback (most recent call last)",)
 
 
 def resolve_run_id(state: Any = None, config: Any = None) -> str | None:
@@ -50,8 +94,11 @@ def _raise_if_llm_error_marker(raw_response_text: str, result=None) -> None:
     resposta válida, fazendo o Developer seguir para QA com código vazio.
     """
     haystack = raw_response_text or ""
+    stderr_text = ""
     if result is not None:
-        haystack += "\n" + (getattr(result, "stdout", "") or "") + "\n" + (getattr(result, "stderr", "") or "")
+        haystack += "\n" + (getattr(result, "stdout", "") or "")
+        stderr_text = getattr(result, "stderr", "") or ""
+        haystack += "\n" + stderr_text
     for marker in _LLM_ERROR_MARKERS:
         if marker in haystack:
             raise RuntimeError(
@@ -59,6 +106,22 @@ def _raise_if_llm_error_marker(raw_response_text: str, result=None) -> None:
                 "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
                 f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
             )
+    # Prefixos de linha: casamento no INÍCIO da linha — a palavra "error" no
+    # meio de conteúdo legítimo (código, docstring, teste) não dispara o gate.
+    for line in haystack.splitlines():
+        stripped = line.strip()
+        if any(stripped.startswith(prefix) for prefix in _LLM_ERROR_LINE_PREFIXES):
+            raise RuntimeError(
+                "LLM Engine falhou: resposta contém erro de CLI. "
+                "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
+                f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
+            )
+    # Traceback só via stderr: no stdout pode ser conteúdo LLM legítimo
+    # (ex.: exemplo de código Python); em stderr é quase sempre crash do runtime.
+    if any(marker in stderr_text for marker in _LLM_STDERR_ONLY_MARKERS):
+        raise RuntimeError(
+            f"LLM Engine falhou: subprocesso crashou (traceback no stderr). Resposta: {raw_response_text[:300]}"
+        )
 
 
 T = TypeVar("T", bound=BaseModel)

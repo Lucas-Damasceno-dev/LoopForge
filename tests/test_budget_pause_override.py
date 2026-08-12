@@ -269,6 +269,56 @@ async def test_cost_endpoint_sums_warning_and_estimated(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_budget_override_persists_across_restart(tmp_path, monkeypatch):
+    """A6: override persiste em budget_overrides no DB da API e sobrevive a restart.
+
+    Simula restart do servidor: POST /cost/override com app1, fecha o engine
+    (close_db), reinicia (init_db + app2 apontando pro MESMO arquivo DB) e
+    verifica que o override continua ativo em GET /cost (o antigo dict em
+    memória era perdido no restart).
+    """
+    _write_ade_budget(tmp_path, 0.01)
+    from lf.api.database import session_factory
+    from lf.api.models import PipelineRun
+
+    async with session_factory() as session:
+        run = PipelineRun(idea="Override persist", stack="python", status="paused")
+        session.add(run)
+        await session.commit()
+        run_id = run.id
+
+    # app1: cria o override
+    app1 = _app_with_costs()
+    async with AsyncClient(transport=ASGITransport(app=app1), base_url="http://test") as client:
+        ov = await client.post(f"/api/v1/runs/{run_id}/cost/override", json={"max_usd": 50.0})
+        assert ov.status_code == 200
+        assert ov.json()["budget"]["max_usd"] == 50.0
+
+    # RESTART: fecha o engine e recria app/engine com o MESMO arquivo DB
+    await close_db()
+
+    # Fonte da verdade: a linha persistida na tabela budget_overrides
+    row = (
+        sqlite3.connect(".loopforge/test_api.sqlite")
+        .execute(
+            "SELECT run_id, budget_usd, source FROM budget_overrides WHERE run_id = ?",
+            (run_id,),
+        )
+        .fetchone()
+    )
+    assert row == (run_id, 50.0, "api"), f"override deveria estar persistido no DB: {row}"
+
+    await init_db()
+    app2 = _app_with_costs()
+    async with AsyncClient(transport=ASGITransport(app=app2), base_url="http://test") as client:
+        cost = await client.get(f"/api/v1/runs/{run_id}/cost")
+        assert cost.status_code == 200
+        assert cost.json()["budget"]["max_usd"] == 50.0, (
+            "override deveria sobreviver ao restart (lido de budget_overrides)"
+        )
+
+
+@pytest.mark.asyncio
 async def test_cost_endpoint_nodes_breakdown(tmp_path, monkeypatch):
     """D1 (Fase D): GET /cost retorna breakdown `nodes` por nó.
 

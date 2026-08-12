@@ -20,7 +20,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lf.api import database
-from lf.api.auth import verify_authentication
 from lf.api.database import Base, get_session
 from lf.api.models import PipelineRun
 from lf.api.schemas import BudgetOverrideRequest, CostBudget, CostNode, CostResponse
@@ -265,12 +264,11 @@ async def override_run_budget(
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    if payload is not None and payload.max_usd is not None:
-        max_usd = payload.max_usd
-    else:
-        max_usd = load_budget_usd()
+    max_usd = payload.max_usd if payload is not None and payload.max_usd is not None else load_budget_usd()
 
-    _BUDGET_OVERRIDES[run_id] = max_usd
+    # Persiste o override no DB da API (budget_overrides) — sobrevive a restart
+    # do servidor (o antigo dict em memória era perdido).
+    await set_budget_override(run_id, max_usd, source="api", session=session)
 
     thread_id = run.thread_id or f"run-{run.id}"
     # Aplica o novo limite ao CircuitBreaker do checkpoint (trajectories.db)

@@ -1,4 +1,5 @@
 import os
+import signal
 import shutil
 import subprocess
 import time
@@ -98,23 +99,30 @@ class OpenCodeRunner:
         # testes/ no repo real em vez do output_dir da run.
         cmd = ["script", "-q", "-c", f"opencode run '{safe_prompt}' -m {model_to_use} --dir {root} --pure", "/dev/null"]
 
+        proc: subprocess.Popen[str] | None = None
         try:
             env = os.environ.copy()
             env["PWD"] = str(root)
-            res = subprocess.run(
+            # start_new_session=True: o subprocesso vira líder de sessão/grupo
+            # próprio. No timeout matamos o GRUPO inteiro (script → sh →
+            # opencode → node → agentes); com subprocess.run só o `script` era
+            # morto e os filhos ficavam órfãos.
+            proc = subprocess.Popen(
                 cmd,
                 cwd=root,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=self.timeout,
+                start_new_session=True,
                 env=env,
             )
+            stdout, stderr = proc.communicate(timeout=self.timeout)
             duration = time.time() - start_time
             changed_files = detect_changed_files(root, start_time)
             return OpenCodeResult(
-                exit_code=res.returncode,
-                stdout=res.stdout,
-                stderr=res.stderr,
+                exit_code=proc.returncode,
+                stdout=stdout,
+                stderr=stderr,
                 changed_files=changed_files,
                 duration_seconds=duration,
             )
@@ -125,6 +133,21 @@ class OpenCodeRunner:
             timed_out_stdout = (
                 exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
             )
+            # Mata o GRUPO de processos (start_new_session=True criou grupo
+            # próprio com pgid == pid do líder), não só o `script`. Fallback:
+            # se o grupo já não existe (ProcessLookupError), mata o líder.
+            if proc is not None:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    try:
+                        proc.kill()
+                    except OSError:
+                        pass
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
             return OpenCodeResult(
                 exit_code=124,
                 stdout=timed_out_stdout,

@@ -1,7 +1,17 @@
-"""Comando CLI 'lf studio' / 'lf ui' para exibir o Terminal Studio TUI do LoopForge v6."""
+"""Comando CLI 'lf studio' / 'lf ui' — visualizador de telemetria em tempo real.
+
+Lê o SQLite de telemetria (``.loopforge/telemetry.sqlite``) e exibe as execuções
+recentes de pipeline em uma TUI com polling simples. Sem dados fake: se o banco
+não existe ou está vazio, os painéis informam isso explicitamente.
+"""
+
 from __future__ import annotations
 
+import sqlite3
+import sys
 import time
+from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -12,6 +22,8 @@ from rich.table import Table
 from rich.text import Text
 
 console = Console()
+
+POLL_INTERVAL_SECONDS = 5.0
 
 
 def make_studio_layout() -> Layout:
@@ -29,95 +41,161 @@ def make_studio_layout() -> Layout:
     return layout
 
 
-def build_pipeline_panel(active_node: str = "Developer") -> Panel:
-    """Constrói o painel de status do Grafo LangGraph."""
-    table = Table(show_header=True, header_style="bold cyan", expand=True)
-    table.add_column("Agente / Nó", style="bold yellow")
-    table.add_column("Papel / Artefato", style="white")
-    table.add_column("Status", justify="center")
+def fetch_runs(db_path: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Lê as execuções recentes do SQLite de telemetria.
 
-    nodes = [
-        ("CPO", "Épico & Visão", "DONE", "green"),
-        ("PM", "User Stories", "DONE", "green"),
-        ("Tech Lead", "Tech Spec & Stack", "DONE", "green"),
-        ("Developer", "Multi-File Project", "RUNNING", "cyan"),
-        ("QA", "Harness Test Suite", "PENDING", "dim"),
-        ("AppSec", "Security Review", "PARALLEL", "magenta"),
-        ("DevOps", "CI/CD & Deploy", "PARALLEL", "blue"),
-    ]
+    Prefere a tabela ``pipeline_runs`` (writer canônico do task_dispatcher);
+    se ausente, tenta a tabela ``runs`` do TelemetryStore. Banco inexistente ou
+    sem tabelas retorna lista vazia.
+    """
+    db_file = Path(db_path).resolve()
+    if not db_file.exists():
+        return []
 
-    for name, role, status, color in nodes:
-        if name.lower() == active_node.lower():
-            badge = f"[bold black on cyan] ➜ {status} [/bold black on cyan]"
-        elif status == "DONE":
-            badge = f"[bold green]✓ {status}[/bold green]"
-        elif status == "PARALLEL":
-            badge = f"[magenta]⚡ {status}[/magenta]"
+    try:
+        conn = sqlite3.connect(str(db_file))
+        conn.row_factory = sqlite3.Row
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "pipeline_runs" in tables:
+            rows = conn.execute(
+                "SELECT id, idea, stack, status, current_node, duration_seconds, created_at "
+                "FROM pipeline_runs ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        elif "runs" in tables:
+            rows = conn.execute(
+                "SELECT id, task_id, node, status, duration_seconds, created_at FROM runs ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
         else:
-            badge = f"[dim]{status}[/dim]"
-        table.add_row(name, role, badge)
+            rows = []
+        conn.close()
+        return [dict(r) for r in rows]
+    except sqlite3.Error:
+        return []
 
-    return Panel(table, title="[bold cyan]⚡ LangGraph DAG Pipeline Status[/bold cyan]", border_style="cyan")
+
+def _build_stats(runs: list[dict[str, Any]]) -> dict[str, str]:
+    """Agrega estatísticas reais das execuções para o painel de resumo."""
+    if not runs:
+        return {"Execuções": "nenhuma execução encontrada"}
+
+    statuses = [str(r.get("status", "")).lower() for r in runs]
+    done = sum(1 for s in statuses if s in ("done", "completed", "success"))
+    failed = sum(1 for s in statuses if s == "failed")
+    running = sum(1 for s in statuses if s in ("running", "pending"))
+    durations = [float(r.get("duration_seconds") or 0.0) for r in runs]
+    avg_duration = sum(durations) / len(durations) if durations else 0.0
+    last = runs[0]
+
+    return {
+        "Execuções (últimas)": str(len(runs)),
+        "Concluídas (done)": str(done),
+        "Falhas (failed)": str(failed),
+        "Em execução/pendente": str(running),
+        "Duração média (s)": f"{avg_duration:.1f}",
+        "Última execução": f"{last.get('id', '')[:8]} · {last.get('status', '')} · {str(last.get('idea', ''))[:30]}",
+    }
 
 
-def build_logs_panel(logs: list[str]) -> Panel:
-    """Constrói o painel de streaming de logs."""
+def _run_line(run: dict[str, Any]) -> str:
+    """Formata uma execução como linha de log."""
+    run_id = str(run.get("id", ""))[:8]
+    idea = str(run.get("idea") or run.get("task_id") or "")[:40]
+    status = str(run.get("status", ""))
+    stack = str(run.get("stack") or run.get("node") or "-")
+    duration = float(run.get("duration_seconds") or 0.0)
+    created = str(run.get("created_at") or "")[:19]
+    return f"[{created}] [{run_id}] {status.upper()} | {idea or '(sem descrição)'} | stack={stack} | {duration:.1f}s"
+
+
+def build_pipeline_panel(stats: dict[str, str]) -> Panel:
+    """Constrói o painel de resumo da telemetria real de execuções."""
+    table = Table(show_header=False, expand=True)
+    table.add_column("Métrica", style="bold yellow")
+    table.add_column("Valor", style="white")
+
+    for key, value in stats.items():
+        table.add_row(key, value)
+
+    return Panel(table, title="[bold cyan]📊 Telemetria de Execuções[/bold cyan]", border_style="cyan")
+
+
+def build_logs_panel(lines: list[str]) -> Panel:
+    """Constrói o painel de execuções recentes (stream de logs real)."""
     text = Text()
-    for log in logs[-15:]:
-        if "INFO" in log or "sucesso" in log.lower():
-            text.append(f"{log}\n", style="green")
-        elif "AVISO" in log or "WARN" in log:
-            text.append(f"{log}\n", style="yellow")
-        elif "ERRO" in log or "FAIL" in log:
-            text.append(f"{log}\n", style="bold red")
+    if not lines:
+        text.append("nenhuma execução encontrada — rode `lf run` para gerar telemetria.\n", style="yellow")
+    for line in lines[-15:]:
+        if "FAILED" in line:
+            text.append(f"{line}\n", style="bold red")
+        elif "DONE" in line or "COMPLETED" in line or "SUCCESS" in line:
+            text.append(f"{line}\n", style="green")
+        elif "RUNNING" in line or "PENDING" in line:
+            text.append(f"{line}\n", style="cyan")
         else:
-            text.append(f"{log}\n", style="cyan")
+            text.append(f"{line}\n", style="yellow")
 
-    return Panel(text, title="[bold magenta]📡 Live Terminal Log Stream[/bold magenta]", border_style="magenta")
+    return Panel(text, title="[bold magenta]📡 Execuções Recentes (telemetria)[/bold magenta]", border_style="magenta")
+
+
+def _read_key() -> str | None:
+    """Lê uma tecla do stdin sem bloquear (retorna None fora de terminal)."""
+    if not sys.stdin.isatty():
+        return None
+    try:
+        import select
+
+        if select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
+            return sys.stdin.read(1).lower()
+    except Exception:
+        return None
+    return None
 
 
 @click.command(name="studio")
-@click.option("--duration", "-d", type=int, default=10, help="Tempo de exibição da sessão interativa em segundos")
-def studio_cmd(duration: int):
-    """Inicia o LoopForge Terminal Studio (TUI de monitoramento em tempo real)."""
+@click.option(
+    "--duration", "-d", type=int, default=10, help="Tempo máximo da sessão em segundos (0 = até pressionar Q)"
+)
+@click.option("--db-path", default=".loopforge/telemetry.sqlite", help="Caminho do SQLite de telemetria")
+def studio_cmd(duration: int, db_path: str):
+    """Visualiza a telemetria real das execuções de pipeline (SQLite) em tempo real."""
     layout = make_studio_layout()
 
     header_panel = Panel(
-        "[bold white]🚀 LoopForge v6 Terminal Studio[/bold white] | [cyan]Autonomous Agent Governance[/cyan] | [yellow]Live Session[/yellow]",
+        "[bold white]🚀 LoopForge Terminal Studio[/bold white] | [cyan]Visualizador de Telemetria[/cyan] | "
+        f"[yellow]DB: {db_path}[/yellow]",
         style="on blue",
     )
     footer_panel = Panel(
-        "[bold white]Atalhos:[/bold white] [green][R] Run[/green] | [cyan][S] Status[/cyan] | [magenta][E] Export[/magenta] | [red][Q] Sair[/red]",
+        "[bold white]Atalhos:[/bold white] [green][R] Refresh[/green] (relê o DB) | [red][Q] Sair[/red]",
         border_style="dim",
     )
 
     layout["header"].update(header_panel)
     layout["footer"].update(footer_panel)
 
-    sample_logs = [
-        "[18:45:00] [INFO] Conectando ao orquestrador LangGraph StateGraph...",
-        "[18:45:01] [CPO] Épico aprovado com 3 user stories principais.",
-        "[18:45:02] [PM] User Stories validadas com critérios de aceite.",
-        "[18:45:03] [Tech Lead] Stack 'Python/FastAPI' selecionada autonomamente.",
-        "[18:45:04] [Developer] Gerando projeto multi-arquivo (pyproject.toml, main.py, test_main.py)...",
-        "[18:45:05] [Memory] 🧠 RAG Memory: 2 lições aprendidas recuperadas do SQLite.",
-        "[18:45:06] [Developer] Invocando LLM Engine via OpenCode Subprocess...",
-    ]
-
-    nodes_sequence = ["CPO", "PM", "Tech Lead", "Developer", "QA", "AppSec"]
+    runs = fetch_runs(db_path)
+    layout["main"]["pipeline_graph"].update(build_pipeline_panel(_build_stats(runs)))
+    layout["main"]["live_logs"].update(build_logs_panel([_run_line(r) for r in runs]))
 
     console.clear()
     start_time = time.time()
-    idx = 3
+    last_refresh = start_time
 
     with Live(layout, refresh_per_second=4, screen=False):
-        while time.time() - start_time < duration:
-            current_node = nodes_sequence[idx % len(nodes_sequence)]
-            layout["main"]["pipeline_graph"].update(build_pipeline_panel(current_node))
-            layout["main"]["live_logs"].update(build_logs_panel(sample_logs))
-
-            time.sleep(1.0)
-            idx += 1
-            sample_logs.append(f"[{time.strftime('%H:%M:%S')}] [{current_node}] Executando ciclo de orquestração do nó...")
+        while True:
+            if duration > 0 and time.time() - start_time >= duration:
+                break
+            key = _read_key()
+            if key == "q":
+                break
+            now = time.time()
+            if key == "r" or now - last_refresh >= POLL_INTERVAL_SECONDS:
+                runs = fetch_runs(db_path)
+                layout["main"]["pipeline_graph"].update(build_pipeline_panel(_build_stats(runs)))
+                layout["main"]["live_logs"].update(build_logs_panel([_run_line(r) for r in runs]))
+                last_refresh = now
+            time.sleep(0.25)
 
     console.print("[bold green]✓ Sessão do Terminal Studio encerrada.[/bold green]")
