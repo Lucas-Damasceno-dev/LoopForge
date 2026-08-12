@@ -151,12 +151,31 @@ class AdeApiKey(BaseModel):
     roles: list[Literal["admin", "runner", "viewer"]] = ["admin"]
 
 
+class AdeMemory(BaseModel):
+    """Configuração da memória cross-project (ROADMAP 3.1).
+
+    ``cross_project=True`` faz a busca de lições aprendidas ignorar o filtro
+    de stack (todas as stacks entram no contexto); default False preserva o
+    comportamento atual (busca restrita à stack do run).
+    """
+
+    cross_project: bool = Field(False, description="Busca de lições ignora o filtro de stack (todas as stacks)")
+
+
 class AdeConfig(BaseModel):
     budget: AdeBudget = Field(default_factory=AdeBudget)
     mcp_servers: list[AdeMcpServer] = Field(default_factory=list)
     providers: AdeProviders = Field(default_factory=AdeProviders)
     hitl: AdeHITL = Field(default_factory=AdeHITL)
     runner: AdeRunner = Field(default_factory=AdeRunner)
+    genome_injection: bool = Field(
+        False,
+        description="Injeta seção 'GENOMA DE PROJETO' nos prompts de cpo/pm/tech_lead (env LF_GENOME_INJECTION)",
+    )
+    memory: AdeMemory = Field(
+        default_factory=AdeMemory,
+        description="Configuração da memória (ex.: cross_project)",
+    )
     api_keys: list[AdeApiKey] = Field(
         default_factory=list,
         description="API keys com roles RBAC (admin/runner/viewer). Se vazio, vale só o env LF_API_KEY (admin).",
