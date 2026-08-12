@@ -160,18 +160,20 @@ class MemoryManager:
         stack: str | None = None,
         limit: int = 3,
         only_relevant: bool = False,
+        cross_project: bool = False,
     ) -> list[dict]:
         """Busca lições aprendidas passadas relevantes por stack e termos da query.
 
         Com ``only_relevant=True`` (API de memória), descarta lições com score 0
         (nenhuma palavra-chave encontrada) — o pipeline de execução mantém o
         comportamento atual (default False) e recebe contexto por stack mesmo
-        sem match de palavras-chave.
+        sem match de palavras-chave. Com ``cross_project=True`` (ROADMAP 3.1),
+        o filtro de stack é ignorado — a busca varre todas as stacks.
         """
         keywords = [w.lower().strip() for w in query.split() if len(w) > 3]
 
         with self._get_connection() as conn:
-            if stack:
+            if stack and not cross_project:
                 rows = conn.execute(
                     "SELECT * FROM lessons WHERE stack = ? ORDER BY created_at DESC LIMIT 20",
                     (stack.lower().strip(),),
