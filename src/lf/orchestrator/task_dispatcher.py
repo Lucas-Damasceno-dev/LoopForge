@@ -21,6 +21,7 @@ from rich.table import Table
 
 from lf.api.events import event_bus
 from lf.config.schema import TaskSchema
+from lf.config.workdir import get_workdir_base, is_within
 from lf.guardrails.circuit_breaker import CircuitBreaker
 from lf.ontology.state_machine.definition import TaskState
 from lf.ontology.state_machine.labels import get_git_label
@@ -144,7 +145,13 @@ class TaskDispatcher:
             human_gate_enabled=self.interactive,
         )
 
-    def _build_initial_state(self, task: TaskSchema, project_id: str, shared_state: dict | None = None) -> dict:
+    def _build_initial_state(
+        self,
+        task: TaskSchema,
+        project_id: str,
+        shared_state: dict | None = None,
+        run_key: str | None = None,
+    ) -> dict:
         target_agent = getattr(task, "agent_id", None) or getattr(task, "persona", None) or "cpo"
         if target_agent not in ("cpo", "pm", "tech_lead", "developer", "qa"):
             target_agent = "cpo"
@@ -155,13 +162,24 @@ class TaskDispatcher:
             if repo_ontology.exists():
                 ontology = str(repo_ontology)
 
+        # P1-4/AUD-2026-08: isolamento cross-run — diretório único por EXECUÇÃO.
+        # O componente da run (run_key) é um uuid novo por dispatch no fluxo CLI
+        # (project_id constante "loopforge_project" + task.id fixo "task-1"
+        # colidiam entre runs consecutivas); no fluxo API é o próprio project_id
+        # "run-{uuid}" (o shared_state já aponta output_dir, este valor é
+        # sobrescrito). O run_key fica persistido no estado → o resume restaura
+        # o MESMO workdir via checkpoint, sem recomputar nada.
+        component = run_key or project_id
         state = {
             "idea": task.title,
-            # P1-4: isolamento cross-run — diretório único por task para impedir
-            # que artefatos de um run (pom.xml, target/, test_reports/) contaminem o
-            # workdir do próximo. Fallback: diretório do projeto quando o id é vazio.
             "output_dir": "/".join(
-                part for part in ("/tmp/loopforge", project_id, _task_dir_suffix(task, project_id)) if part
+                part
+                for part in (
+                    get_workdir_base(),
+                    component,
+                    _task_dir_suffix(task, project_id),
+                )
+                if part
             ),
             "epic": {},
             "user_stories": [],
@@ -1007,6 +1025,37 @@ class TaskDispatcher:
             "attempt_count": output.get("attempt_count", 0),
         }
 
+    def _cleanup_task_workdir(self, final_state: dict) -> None:
+        """P1-4/AUD-2026-08: remove artefatos regeneráveis do workdir da task ao final da run.
+
+        Só age DENTRO do workdir base configurado (``LF_WORKDIR_BASE``) — nunca
+        em path arbitrário (``is_within`` antes de qualquer remoção). Preserva o
+        código-fonte gerado (git/PR/diff dependem dele); remove apenas artefatos
+        de build/cache/dependência (target/, test_reports/, .venv/,
+        node_modules/, __pycache__/) e manifestos/fontes estrangeiros à stack.
+        """
+        output_dir = final_state.get("output_dir")
+        if not output_dir:
+            return
+        try:
+            base = Path(get_workdir_base()).resolve()
+            if not is_within(base, output_dir):
+                logger.warning(
+                    "--- AVISO: workdir da task fora da base configurada (%s) — limpeza ignorada: %s ---",
+                    base,
+                    output_dir,
+                )
+                return
+            from lf.pipeline.nodes.developer import _cleanup_stale_project_dirs
+
+            _cleanup_stale_project_dirs(
+                [output_dir],
+                stack=str(final_state.get("stack", "")),
+                artifacts_only=True,
+            )
+        except Exception as exc:
+            logger.warning("Falha ao limpar workdir da task ao final da run: %s", exc)
+
     def list_checkpoints(self) -> list[str]:
         """Lista todos os thread_ids com trajetórias gravadas em .loopforge/trajectories.db."""
         if not self._trajectories_db().exists():
@@ -1049,6 +1098,24 @@ class TaskDispatcher:
         # Quando project_id já é 'run-{uuid}' (chamada da API), usa-o direto,
         # removendo o sufixo legado '-task-{uuid[:8]}' do task.id.
         thread_id = project_id if project_id.startswith("run-") else f"{project_id}-{task.id}"
+
+        # P1-4/AUD-2026-08: no fluxo CLI o project_id é constante
+        # ("loopforge_project") e o task.id fixo ("task-1") — runs consecutivas
+        # colidiam no MESMO output_dir. Gera um run_key uuid único por dispatch
+        # (mesmo padrão do session_id CLI / _pipeline_run_id) e reconstrói o
+        # estado com o workdir isolado. Fluxo API ("run-{uuid}") usa o próprio
+        # project_id como componente — sem mudança de comportamento.
+        if not project_id.startswith("run-"):
+            run_key = f"run-{uuid.uuid4().hex[:12]}"
+            initial_state["output_dir"] = "/".join(
+                part
+                for part in (
+                    get_workdir_base(),
+                    run_key,
+                    _task_dir_suffix(task, project_id),
+                )
+                if part
+            )
 
         if self.interactive:
             return self._dispatch_sync(initial_state, thread_id, task, project_id)
@@ -1133,6 +1200,7 @@ class TaskDispatcher:
                 thread_id=thread_id,
                 run_id=pipeline_run_id,
             )
+            self._cleanup_task_workdir(result)
 
             if self.notify:
                 status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
@@ -1264,6 +1332,7 @@ class TaskDispatcher:
                 thread_id=thread_id,
                 run_id=pipeline_run_id,
             )
+            self._cleanup_task_workdir(result)
 
             if self.notify:
                 status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
@@ -1395,6 +1464,7 @@ class TaskDispatcher:
                 thread_id=thread_id,
                 run_id=pipeline_run_id,
             )
+            self._cleanup_task_workdir(result)
 
             return result
 

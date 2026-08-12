@@ -57,6 +57,53 @@ def _build_wizard_task_schema(
     )
 
 
+def _print_cost_report(session_id: str, watermark: int | None, retries_consumed: int, circuit: CircuitBreaker) -> None:
+    """Imprime relatório de custo real por nó, cache hit rate e retries (A5).
+
+    Custo real vem de ``llm_costs`` (telemetry.sqlite) via watermark — apenas
+    as chamadas LLM desta run. Sem custo medido, reporta "n/a" (nunca hardcode).
+    Persiste os custos por nó na tabela ``runs`` do TelemetryStore (schema
+    permite: session_id, task_id, node, status, cost_usd).
+    """
+    from rich.table import Table
+
+    from lf.pipeline.cache import SQLiteLLMCache
+    from lf.telemetry.costs import query_llm_costs_since, query_node_costs_since
+    from lf.telemetry.store import TelemetryStore
+
+    node_costs = query_node_costs_since(watermark)
+    total = query_llm_costs_since(watermark)
+
+    table = Table(title="💰 Relatório de Custo (USD) por Nó do Pipeline")
+    table.add_column("Nó", style="cyan")
+    table.add_column("Custo (USD)", justify="right", style="yellow")
+    if node_costs:
+        for node, cost in node_costs.items():
+            table.add_row(node, f"${cost:.6f}")
+    else:
+        table.add_row("(nenhum custo medido)", "n/a")
+    console.print(table)
+
+    cache_stats = SQLiteLLMCache().stats()
+    console.print(
+        f"\n🗄️ [bold]Cache LLM:[/bold] {cache_stats['hits']} hits, "
+        f"{cache_stats['misses']} misses, "
+        f"hit rate {cache_stats['hit_rate'] * 100:.1f}% "
+        f"({cache_stats['total']} consultas)"
+    )
+    console.print(
+        f"🔁 [bold]Retries consumidos:[/bold] {retries_consumed} "
+        f"(iterações do circuit breaker: {circuit.total_iterations})"
+    )
+    total_str = f"${total['total_cost_usd']:.6f}" if total["available"] else "n/a"
+    console.print(f"💰 [bold]Custo total da run ({session_id}):[/bold] {total_str}")
+
+    # Persiste custos por nó no TelemetryStore (schema de runs aceita cost_usd)
+    store = TelemetryStore()
+    for node, cost in node_costs.items():
+        store.log_event(session_id=session_id, task_id=f"task-{node}", node=node, status="done", cost=cost)
+
+
 @click.command(name="run")
 @click.option("--idea", default=None, help="Ideia ou objetivo da funcionalidade")
 @click.option("--stack", default=None, help="Stack de tecnologia opcional (se omitido, o Tech Lead decide)")
@@ -79,6 +126,12 @@ def _build_wizard_task_schema(
     help="Modo Avançado: escopo completo, múltiplos módulos e alta complexidade",
 )
 @click.option("--wizard", is_flag=True, default=False, help="Forçar o wizard interativo de inicialização")
+@click.option(
+    "--report-cost",
+    is_flag=True,
+    default=False,
+    help="Imprimir relatório de custo real por nó, cache hit rate e retries consumidos",
+)
 def run_cmd(
     idea: str | None,
     stack: str | None,
@@ -92,6 +145,7 @@ def run_cmd(
     mvp: bool,
     advanced: bool,
     wizard: bool,
+    report_cost: bool,
 ):
     """Executa a pipeline de tarefas dos agentes autônomos do LoopForge."""
     session_id = str(uuid.uuid4())[:8]
@@ -117,6 +171,12 @@ def run_cmd(
 
     cfg = load_config()
     circuit = CircuitBreaker(max_total_cost=cfg.budget_limit_usd)
+    # A5: watermark do custo real (llm_costs) ANTES da run — isola as chamadas
+    # LLM desta sessão das anteriores para o relatório de custo por nó.
+    from lf.telemetry.costs import snapshot_llm_cost_watermark
+
+    watermark = snapshot_llm_cost_watermark()
+    retries_consumed = 0
     dispatcher = TaskDispatcher(
         mock_llm=mock,
         interactive=interactive,
@@ -167,6 +227,9 @@ def run_cmd(
         try:
             state = dispatcher.dispatch(task, project_id=cfg.project_id, shared_state=shared_state)
             shared_state.update({k: v for k, v in state.items() if v})
+            # A5: retries consumidos = tentativas de nó (attempt/qa) acumuladas
+            retries_consumed += int(state.get("attempt_count", 0) or 0)
+            retries_consumed += int(state.get("qa_attempt_count", 0) or 0)
 
             last_output_dir = state.get("output_dir", last_output_dir)
             error = state.get("error")
@@ -186,6 +249,15 @@ def run_cmd(
         except Exception as e:
             circuit.record_failure()
             console.print(f"[red]Tarefa {task.id} falhou com erro: {e}[/red]")
+
+    # A5: relatório de custo real por feature (--report-cost)
+    if report_cost:
+        _print_cost_report(
+            session_id=session_id,
+            watermark=watermark,
+            retries_consumed=retries_consumed,
+            circuit=circuit,
+        )
 
     # Se a flag --pr foi passada, dispara a criação de commit e PR no git
     if pr:

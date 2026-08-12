@@ -1,15 +1,15 @@
-# 📊 Project Executive Summary: Corrigir bug na função de cálculo de impostos
+# 📊 Project Executive Summary: Run java
 
 ![QA Status](https://img.shields.io/badge/QA-PASS-brightgreen)
 ![Security Audit](https://img.shields.io/badge/AppSec-PASS-brightgreen)
-![Stack](https://img.shields.io/badge/Stack-PYTHON-blue)
+![Stack](https://img.shields.io/badge/Stack-JAVA-blue)
 
-> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-12 06:21:17 UTC
+> **Stack:** `java` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-12 08:13:20 UTC
 
 ## 🏗️ Diagrama de Arquitetura do Projeto Gerado
 ```mermaid
 graph TD
-    Client[Client / User] --> API[API Service (PYTHON)]
+    Client[Client / User] --> API[API Service (JAVA)]
     API --> Logic[Business Logic Core]
     Logic --> Tests[QA Test Suite (PASS)]
 ```
@@ -23,6 +23,6 @@ graph TD
 
 ## 🚀 Instruções de Execução Rápida
 ```bash
-pytest
-python3 generated_code.py
+mvn clean test
+mvn compile
 ```

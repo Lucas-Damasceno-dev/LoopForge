@@ -99,6 +99,7 @@ Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
             schema_model=UserStoryList,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
+            node="pm",
         )
         stories = []
         for i, us in enumerate(result.get("stories", [])):

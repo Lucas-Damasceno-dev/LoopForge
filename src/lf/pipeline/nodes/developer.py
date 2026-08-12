@@ -19,6 +19,7 @@ from typing import Any, Optional
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
+from ...config.workdir import is_within
 from ...guardrails.circuit_breaker import CircuitBreaker
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
@@ -571,6 +572,7 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
             circuit_breaker=state.get("circuit_breaker"),
             project_root=output_dir,
             on_token_delta=on_token_delta,
+            node="developer",
         )
         if not isinstance(raw, str):
             raw = str(raw)
@@ -754,6 +756,31 @@ _FOREIGN_TESTS = {
     "javascript": {".py", ".go", ".rs", ".java"},
 }
 
+# Diretórios de artefatos regeneráveis (build/cache/dependências) — sempre
+# removidos na limpeza, inclusive ao final da run (artifacts_only=True).
+_ARTIFACT_DIRS = {
+    "target",
+    "build",
+    "dist",
+    "test_reports",
+    ".pytest_cache",
+    "htmlcov",
+    ".venv",
+    "node_modules",
+    "__pycache__",
+}
+
+# Diretórios de código-fonte de tentativas anteriores — removidos apenas no
+# retry do nó Developer (artifacts_only=False); preservados ao final da run
+# (git/PR/diff dependem do código-fonte gerado).
+_SOURCE_DIRS = {
+    "cmd",
+    "internal",
+    "src",
+    "pkg",
+    "migrations",
+}
+
 
 def _is_foreign_file(rel_path: Path, stack: str) -> bool:
     """True se o arquivo (relativo a base_path) é estrangeiro à stack decidida."""
@@ -773,28 +800,24 @@ def _is_foreign_file(rel_path: Path, stack: str) -> bool:
     return is_foreign_manifest or is_foreign_source or is_foreign_test
 
 
-def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "") -> None:
-    """Limpa diretórios de código de tentativas anteriores para evitar colisões entre arquiteturas diferentes."""
+def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "", artifacts_only: bool = False) -> None:
+    """Limpa diretórios de código/artefatos de tentativas anteriores (P1-4/AUD-2026-08).
+
+    ``artifacts_only=True`` (fim de run, chamado pelo dispatcher): remove apenas
+    artefatos regeneráveis (target/, build/, dist/, test_reports/, .pytest_cache/,
+    htmlcov/, .venv/, node_modules/, __pycache__/) e manifestos/fontes estrangeiros
+    à stack — o código-fonte gerado fica (PR/diff/explore dependem dele).
+
+    ``artifacts_only=False`` (retry do nó Developer): remove também diretórios de
+    código de tentativas anteriores (cmd/, internal/, src/, pkg/, migrations/).
+
+    Segurança: nunca rm -rf arbitrário — cada alvo é validado como subpath do seu
+    próprio base_dir antes de remover (is_within), e diretórios dentro do repo
+    LoopForge são pulados (proteção dogfooding).
+    """
     import shutil
 
-    # P1-4: além do código de tentativas anteriores, remove artefatos de
-    # build/cache regeneráveis (target/, build/, dist/, test_reports/,
-    # .pytest_cache/, htmlcov/) que sobreviviam entre runs de stacks diferentes.
-    # .venv/ e node_modules ficam de fora: podem conter deps válidas instaladas
-    # pelo harness (pip install etc.).
-    stale_dirs = {
-        "cmd",
-        "internal",
-        "src",
-        "pkg",
-        "migrations",
-        "target",
-        "build",
-        "dist",
-        "test_reports",
-        ".pytest_cache",
-        "htmlcov",
-    }
+    stale_dirs = _ARTIFACT_DIRS if artifacts_only else (_ARTIFACT_DIRS | _SOURCE_DIRS)
     unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
     for base_dir in unique_dirs:
         base_path = Path(base_dir).resolve()
@@ -803,6 +826,10 @@ def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "") -> None
             continue
         for s_dir in stale_dirs:
             target = base_path / s_dir
+            # Subpath seguro: alvo é filho direto do base_dir sendo limpo — valida
+            # mesmo assim (defesa contra path traversal em base_dir estranho).
+            if not is_within(base_path, target):
+                continue
             if target.exists() and target.is_dir():
                 try:
                     shutil.rmtree(target)
@@ -811,13 +838,18 @@ def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "") -> None
                     print(f"--- AVISO: Não foi possível remover subdiretório antigo '{target}': {exc} ---")
 
         # Remove manifestos e fontes estrangeiras à stack decidida (ex: artefatos
-        # Go obsoletos de uma run anterior com stack diferente).
+        # Go obsoletos de uma run anterior com stack diferente). pom.xml de uma run
+        # Java é MANIFESTO PRÓPRIO da stack java — só é removido quando estrangeiro
+        # (stack != java), garantindo a remoção do resíduo sem quebrar o Maven do
+        # run atual (a própria stack preserva o manifesto que o harness consome).
         for file_path in base_path.rglob("*"):
             if not file_path.is_file():
                 continue
             try:
                 rel = file_path.relative_to(base_path)  # proteção contra path traversal
             except ValueError:
+                continue
+            if not is_within(base_path, file_path):
                 continue
             if _is_foreign_file(rel, stack):
                 try:

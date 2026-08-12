@@ -53,6 +53,7 @@ def call_llm_via_opencode(
     circuit_breaker: Any = None,
     project_root: str | Path | None = None,
     on_token_delta: Callable[[str], None] | None = None,
+    node: str | None = None,
 ) -> dict[str, Any]: ...
 
 
@@ -68,6 +69,7 @@ def call_llm_via_opencode(
     circuit_breaker: Any = None,
     project_root: str | Path | None = None,
     on_token_delta: Callable[[str], None] | None = None,
+    node: str | None = None,
 ) -> str: ...
 
 
@@ -82,6 +84,7 @@ def call_llm_via_opencode(
     circuit_breaker: Any = None,
     project_root: str | Path | None = None,
     on_token_delta: Callable[[str], None] | None = None,
+    node: str | None = None,
 ) -> str | dict[str, Any]:
     """Chama OpenCode como LLM para geração de texto/estruturado.
 
@@ -101,6 +104,8 @@ def call_llm_via_opencode(
             (V1.1/ADR-0007). Repassado ao provider HTTP quando a API key
             OpenRouter está disponível; o caminho subprocesso ignora (sem
             incremento incremental — fallback silencioso).
+        node: Nome do nó do pipeline (ex.: "cpo") para dimensionar o custo
+            registrado no CostTracker (coluna ``node`` de llm_costs).
 
     Returns:
         str se não tiver schema_model, dict se tiver schema_model
@@ -168,6 +173,7 @@ Responda SOMENTE o objeto JSON puro."""
     )
 
     raw_response_text = ""
+    usage = None
     used_subprocess = False
     run_root = project_root or os.getcwd()
     with _console.status(f"⏳ Consultando LLM ({display_model})...", spinner="dots"):
@@ -175,7 +181,7 @@ Responda SOMENTE o objeto JSON puro."""
             model_name = model or DEFAULT_OPENROUTER_MODEL
             user_content = user_prompt + (format_instruction if schema_model else "")
             try:
-                raw_response_text, _ = call_openrouter_api(
+                raw_response_text, usage = call_openrouter_api(
                     user_content,
                     model=model_name,
                     api_key=openrouter_key,
@@ -226,6 +232,28 @@ Responda SOMENTE o objeto JSON puro."""
                 prompt_text=full_prompt,
                 response_text=raw_response_text,
                 estimated=True,
+                node=node,
+            )
+        except Exception:
+            pass
+    # M-09b: custo REAL do path OpenRouter direto — antes o `usage` da API era
+    # descartado e NENHUM custo era registrado (ledger de budget cego). Usa os
+    # token counts reais da resposta quando disponíveis (estimated=False);
+    # fallback estimativa chars//4 (estimated=True). Nunca quebra a chamada.
+    elif raw_response_text:
+        try:
+            from ...pipeline.llm_factory import CostTracker
+
+            prompt_tokens = usage.get("prompt_tokens") if usage else None
+            completion_tokens = usage.get("completion_tokens") if usage else None
+            CostTracker().track(
+                model=display_model,
+                prompt_text=full_prompt,
+                response_text=raw_response_text,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                estimated=not (prompt_tokens and completion_tokens),
+                node=node,
             )
         except Exception:
             pass

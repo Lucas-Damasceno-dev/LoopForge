@@ -1,0 +1,88 @@
+name: LoopForge Benchmark
+
+# Benchmark on-demand (workflow_dispatch) + semanal opcional (seg 06:00 UTC).
+# NÃO roda por push: benchmark real custa dinheiro e só deve disparar
+# explicitamente. Publica artefatos na branch gh-pages (mesmo mecanismo do
+# docs.yml — push direto para gh-pages, sem upload-pages-artifact).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run benchmark real (modelo barato fixo)
+        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'oc/deepseek-v4-flash-free' }}
+        run: lf benchmark --runs 2
+      - name: Run benchmark mock (sem OPENROUTER_API_KEY — smoke test)
+        if: ${{ secrets.OPENROUTER_API_KEY == '' }}
+        run: lf benchmark --runs 2 --mock
+      - name: Deploy artefatos e histórico para gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages --depth=1 || git branch gh-pages
+          git worktree add /tmp/benchmark-pages gh-pages || true
+          mkdir -p /tmp/benchmark-pages/benchmarks
+          cp .loopforge/benchmarks/results.json /tmp/benchmark-pages/benchmarks/results.json
+          cp .loopforge/benchmarks/benchmark_report.md /tmp/benchmark-pages/benchmarks/benchmark_report.md
+          cd /tmp/benchmark-pages
+          python - <<'EOF'
+          import json, os
+
+          results_file = "benchmarks/results.json"
+          history_file = "benchmarks/history.md"
+
+          with open(results_file, encoding="utf-8") as f:
+              r = json.load(f)
+
+          date = r["generated_at"][:10]
+          model = r["model"]
+          elo = r["elo"]["new"]
+          cost = r["total_cost_usd"]
+          stacks = "; ".join(
+              f"{k}: {v['success_rate']:.0f}% (${v['cost_mean']})"
+              for k, v in r.get("per_stack", {}).items()
+          )
+          row = f"| {date} | {model} | {elo:.1f} | {cost} | {stacks} |\n"
+
+          lines = []
+          if os.path.exists(history_file):
+              with open(history_file, encoding="utf-8") as f:
+                  lines = f.readlines()
+
+          # Idempotente: mesma data+modelo+ELO já registrados? pula.
+          if row.strip() not in "".join(lines):
+              if not lines:
+                  lines = [
+                      "# LoopForge Benchmark History\n\n",
+                      "| Data | Modelo | ELO | Custo total (USD) | Stacks |\n",
+                      "|---|---|---|---|---|\n",
+                  ]
+              lines.append(row)
+              with open(history_file, "w", encoding="utf-8") as f:
+                  f.writelines(lines)
+          EOF
+          git add benchmarks
+          if git diff --cached --quiet; then
+            echo "Sem mudanças no benchmark — pulando commit/push"
+          else
+            git commit -m "[skip ci] LoopForge benchmark: atualizar resultados"
+            git push origin gh-pages
+          fi

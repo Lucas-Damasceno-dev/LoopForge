@@ -150,6 +150,7 @@ def tech_lead(state: GraphState) -> dict:
             schema_model=ValidationResult,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
+            node="tech_lead",
         )
 
         if not decided_stack:
@@ -214,6 +215,7 @@ Template (use como guia):
             user_prompt=user_prompt_str,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
+            node="tech_lead",
         )
     except Exception as e:
         print(f"--- ERRO TL tech spec: {e} ---")

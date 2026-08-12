@@ -1,4 +1,5 @@
 """Benchmark Suite: Métricas de desempenho, custo e ELO Rating System para o LoopForge."""
+
 from __future__ import annotations
 
 import json
@@ -24,6 +25,7 @@ class RunBenchmark:
     node_benchmarks: list[NodeBenchmark] = field(default_factory=list)
     success: bool = True
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    model: str = "n/a"
 
 
 class BenchmarkSuite:
@@ -41,7 +43,9 @@ class BenchmarkSuite:
             json.dump(data, f, indent=2, ensure_ascii=False)
         return path
 
-    def calculate_elo_delta(self, passed: int, total: int, k_factor: float = 32.0, expected_score: float = 0.5) -> float:
+    def calculate_elo_delta(
+        self, passed: int, total: int, k_factor: float = 32.0, expected_score: float = 0.5
+    ) -> float:
         """Calcula a variação do ELO com base no percentual de testes aprovados."""
         actual_score = (passed / total) if total > 0 else 0.0
         return round(k_factor * (actual_score - expected_score), 1)
@@ -58,7 +62,7 @@ class BenchmarkSuite:
                 print(f"--- AVISO: Erro ao ler ELO rating ({e}), usando default ---")
         return 1200.0
 
-    def update_elo_rating(self, elo_delta: float) -> tuple[float, float]:
+    def update_elo_rating(self, elo_delta: float, model: str = "n/a") -> tuple[float, float]:
         """Atualiza a pontuação ELO e grava no histórico."""
         elo_file = os.path.join(self.storage_dir, "elo_history.json")
         current = self.load_elo_rating()
@@ -73,12 +77,15 @@ class BenchmarkSuite:
             except Exception as e:
                 print(f"--- AVISO: Erro ao ler histórico ELO ({e}), iniciando novo ---")
 
-        history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "previous_elo": current,
-            "new_elo": new_elo,
-            "delta": elo_delta,
-        })
+        history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "previous_elo": current,
+                "new_elo": new_elo,
+                "delta": elo_delta,
+                "model": model,
+            }
+        )
 
         with open(elo_file, "w", encoding="utf-8") as f:
             json.dump({"current_elo": new_elo, "history": history}, f, indent=2)

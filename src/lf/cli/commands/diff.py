@@ -1,4 +1,5 @@
 """Comando CLI 'lf diff' para comparar alterações propostas pelo pipeline contra o workspace."""
+
 from __future__ import annotations
 
 import difflib
@@ -11,18 +12,22 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
+from lf.config.workdir import get_workdir_base
+
 console = Console()
 
 
 @click.command(name="diff")
 @click.option("--project-id", default="project", help="ID do projeto gerado (padrão: project)")
 @click.option("--target-dir", default=".", help="Diretório de trabalho alvo")
-@click.option("--interactive", "-i", is_flag=True, help="Exibe o diff em modo comparativo interativo Lado-a-Lado (Side-by-Side)")
+@click.option(
+    "--interactive", "-i", is_flag=True, help="Exibe o diff em modo comparativo interativo Lado-a-Lado (Side-by-Side)"
+)
 def diff_cmd(project_id: str, target_dir: str, interactive: bool):
     """Exibe o diff entre os arquivos propostos pelo LoopForge e o projeto atual."""
     console.print(f"[bold cyan]🔍 Analisando alterações propostas para '{project_id}'...[/bold cyan]\n")
 
-    proposed_dir = Path(f"/tmp/loopforge/{project_id}").resolve()
+    proposed_dir = Path(f"{get_workdir_base()}/{project_id}").resolve()
     target_path = Path(target_dir).resolve()
 
     if not proposed_dir.exists():
@@ -57,12 +62,14 @@ def diff_cmd(project_id: str, target_dir: str, interactive: bool):
                 if interactive:
                     _render_side_by_side_files(str(rel), original_text, proposed_text)
                 else:
-                    diff_lines = list(difflib.unified_diff(
-                        original_text.splitlines(keepends=True),
-                        proposed_text.splitlines(keepends=True),
-                        fromfile=f"a/{rel}",
-                        tofile=f"b/{rel}",
-                    ))
+                    diff_lines = list(
+                        difflib.unified_diff(
+                            original_text.splitlines(keepends=True),
+                            proposed_text.splitlines(keepends=True),
+                            fromfile=f"a/{rel}",
+                            tofile=f"b/{rel}",
+                        )
+                    )
                     diff_text = "".join(diff_lines)
                     if diff_text:
                         syntax = Syntax(diff_text, "diff", theme="monokai", line_numbers=True)

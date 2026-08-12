@@ -115,8 +115,7 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 pytest tests/
 ```
 
-- **31 arquivos de teste** em `tests/` (suite ativa)
-- **`tests_py/` está depreciado/vazio** — não utilizar
+- **97 arquivos de teste** em `tests/` (suite ativa)
 - Cobertura de Decisão Autônoma de Stack, Auditoria Paralela AppSec+DevOps, WebSockets Live, ELO Rating e Lessons Generator
 - CI pipeline: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests/`
 

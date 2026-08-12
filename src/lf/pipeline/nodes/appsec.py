@@ -93,6 +93,7 @@ def appsec(state: GraphState) -> dict:
                     system_prompt=get_effective_prompt("appsec", DEFAULT_PROMPT),
                     user_prompt=prompt,
                     mock=state.get("mock_llm", False),
+                    node="appsec",
                 )
                 recommendations.append(f"Análise LLM AppSec: {str(llm_res)[:150]}")
             except Exception as e:

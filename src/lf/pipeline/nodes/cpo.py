@@ -94,6 +94,7 @@ def cpo(state: GraphState) -> dict:
             schema_model=EpicSchema,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
+            node="cpo",
         )
         epic["dates"] = {"created_at": now_iso, "started_at": now_iso}
     except Exception as e:

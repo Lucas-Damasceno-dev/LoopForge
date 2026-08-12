@@ -145,6 +145,7 @@ def test_writer(state: GraphState) -> dict:
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
             project_root=output_dir,
+            node="test_writer",
         )
         if not isinstance(raw, str):
             raw = str(raw)

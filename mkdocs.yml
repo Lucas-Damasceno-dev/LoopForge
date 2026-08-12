@@ -35,8 +35,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Architecture & 9-Agent Pipeline: architecture.md
-  - Architecture (English): ARCHITECTURE.md
+  - Architecture & 9-Agent Pipeline: ARCHITECTURE.md
   - Configuration: configuration.md
   - CLI Reference: cli-reference.md
   - REST & WebSockets API: api-reference.md

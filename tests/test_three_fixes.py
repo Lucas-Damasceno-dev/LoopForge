@@ -43,6 +43,7 @@ def test_separate_attempt_counters(tmp_path):
 
 def test_cli_benchmark_cmd(tmp_path):
     runner = CliRunner()
-    res = runner.invoke(benchmark_cmd, ["--runs", "1", "--storage-dir", str(tmp_path)])
+    # --mock agora exige flag explícita (default real); smoke rápido com 1 problema
+    res = runner.invoke(benchmark_cmd, ["--limit", "1", "--runs", "1", "--mock", "--storage-dir", str(tmp_path)])
     assert res.exit_code == 0
     assert "LoopForge" in res.output

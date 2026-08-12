@@ -24,11 +24,14 @@ from fastapi import APIRouter, HTTPException
 from git import InvalidGitRepositoryError, NoSuchPathError, Repo
 from pydantic import BaseModel, Field
 
+from lf.config.workdir import get_workdir_base
+
 git_router = APIRouter(prefix="/api/v1/git", tags=["Git"])
 
-# Raiz dos workdirs de runs criados pela API (mesmo padrão de lf/api/app.py).
+# Raiz dos workdirs de runs criados pela API (mesmo padrão de lf/api/app.py,
+# resolvida via LF_WORKDIR_BASE — default /tmp/loopforge).
 # Constante de módulo: testes monkeypatcham para tmp_path hermético.
-_RUNS_ROOT = Path("/tmp/loopforge")
+_RUNS_ROOT = Path(get_workdir_base())
 
 # Limite de commits devolvidos no log (BLUEPRINT: log limit 20).
 _LOG_LIMIT = 20

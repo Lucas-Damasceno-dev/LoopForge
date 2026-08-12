@@ -26,18 +26,19 @@ src/lf/
 │   └── loader.py     # load_config() JSON/YAML
 ├── pipeline/         # LangGraph StateGraph, nodes, state
 │   ├── graph.py      # build_graph(), entry_router(), should_retry(), NodeRegistry
-│   ├── state.py      # GraphState TypedDict (57 campos)
+│   ├── state.py      # GraphState TypedDict (32 campos)
 │   ├── llm_factory.py# SQLiteLLMCache, compressão de prompt, call_openrouter_api
 │   └── nodes/        # 9 nós dos agentes
 │       ├── cpo.py            # → PM
 │       ├── pm.py             # → Tech Lead
-│       ├── tech_lead.py      # → Developer (decisão dinâmica de stack)
+│       ├── tech_lead.py      # → Test Writer (decisão dinâmica de stack)
+│       ├── test_writer.py    # → Developer (gera testes-contrato + inventário MODULES)
 │       ├── developer.py      # → QA (geração multi-arquivo)
 │       ├── qa.py             # → Parallel Audit (detecção automática de manifestos)
 │       ├── parallel_audit.py # → AppSec + DevOps em paralelo via ThreadPoolExecutor
 │       ├── appsec.py         # Scanner de segurança estático e auditoria LLM
 │       ├── devops.py         # Análise de deployabilidade e CI/CD
-│       └── lessons.py        # Gerador do artefato final lessons.md
+│       └── lessons.py        # Função generate_lessons_md (NÃO é nó) — executada dentro do parallel_audit
 ├── orchestrator/     # Despacho de tarefas e criação de planos
 │   ├── task_dispatcher.py # dispatch(), resume(), HITL handler, checkpoints SQLite
 │   └── plan_creator.py    # Converte visão em TaskSchema[]
@@ -52,7 +53,7 @@ src/lf/
 │   ├── benchmark.py        # BenchmarkSuite com cálculo ELO
 │   └── benchmark_dataset.py# 10 problemas curados multi-stack
 └── runner/           # Subprocesso OpenCode, git runner e test harness
-    ├── opencode/     # OpenCodeRunner (script -q -c, timeout 600s)
+    ├── opencode/     # OpenCodeRunner (script -q -c, timeout default 300s configurável)
     ├── harness/      # TestHarnessRunner (auto-detecção de manifestos)
     └── git/          # checkpoint.py, pr.py, sandbox.py (worktrees)
 ```
@@ -68,14 +69,41 @@ TaskDispatcher → initial_state (stack=None)
        ↓
 build_graph() → StateGraph.invoke()
        ↓
-CPO → PM → Tech Lead (decide stack) → Developer (gera multi-arquivos) → QA (detecta & testa)
-                                                                           ↓
-                                                   Parallel Audit (AppSec + DevOps)
-                                                                           ↓
-                                                          Lessons Generator (lessons.md)
-                                                                           ↓
-                                                          FINISH / PR (gh pr create)
+CPO → PM → Tech Lead (decide stack) → Test Writer (gera testes-contrato) → Developer (gera multi-arquivos)
+       ↓
+QA (detecta & testa) → Parallel Audit (AppSec + DevOps; gera lessons.md + PROJECT_SUMMARY.md)
+       ↓
+FINISH / PR (gh pr create)
 ```
+
+### Diagrama Mermaid
+
+```mermaid
+graph TD
+    CPO[1. CPO Node] --> PM[2. Product Manager Node]
+    PM --> TL[3. Tech Lead Node]
+    TL --> TW[4. Test Writer Node]
+    TW --> DEV[5. Developer Node]
+    DEV --> QA[6. QA Node]
+    QA -->|PASS| PARALLEL[7. Parallel Audit Node]
+    QA -->|FAIL & Retries Left| DEV
+    QA -->|FAIL & Exhausted| END((FINISH))
+    PARALLEL --> AppSec[AppSec Review]
+    PARALLEL --> DevOps[DevOps Analysis]
+    AppSec -->|CRÍTICA/ALTA| DEV
+    PARALLEL --> END
+```
+
+Nota: o gerador de lições (`generate_lessons_md`) **não é um nó** — é uma função executada dentro do nó `parallel_audit`, produzindo `lessons.md` e `PROJECT_SUMMARY.md`.
+
+### Retry Logic (`should_retry`)
+
+Após o nó QA (`graph.py:64-81`):
+
+- **PASS** (0 testes falhos) → prossegue para `parallel_audit`
+- **FAIL** com retries restantes (`qa_attempt_count < max_retries`) → retorna ao `developer`
+- **FAIL** esgotado → `parallel_audit` mesmo assim, com o erro registrado **dentro do nó** (arestas condicionais não propagam mutação de estado)
+- **AppSec com severidade CRÍTICA/ALTA** → `developer` novamente via aresta `parallel_audit: {developer, __end__}` (`graph.py:119`)
 
 ---
 
@@ -125,7 +153,7 @@ Ações disponíveis via `POST /api/runs/{id}/decide`:
 - `adjust_prompt` — ajusta o prompt e reexecuta (com `feedback_category` e `feedback_message`)
 - `abort` — encerra a pipeline
 
-Timeout padrão: **300s** (configurável em `TaskDispatcher.hitl_timeout_seconds`). Comportamento em timeout: abort.
+Timeout padrão: **300s**, configurável via `ade.yaml` (`hitl.timeout_seconds`). Comportamento em timeout configurável via `ade.yaml` (`hitl.on_timeout`: `continue` | `abort` (default) | `pause`) — `task_dispatcher.py:107-118`.
 
 Decisões registradas em `.loopforge/telemetry.sqlite` (tabela `human_decisions`).
 
@@ -147,11 +175,12 @@ Integrado ao `OpenCodeRunner.run()` e ao `TaskDispatcher.dispatch()` — verific
 
 ## Memória Persistente
 
-`MemoryManager` (`memory/manager.py`) armazena lições aprendidas (lessons) em `.loopforge/memory.sqlite`:
+`MemoryManager` (`memory/manager.py`) armazena lições aprendidas (lessons) em `.loopforge/telemetry.sqlite` (default `TELEMETRY_DB_PATH`):
 
 - Tabela: `lessons(id, run_id, stack, idea, lesson_text, created_at)`
 - Indexado por `stack` para busca eficiente
-- `search_relevant_lessons(query, stack)` retorna top 3 por relevância (keyword scoring)
+- `search_relevant_lessons(query, stack, cross_project=...)` retorna top 3 por relevância (keyword scoring)
+- `cross_project_enabled()` (`manager.py:17`) controla busca global entre projetos; quando ativo, `cross_project=True` ignora o filtro de stack
 - Conteúdo injetado em prompts de novos runs via `format_lessons_for_prompt()`
 
 ---

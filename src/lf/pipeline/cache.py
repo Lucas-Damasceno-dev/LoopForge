@@ -1,4 +1,5 @@
 """SQLiteLLMCache — Cache semântico de chamadas LLM com SQLite desacoplado."""
+
 import hashlib
 import logging
 import re
@@ -47,6 +48,17 @@ class SQLiteLLMCache:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cache_stats (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    hits INTEGER NOT NULL DEFAULT 0,
+                    misses INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            conn.execute("INSERT OR IGNORE INTO cache_stats (id, hits, misses) VALUES (1, 0, 0)")
+            conn.commit()
 
     def get(self, prompt: str) -> str | None:
         sem_prompt = _semantic_normalize_prompt(prompt)
@@ -54,7 +66,26 @@ class SQLiteLLMCache:
         with _connect_sqlite(self.db_path) as conn:
             cur = conn.execute("SELECT response FROM cache WHERE prompt_hash = ?", (h,))
             row = cur.fetchone()
-            return row[0] if row else None
+            if row:
+                conn.execute("UPDATE cache_stats SET hits = hits + 1 WHERE id = 1")
+                conn.commit()
+                return row[0]
+            conn.execute("UPDATE cache_stats SET misses = misses + 1 WHERE id = 1")
+            conn.commit()
+            return None
+
+    def stats(self) -> dict:
+        """Retorna métricas de hit/miss do cache: hits, misses, total e hit_rate."""
+        with _connect_sqlite(self.db_path) as conn:
+            row = conn.execute("SELECT hits, misses FROM cache_stats WHERE id = 1").fetchone()
+        hits, misses = (int(row[0]), int(row[1])) if row else (0, 0)
+        total = hits + misses
+        return {
+            "hits": hits,
+            "misses": misses,
+            "total": total,
+            "hit_rate": (hits / total) if total > 0 else 0.0,
+        }
 
     def set(self, prompt: str, response: str):
         sem_prompt = _semantic_normalize_prompt(prompt)
@@ -69,4 +100,6 @@ class SQLiteLLMCache:
     def clear(self):
         with _connect_sqlite(self.db_path) as conn:
             conn.execute("DELETE FROM cache")
+            conn.execute("DELETE FROM cache_stats")
+            conn.execute("INSERT INTO cache_stats (id, hits, misses) VALUES (1, 0, 0)")
             conn.commit()
