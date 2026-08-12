@@ -128,13 +128,12 @@ async def test_disconnect_com_run_id_deleta_chave_quando_vazia():
 
 @pytest.mark.asyncio
 async def test_disconnect_com_run_id_que_nao_possui_a_conexao():
-    """disconnect(run_id errado, ws): remove do global, mas deixa stale no canal.
+    """disconnect(run_id errado, ws): ws removida do global E do canal real.
 
-    Comportamento atual (websocket_manager.py:50-51): a remoção do canal
-    global é incondicional. Se o run_id não bate com o registro, a ws sai do
-    global mas permanece em ``run_connections["run-1"]`` — entrada stale.
-    App.py sempre passa o mesmo run_id do connect, então não ocorre em
-    produção; registrado como fragilidade no report.
+    Antes (bug websocket_manager.py:50-51): remoção do canal dependia do run_id
+    bater com o registro; run_id errado deixava a ws stale em
+    ``run_connections["run-1"]``. Agora a ws é removida de todos os canais onde
+    estiver — sem entradas stale (M-06).
     """
     manager = WebSocketConnectionManager()
     ws = FakeWebSocket()
@@ -143,7 +142,7 @@ async def test_disconnect_com_run_id_que_nao_possui_a_conexao():
     manager.disconnect("run-2", ws)  # type: ignore[arg-type]
 
     assert ws not in manager.active_connections
-    assert manager.run_connections == {"run-1": [ws]}  # stale: run-1 ainda lista ws
+    assert manager.run_connections == {}  # sem stale
 
 
 @pytest.mark.asyncio

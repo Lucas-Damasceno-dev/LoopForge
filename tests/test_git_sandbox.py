@@ -1,7 +1,6 @@
 """Testes de cobertura para src/lf/runner/git/sandbox.py (GitSandbox).
 
 Usa git real em tmp_path — o alvo é a lógica do sandbox, não o git em si.
-Contém teste documentando BUG conhecido de merge_worktree (target_branch ignorado).
 """
 
 import subprocess
@@ -102,24 +101,19 @@ class TestMergeWorktree:
         _commit_in_worktree(path, f"wt change {task_id}")
         return path
 
-    def test_merges_into_current_branch(self, git_repo: Path) -> None:
-        """Comportamento real: merge aplicado na branch corrente, não em target_branch.
-
-        Documenta BUG em sandbox.py:46 — target_branch é ignorado, sem checkout do alvo.
-        """
+    def test_merges_into_target_branch_and_restores(self, git_repo: Path) -> None:
+        """Merge aplicado na branch alvo (main), mesmo estando em develop; volta a develop."""
         _git(git_repo, "checkout", "-b", "develop")
         self._setup_worktree_with_change(git_repo, "cur")
         sandbox = GitSandbox(git_repo)
         assert sandbox.merge_worktree("cur", target_branch="main") is True
         dev_log = _git(git_repo, "log", "develop", "--oneline").stdout
         main_log = _git(git_repo, "log", "main", "--oneline").stdout
-        assert "feat: merge worktree cur" in dev_log
-        assert "feat: merge worktree cur" not in main_log  # BUG: deveria estar em main
+        assert "feat: merge worktree cur" in main_log
+        assert "feat: merge worktree cur" not in dev_log
+        # Estado do workdir de trabalho preservado após o merge
+        assert _git(git_repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip() == "develop"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="BUG sandbox.py:46 — merge_worktree ignora target_branch; merge cai na branch corrente",
-    )
     def test_respects_target_branch(self, git_repo: Path) -> None:
         """Contrato esperado: merge deve ir para target_branch mesmo estando em outra branch."""
         _git(git_repo, "checkout", "-b", "develop")
@@ -127,7 +121,7 @@ class TestMergeWorktree:
         sandbox = GitSandbox(git_repo)
         assert sandbox.merge_worktree("tgt", target_branch="main") is True
         main_log = _git(git_repo, "log", "main", "--oneline").stdout
-        assert "feat: merge worktree tgt" in main_log  # falha hoje → xfail
+        assert "feat: merge worktree tgt" in main_log
 
     def test_conflict_returns_false(self, git_repo: Path) -> None:
         self._setup_worktree_with_change(git_repo, "conf")

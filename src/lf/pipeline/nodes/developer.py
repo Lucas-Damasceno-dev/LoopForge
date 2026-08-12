@@ -700,15 +700,6 @@ def _generate_mock_project(stack: str) -> dict[str, str]:
         }
 
 
-PROTECTED_ROOT_FILES = {
-    "pyproject.toml",
-    ".loopforge.json",
-    "AGENTS.md",
-    "README.md",
-    "uv.lock",
-}
-
-
 def _find_loopforge_repo_root(path: Path) -> Path | None:
     """Sobe o path procurando um ancestral que seja o repo LoopForge (AGENTS.md + src/lf)."""
     current = Path(path).resolve()
@@ -864,15 +855,6 @@ def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> N
             continue
 
         for rel_path, content in files_map.items():
-            norm_rel = os.path.normpath(rel_path)
-            # Defesa extra (PROTECTED_ROOT_FILES): nunca sobrescrever arquivos
-            # críticos do repo, mesmo se a detecção de raiz falhar por estrutura.
-            if is_loopforge_repo and (norm_rel in PROTECTED_ROOT_FILES or norm_rel.startswith(".github")):
-                print(
-                    f"--- AVISO: Dogfooding Protection ativado: Bloqueada sobrescrita do arquivo do repositório '{rel_path}' ---"
-                )
-                continue
-
             full_path = os.path.join(base_dir, rel_path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
