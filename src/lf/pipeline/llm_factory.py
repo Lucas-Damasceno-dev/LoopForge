@@ -2,7 +2,6 @@ import asyncio
 import contextlib
 import json
 import os
-import queue
 import re
 import sqlite3
 import threading
@@ -360,34 +359,46 @@ class TokenDeltaPublisher:
 
     Os nós síncronos do LangGraph rodam em thread do ThreadPoolExecutor (sem
     loop asyncio) — por isso o publisher mantém UMA thread daemon com loop
-    asyncio próprio e consome uma queue thread-safe. ``__call__`` apenas
-    enfileira (put_nowait, não bloqueia o pipeline) e o drain serializado
-    garante seq monotônico por run. Nunca levanta exceção — falha silenciosa
-    por design.
+    asyncio próprio. ``__call__`` agenda o delta via ``call_soon_threadsafe``
+    (não bloqueia o pipeline) e o drain serializado garante seq monotônico.
+    Nunca levanta exceção — falha silenciosa por design.
     """
 
     def __init__(self, run_id: str, node: str) -> None:
         self.run_id = run_id
         self.node = node
-        self._queue: queue.Queue[str] = queue.Queue()
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
+        self._queue: asyncio.Queue[str] | None = None
 
     def __call__(self, content: str) -> None:
         if not content:
             return
-        self._queue.put_nowait(content)
         if self._thread is None or not self._thread.is_alive():
+            self._loop = asyncio.new_event_loop()
             self._thread = threading.Thread(target=self._run_loop, name="token-delta-publisher", daemon=True)
             self._thread.start()
+        assert self._loop is not None
+        self._loop.call_soon_threadsafe(self._enqueue, content)
 
     def _run_loop(self) -> None:
-        asyncio.run(self._drain())
+        assert self._loop is not None
+        asyncio.set_event_loop(self._loop)
+        # Fila criada dentro do loop: acessada apenas via call_soon_threadsafe.
+        self._queue = asyncio.Queue()
+        self._loop.create_task(self._drain())
+        self._loop.run_forever()
+
+    def _enqueue(self, content: str) -> None:
+        # Executa dentro do loop (agendado via call_soon_threadsafe).
+        if self._queue is not None:
+            self._queue.put_nowait(content)
 
     async def _drain(self) -> None:
-        """Consome a queue na ordem de chegada, publicando cada delta no EventBus."""
-        loop = asyncio.get_running_loop()
+        """Consome a fila na ordem de chegada, publicando cada delta no EventBus."""
+        assert self._queue is not None
         while True:
-            content = await loop.run_in_executor(None, self._queue.get)
+            content = await self._queue.get()
             with contextlib.suppress(Exception):
                 await self._publish(content)
 
