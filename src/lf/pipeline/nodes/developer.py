@@ -336,8 +336,15 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: 
     return errors
 
 
-def developer(state: GraphState) -> dict:
-    """Gera projeto completo multi-arquivo na stack decidida pelo Tech Lead."""
+def developer(state: GraphState, config: dict | None = None) -> dict:
+    """Gera projeto completo multi-arquivo na stack decidida pelo Tech Lead.
+
+    ``config`` (injetado pelo LangGraph) carrega o ``thread_id`` canônico
+    ``run-{run_id}`` (ADR-0003) — usado para o streaming token a token
+    (V1.1/ADR-0007) publicar ``token_delta`` com o run_id correto. Sem thread
+    ``run-*`` (CLI legada/chamada direta), o streaming fica desligado em
+    silêncio — nunca quebra nem atrasa a pipeline.
+    """
     print("---EXECUTANDO NÓ: Developer---")
 
     attempt_count = state.get("attempt_count", 0) + 1
@@ -528,6 +535,16 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
     user_prompt = "\n".join(prompt_parts)
 
     print(f"--- Chamando LLM Engine (Stack TL: {stack}, Model: {model_name})... ---")
+    # V1.1/ADR-0007: streaming token a token → ADE. O run_id vem do thread_id
+    # canônico `run-{uuid}` (ADR-0003); sem ele (CLI legada/chamada direta) o
+    # streaming fica desligado — nunca emite delta sintético e nunca falha.
+    on_token_delta = None
+    if config:
+        thread_id = (config.get("configurable") or {}).get("thread_id")
+        if isinstance(thread_id, str) and thread_id.startswith("run-"):
+            from ...pipeline.llm_factory import TokenDeltaPublisher
+
+            on_token_delta = TokenDeltaPublisher(thread_id[len("run-") :], "developer")
     try:
         raw = call_llm_via_opencode(
             system_prompt=system_prompt,
@@ -538,6 +555,7 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
             cache=True,
             circuit_breaker=state.get("circuit_breaker"),
             project_root=output_dir,
+            on_token_delta=on_token_delta,
         )
         if not isinstance(raw, str):
             raw = str(raw)
