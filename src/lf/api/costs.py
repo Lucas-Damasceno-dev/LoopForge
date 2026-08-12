@@ -233,7 +233,7 @@ async def get_run_cost(
         raise HTTPException(status_code=404, detail="Run not found")
 
     spent, estimated = _sum_run_costs(run_id)
-    max_usd = _effective_max_usd(run_id)
+    max_usd = await _effective_max_usd(run_id, session)
     percent_used = (spent / max_usd) if max_usd > 0 else 0.0
     budget_warning = percent_used >= 0.80  # M-10: aviso aos 80%
 
