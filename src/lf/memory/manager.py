@@ -3,6 +3,7 @@
 Gerencia o histórico de lições aprendidas (lessons.md) e contexto de projetos passados,
 permitindo busca por relevância de stack e palavras-chave para recuperar aprendizados.
 """
+
 from __future__ import annotations
 
 import os
@@ -44,13 +45,17 @@ class MemoryManager:
             """)
             conn.commit()
 
-    def save_lesson(self, run_id: str, stack: str, idea: str, lesson_text: str) -> None:
-        """Salva uma nova lição aprendida no repositório de memória."""
+    def save_lesson(self, run_id: str, stack: str, idea: str, lesson_text: str) -> dict | None:
+        """Salva uma nova lição aprendida e retorna a lição criada (None se vazia).
+
+        A API de memória reutiliza este método no POST /lessons; por isso passa a
+        devolver o registro completo recém-inserido (id gerado no INSERT).
+        """
         if not lesson_text or not lesson_text.strip():
-            return
+            return None
 
         with self._get_connection() as conn:
-            conn.execute(
+            cur = conn.execute(
                 """
                 INSERT INTO lessons (run_id, stack, idea, lesson_text, created_at)
                 VALUES (?, ?, ?, ?, ?)
@@ -58,6 +63,78 @@ class MemoryManager:
                 (run_id, stack.lower().strip(), idea.strip(), lesson_text.strip(), time.time()),
             )
             conn.commit()
+            row = conn.execute("SELECT * FROM lessons WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return dict(row) if row else None
+
+    def get_lesson(self, lesson_id: int) -> dict | None:
+        """Retorna uma lição pelo id, ou None se não existir."""
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
+        return dict(row) if row else None
+
+    def list_lessons(self, stack: str | None = None, limit: int = 50) -> list[dict]:
+        """Lista as lições mais recentes, opcionalmente filtradas por stack.
+
+        Ordenadas por created_at DESC (mais recentes primeiro). O valor de stack
+        é normalizado em minúsculas antes do filtro.
+        """
+        with self._get_connection() as conn:
+            if stack:
+                rows = conn.execute(
+                    "SELECT * FROM lessons WHERE stack = ? ORDER BY created_at DESC LIMIT ?",
+                    (stack.lower().strip(), limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM lessons ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_lesson(
+        self,
+        lesson_id: int,
+        *,
+        stack: str | None = None,
+        idea: str | None = None,
+        lesson_text: str | None = None,
+    ) -> dict | None:
+        """Atualiza apenas os campos informados de uma lição.
+
+        Retorna a lição atualizada, ou None se o id não existir. Com todos os
+        campos ausentes, devolve a lição inalterada (PATCH vazio é idempotente).
+        """
+        fields: list[str] = []
+        params: list[str] = []
+        if stack is not None:
+            fields.append("stack = ?")
+            params.append(stack.lower().strip())
+        if idea is not None:
+            fields.append("idea = ?")
+            params.append(idea.strip())
+        if lesson_text is not None:
+            fields.append("lesson_text = ?")
+            params.append(lesson_text.strip())
+        if not fields:
+            return self.get_lesson(lesson_id)
+
+        params.append(str(lesson_id))
+        with self._get_connection() as conn:
+            cur = conn.execute(
+                f"UPDATE lessons SET {', '.join(fields)} WHERE id = ?",
+                params,
+            )
+            conn.commit()
+        if cur.rowcount == 0:
+            return None
+        return self.get_lesson(lesson_id)
+
+    def delete_lesson(self, lesson_id: int) -> bool:
+        """Remove uma lição pelo id. Retorna True se algum registro foi removido."""
+        with self._get_connection() as conn:
+            cur = conn.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
+            conn.commit()
+        return cur.rowcount > 0
 
     def search_relevant_lessons(self, query: str, stack: str | None = None, limit: int = 3) -> list[dict]:
         """Busca lições aprendidas passadas relevantes por stack e termos da query."""
@@ -70,9 +147,7 @@ class MemoryManager:
                     (stack.lower().strip(),),
                 ).fetchall()
             else:
-                rows = conn.execute(
-                    "SELECT * FROM lessons ORDER BY created_at DESC LIMIT 20"
-                ).fetchall()
+                rows = conn.execute("SELECT * FROM lessons ORDER BY created_at DESC LIMIT 20").fetchall()
 
         results = []
         for r in rows:
