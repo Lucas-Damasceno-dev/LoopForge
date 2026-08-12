@@ -1,7 +1,8 @@
-"""Testes da fila de execução E3 (M-21/A8): 1 run ativa + FIFO de runs `queued`.
+"""Testes da fila de execução E3 (M-21/A8): N runs ativas + FIFO de runs `queued`.
 
 Cobre o requisito do plano: 2º POST /runs com o 1º ainda ativo nasce `queued`
-e não executa até o 1º terminar; ao terminar, o worker promove a próxima.
+e não executa até o 1º terminar (aqui com max_concurrent_runs=1 injetado); ao
+terminar, o worker promove a próxima.
 Também verifica os eventos run_updated publicados via EventBus em cada transição.
 """
 
@@ -14,6 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from lf.api.app import create_app
 from lf.api.database import close_db, init_db
 from lf.api.events import event_bus
+from lf.config.schema import AdeConfig, AdeRunner
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -21,6 +23,12 @@ async def setup_queue_env(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("LF_API_TEST", "1")
     monkeypatch.setenv("LF_API_REQUIRE_AUTH", "false")
+    # E3: este teste pinna a semântica antiga (1 run ativa) — o default do
+    # config é 2 concorrentes (test_parallel_runs.py cobre o paralelismo real).
+    monkeypatch.setattr(
+        "lf.api.app.load_ade_config",
+        lambda: AdeConfig(runner=AdeRunner(max_concurrent_runs=1)),
+    )
     await init_db()
     yield
     await close_db()
@@ -60,7 +68,7 @@ async def test_second_run_queued_until_first_finishes():
 
         # Estado da fila (determinístico): run1 ativa, run2 aguardando
         q = app.state.run_queue
-        assert q.active == run1_id, f"ativa deveria ser run1, é {q.active}"
+        assert q.active == {run1_id}, f"ativa deveria ser run1, é {q.active}"
         assert run2_id in q.pending, "run2 deveria estar na fila"
 
         # persistido no DB: GET reflete queued
