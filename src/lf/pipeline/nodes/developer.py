@@ -15,11 +15,13 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from langchain_core.runnables import RunnableConfig
+from langgraph.types import interrupt
+
 from ...guardrails.circuit_breaker import CircuitBreaker
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 from ...runner.opencode.runner import DEFAULT_OPENCODE_MODEL
-from langgraph.types import interrupt
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +338,7 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: 
     return errors
 
 
-def developer(state: GraphState, config: dict | None = None) -> dict:
+def developer(state: GraphState, config: RunnableConfig | None = None) -> dict:
     """Gera projeto completo multi-arquivo na stack decidida pelo Tech Lead.
 
     ``config`` (injetado pelo LangGraph) carrega o ``thread_id`` canônico
