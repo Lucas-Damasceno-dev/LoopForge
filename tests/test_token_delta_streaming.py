@@ -95,6 +95,12 @@ def test_native_provider_generate_streams_deltas(monkeypatch):
         def raise_for_status(self):
             pass
 
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
         def iter_lines(self):
             yield from SSE_LINES
 
