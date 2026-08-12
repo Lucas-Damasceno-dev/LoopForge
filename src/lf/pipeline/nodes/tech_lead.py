@@ -146,18 +146,7 @@ def tech_lead(state: GraphState) -> dict:
 
     try:
         validation = call_llm_via_opencode(
-            system_prompt="""Você é um Tech Lead. Revise as user stories e recomende a melhor stack.
-
-Analise o problema e recomende a melhor stack (linguagem + framework + ferramentas). Considere:
-- Tipo de projeto e escopo
-- Performance e segurança necessárias
-- Ecossistema e produtividade
-
-Responda com:
-- needs_feedback: true se alguma história precisa de revisão
-- feedback_message: feedback detalhado
-- approved_stories: IDs das histórias aprovadas
-- recommended_stack: linguagem ou stack recomendada (ex: python, rust, java, javascript, go)""",
+            system_prompt=get_effective_prompt("tech_lead", DEFAULT_PROMPT),
             user_prompt=f"Ideia do Projeto: {idea}\n\nUser Stories:\n{stories_str}",
             schema_model=ValidationResult,
             mock=state.get("mock_llm", False),
