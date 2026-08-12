@@ -118,7 +118,7 @@ class TestMergeWorktree:
 
     @pytest.mark.xfail(
         strict=False,
-        reason="BUG sandbox.py:46 — merge_worktree ignora target_branch; merge cai na branch corrente sem checkout do alvo",
+        reason="BUG sandbox.py:46 — merge_worktree ignora target_branch; merge cai na branch corrente",
     )
     def test_respects_target_branch(self, git_repo: Path) -> None:
         """Contrato esperado: merge deve ir para target_branch mesmo estando em outra branch."""
