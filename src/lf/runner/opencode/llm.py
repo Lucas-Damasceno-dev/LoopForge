@@ -147,7 +147,7 @@ def call_llm_via_opencode(
     # Cache check
     if cache and not mock:
         llm_cache = SQLiteLLMCache()
-        cached = llm_cache.get(full_prompt)
+        cached = llm_cache.get(full_prompt, model=model_to_use, temperature=temperature)
         if cached:
             if schema_model:
                 try:
@@ -313,14 +313,19 @@ Responda SOMENTE o objeto JSON puro."""
 
         if cache:
             llm_cache = SQLiteLLMCache()
-            llm_cache.set(full_prompt, json.dumps(result_dict, default=str))
+            llm_cache.set(
+                full_prompt,
+                json.dumps(result_dict, default=str),
+                model=model_to_use,
+                temperature=temperature,
+            )
 
         return result_dict
 
     # Não tem schema — retorna texto puro
     if cache:
         llm_cache = SQLiteLLMCache()
-        llm_cache.set(full_prompt, raw_response_text)
+        llm_cache.set(full_prompt, raw_response_text, model=model_to_use, temperature=temperature)
 
     return raw_response_text
 

@@ -14,7 +14,7 @@ import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
@@ -118,17 +118,6 @@ def _clean_code(raw: str) -> str:
     ):
         code = code.split("\n", 1)[-1] if "\n" in code else code
     return code.strip()
-
-
-def _extract_generated_code(res: Any, output_dir: str, duration: float = 0.0) -> str:
-    """Helper de extração mantido para compatibilidade de testes."""
-    if hasattr(res, "changed_files") and res.changed_files:
-        for file_path in res.changed_files:
-            p = Path(file_path)
-            if p.exists() and p.is_file():
-                return p.read_text(encoding="utf-8")
-    stdout = getattr(res, "stdout", "") or ""
-    return _clean_code(stdout)
 
 
 def _parse_multi_file_response(raw_text: str, default_filename: str = "main.py") -> dict[str, str]:

@@ -145,6 +145,11 @@ def tech_lead(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
     decided_stack = current_stack
     new_feedback = list(state.get("feedback_history", []))
 
+    # Fallback degradado: setado nos excepts quando mock/heurística é usada por
+    # falha de LLM (não em modo mock explícito, que retorna antes).
+    degraded = False
+    degraded_reason = ""
+
     try:
         validation = call_llm_via_opencode(
             system_prompt=get_effective_prompt("tech_lead", DEFAULT_PROMPT),
@@ -168,6 +173,8 @@ def tech_lead(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
         print(f"--- ERRO TL validação: {e} ---")
         if not decided_stack:
             decided_stack = _extract_stack_from_text(idea) or "python"
+        degraded = True
+        degraded_reason = f"validação: {str(e)[:150]}"
 
     # Fase 2: Gerar tech spec
     print(f"--- Gerando especificação técnica (Stack decidida pelo TL: {decided_stack}) ---")
@@ -224,6 +231,8 @@ Template (use como guia):
     except Exception as e:
         print(f"--- ERRO TL tech spec: {e} ---")
         tech_spec = _mock_tech_spec(user_stories, tech_spec_template, now_date, decided_stack)
+        degraded = True
+        degraded_reason = f"tech_spec: {str(e)[:150]}"
 
     output_dir = state.get("output_dir", ".")
     if output_dir:
@@ -241,6 +250,7 @@ Template (use como guia):
     else:
         rationale = f"Stack '{decided_stack}' selecionada por requisitos de arquitetura."
 
+    extra = {"degraded": True, "degraded_reason": degraded_reason} if degraded else {}
     return {
         **state,
         "stack": decided_stack,
@@ -248,6 +258,7 @@ Template (use como guia):
         "tech_spec": tech_spec,
         "feedback_history": new_feedback,
         "next_agent": "test_writer",
+        **extra,
     }
 
 

@@ -10,12 +10,29 @@ from ..config.paths import LLM_CACHE_DB_PATH
 
 logger = logging.getLogger(__name__)
 
+# TTL do cache: entradas mais velhas que isso são tratadas como miss (get) e
+# podadas no próximo insert (set). Evita resposta stale e crescimento infinito.
+_CACHE_TTL_DAYS = 30
+
 
 def _semantic_normalize_prompt(prompt: str) -> str:
     norm = prompt.lower()
     norm = re.sub(r"\b20\d{2}-\d{2}-\d{2}[tT ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:z|Z)?\b", "", norm)
     norm = re.sub(r"\s+", " ", norm)
     return norm.strip()
+
+
+def _cache_key(prompt: str, model: str | None = None, temperature: float | None = None) -> str:
+    """Chave SHA256 do prompt normalizado + modelo + temperatura.
+
+    model/temperature None (chamada legada) → chave só do prompt, mantendo o
+    comportamento antigo. Com modelo informado, o mesmo prompt com modelos
+    diferentes não colide mais (antes reusava resposta errada entre modelos).
+    """
+    sem_prompt = _semantic_normalize_prompt(prompt)
+    model_part = model or ""
+    temp_part = "" if temperature is None else str(temperature)
+    return hashlib.sha256(f"{model_part}|{temp_part}|{sem_prompt}".encode()).hexdigest()
 
 
 def _connect_sqlite(db_path: str | Path) -> sqlite3.Connection:
@@ -48,6 +65,11 @@ class SQLiteLLMCache:
                 )
                 """
             )
+            # Compat com DB existente: garante created_at em bancos criados antes
+            # do TTL (defensivo — CREATE IF NOT EXISTS não altera schema antigo).
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(cache)")}
+            if "created_at" not in cols:
+                conn.execute("ALTER TABLE cache ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS cache_stats (
@@ -60,11 +82,14 @@ class SQLiteLLMCache:
             conn.execute("INSERT OR IGNORE INTO cache_stats (id, hits, misses) VALUES (1, 0, 0)")
             conn.commit()
 
-    def get(self, prompt: str) -> str | None:
-        sem_prompt = _semantic_normalize_prompt(prompt)
-        h = hashlib.sha256(sem_prompt.encode()).hexdigest()
+    def get(self, prompt: str, model: str | None = None, temperature: float | None = None) -> str | None:
+        h = _cache_key(prompt, model, temperature)
         with _connect_sqlite(self.db_path) as conn:
-            cur = conn.execute("SELECT response FROM cache WHERE prompt_hash = ?", (h,))
+            # TTL: rows com created_at anterior a _CACHE_TTL_DAYS contam como miss
+            cur = conn.execute(
+                "SELECT response FROM cache WHERE prompt_hash = ? AND created_at > datetime('now', ?)",
+                (h, f"-{_CACHE_TTL_DAYS} days"),
+            )
             row = cur.fetchone()
             if row:
                 conn.execute("UPDATE cache_stats SET hits = hits + 1 WHERE id = 1")
@@ -87,10 +112,20 @@ class SQLiteLLMCache:
             "hit_rate": (hits / total) if total > 0 else 0.0,
         }
 
-    def set(self, prompt: str, response: str):
-        sem_prompt = _semantic_normalize_prompt(prompt)
-        h = hashlib.sha256(sem_prompt.encode()).hexdigest()
+    def set(
+        self,
+        prompt: str,
+        response: str,
+        model: str | None = None,
+        temperature: float | None = None,
+    ):
+        h = _cache_key(prompt, model, temperature)
         with _connect_sqlite(self.db_path) as conn:
+            # Eviction leve: poda entradas expiradas a cada insert (sem apagar tudo)
+            conn.execute(
+                "DELETE FROM cache WHERE created_at < datetime('now', ?)",
+                (f"-{_CACHE_TTL_DAYS} days",),
+            )
             conn.execute(
                 "INSERT OR REPLACE INTO cache (prompt_hash, response) VALUES (?, ?)",
                 (h, response),

@@ -56,6 +56,13 @@ class GraphState(TypedDict):
     error: str | None
     feedback_history: list[dict]
 
+    # Fallback degradado — canal honesto de "mock por falha de LLM": os nós
+    # setam degraded=True quando caem em resposta mock/heurística por ERRO de
+    # LLM (não por modo mock explícito). O orquestrador lê esses canais para
+    # marcar o run como degraded em vez de um completed enganoso.
+    degraded: NotRequired[bool]
+    degraded_reason: NotRequired[str]
+
     # Config de LLM
     mock_llm: bool
     llm_provider: str

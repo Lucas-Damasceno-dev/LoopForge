@@ -94,6 +94,11 @@ Objetivos: {", ".join(epic.get("business_objectives", []))}
 Escopo IN: {", ".join(epic.get("scope_in", []))}
 Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
 
+    # Fallback degradado: setado no except quando o mock é usado por falha de LLM
+    degraded = False
+    degraded_reason = ""
+    stories: list[dict] = []
+
     try:
         result = call_llm_via_opencode(
             system_prompt=system_prompt,
@@ -114,6 +119,9 @@ Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
     except Exception as e:
         print(f"--- ERRO PM: {e} ---")
         stories = _mock_stories(epic)
+        # Fallback mock por falha de LLM → marca o run como degradado.
+        degraded = True
+        degraded_reason = str(e)[:200]
 
     output_dir = state.get("output_dir", ".")
     if output_dir:
@@ -123,7 +131,8 @@ Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
             with open(path, "w") as f:
                 json.dump(us, f, indent=2, ensure_ascii=False)
 
-    return {**state, "user_stories": stories, "next_agent": "tech_lead"}
+    extra = {"degraded": True, "degraded_reason": degraded_reason} if degraded else {}
+    return {**state, "user_stories": stories, "next_agent": "tech_lead", **extra}
 
 
 def _mock_stories(epic: dict) -> list[dict]:

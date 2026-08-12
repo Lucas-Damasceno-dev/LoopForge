@@ -1,8 +1,7 @@
 """P2-5: timeout default elevado para chamadas LLM (300s; 600s p/ modelos de reasoning).
 
-Cobre os helpers `_is_reasoning_model`/`_resolve_timeout`, o uso em
-`call_openrouter_api` e o default do `NativeLLMProvider` (antigo 60s fixo que
-cortava reasoning models).
+Cobre os helpers `_is_reasoning_model`/`_resolve_timeout` e o uso em
+`call_openrouter_api`.
 """
 
 import os
@@ -13,7 +12,6 @@ from httpx import Request, Response
 from lf.pipeline.llm_factory import (
     DEFAULT_LLM_TIMEOUT,
     REASONING_TIMEOUT,
-    NativeLLMProvider,
     _is_reasoning_model,
     _resolve_timeout,
     call_openrouter_api,
@@ -79,15 +77,3 @@ def test_call_openrouter_api_usa_env_timeout(mock_post):
     ):
         call_openrouter_api(prompt="oi")
     assert mock_post.call_args.kwargs["timeout"] == 180.0
-
-
-def test_native_provider_usa_env_timeout():
-    with mock.patch.dict(os.environ, {"OPENROUTER_TIMEOUT": "180"}):
-        provider = NativeLLMProvider(api_key="k")
-    assert provider.timeout == 180.0
-
-
-def test_native_provider_default_sem_env():
-    with mock.patch.dict(os.environ, {"OPENROUTER_TIMEOUT": "", "OPENROUTER_MODEL": "gpt-4o"}):
-        provider = NativeLLMProvider(api_key="k")
-    assert provider.timeout == DEFAULT_LLM_TIMEOUT

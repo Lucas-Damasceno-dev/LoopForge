@@ -102,7 +102,16 @@ def cpo(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # 
         epic["dates"] = {"created_at": now_iso, "started_at": now_iso}
     except Exception as e:
         print(f"--- ERRO CPO: {e} ---")
-        return {**state, "epic": _mock_epic(state.get("idea", "")), "next_agent": "pm", "error": str(e)}
+        # Fallback mock por falha de LLM → marca o run como degradado (o
+        # orquestrador usa state["degraded"] para não reportar completed enganoso).
+        return {
+            **state,
+            "epic": _mock_epic(state.get("idea", "")),
+            "next_agent": "pm",
+            "error": str(e),
+            "degraded": True,
+            "degraded_reason": str(e)[:200],
+        }
 
     output_dir = state.get("output_dir", ".")
     if output_dir:

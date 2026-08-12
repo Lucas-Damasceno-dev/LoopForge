@@ -7,7 +7,6 @@ from genome import BaseLanguageScanner, GenomeScanner, ModuleInfo
 from lf.config.registry import BaseStackHandler, TechStackRegistry
 from lf.config.schema import resolve_tech_stack
 from lf.pipeline.graph import EdgeRegistry, NodeRegistry, build_graph
-from lf.pipeline.llm_factory import BaseLLMProvider, LLMProviderRegistry, execute_llm
 
 
 class ElixirStackHandler(BaseStackHandler):
@@ -33,15 +32,6 @@ class ElixirStackHandler(BaseStackHandler):
         return None
 
 
-class CustomLLMProvider(BaseLLMProvider):
-    @property
-    def provider_name(self) -> str:
-        return "custom"
-
-    def generate(self, system_prompt: str, user_prompt: str, **kwargs):
-        return "custom_response"
-
-
 class DummyScanner(BaseLanguageScanner):
     @property
     def language_name(self) -> str:
@@ -62,16 +52,6 @@ def test_tech_stack_registry_extensibility():
     assert resolved.framework == "phoenix"
     assert resolved.testing_harness == "mix test"
     assert resolved.package_manager == "mix"
-
-
-def test_llm_provider_registry():
-    LLMProviderRegistry.register(CustomLLMProvider())
-    provider = LLMProviderRegistry.get("custom")
-    assert provider.provider_name == "custom"
-    assert provider.generate("sys", "user") == "custom_response"
-
-    res = execute_llm("sys", "user", provider_name="mock", mock=True)
-    assert "[MOCK Provider]" in str(res)
 
 
 def test_genome_scanner_registry():

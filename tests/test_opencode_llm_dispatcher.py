@@ -1,3 +1,4 @@
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,6 +9,7 @@ from lf.guardrails.circuit_breaker import CircuitBreaker
 from lf.orchestrator.task_dispatcher import TaskDispatcher
 from lf.pipeline.llm_factory import SQLiteLLMCache
 from lf.runner.opencode.llm import call_llm_via_opencode
+from lf.runner.opencode.runner import DEFAULT_OPENCODE_MODEL
 
 
 class SimpleSchema(BaseModel):
@@ -18,8 +20,9 @@ def test_call_llm_via_opencode_cache(tmp_path):
     cache = SQLiteLLMCache(db_path=tmp_path / "cache.sqlite")
     full_prompt = "System prompt\n\nUser prompt"
 
-    # Seed cache
-    cache.set(full_prompt, '{"title": "Cached Title"}')
+    # Seed cache — chave inclui model+temperature (mesma resolução do call site)
+    seed_model = os.environ.get("OPENCODE_MODEL", DEFAULT_OPENCODE_MODEL)
+    cache.set(full_prompt, '{"title": "Cached Title"}', model=seed_model, temperature=0.3)
 
     with patch("lf.runner.opencode.llm.SQLiteLLMCache", return_value=cache):
         # Call with cache hit
@@ -75,9 +78,9 @@ def test_task_dispatcher_create_pr_with_labels(tmp_path):
     task = TaskSchema(id="T-001", title="Test Task", persona="developer")
     final_state = {"test_report": {"summary": {"tests_failed": 0}}}
 
-    with patch("lf.orchestrator.task_dispatcher.GitCheckpointManager"), patch(
-        "lf.orchestrator.task_dispatcher.create_github_pr"
-    ) as mock_pr:
+    with (
+        patch("lf.orchestrator.task_dispatcher.GitCheckpointManager"),
+        patch("lf.orchestrator.task_dispatcher.create_github_pr") as mock_pr,
+    ):
         dispatcher._create_pr_with_labels(task, final_state, project_id="proj1")
         assert mock_pr.called is True
-

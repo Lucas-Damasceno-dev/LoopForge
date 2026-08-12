@@ -1,9 +1,8 @@
 """Testes do streaming token a token (V1.1/ADR-0007) — eventos ``token_delta``.
 
 Cobre: (1) publicação via EventBus com envelope v1; (2) streaming incremental
-em ``call_openrouter_api``; (3) streaming no NativeLLMProvider; (4) Mock sem
-deltas sintéticos; (5) serialização do TokenDeltaPublisher; (6) repasse do
-callback por ``call_llm_via_opencode``.
+em ``call_openrouter_api``; (3) serialização do TokenDeltaPublisher; (4) repasse
+do callback por ``call_llm_via_opencode``.
 """
 
 import asyncio
@@ -11,12 +10,7 @@ from uuid import uuid4
 
 import pytest
 
-from lf.pipeline.llm_factory import (
-    MockLLMProvider,
-    NativeLLMProvider,
-    TokenDeltaPublisher,
-    call_openrouter_api,
-)
+from lf.pipeline.llm_factory import TokenDeltaPublisher, call_openrouter_api
 
 SSE_LINES = [
     'data: {"choices":[{"delta":{"content":"Ola"}}]}',
@@ -79,46 +73,6 @@ def test_call_openrouter_api_streams_deltas_via_callback(monkeypatch):
 
     assert text == "Ola mundo"
     assert deltas == ["Ola", " ", "mundo"]
-
-
-def test_native_provider_generate_streams_deltas(monkeypatch):
-    """NativeLLMProvider.generate com callback emite deltas + texto consolidado."""
-    from lf.pipeline.cache import SQLiteLLMCache
-
-    SQLiteLLMCache().clear()
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    native = NativeLLMProvider()
-
-    class FakeResp:
-        status_code = 200
-
-        def raise_for_status(self):
-            pass
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def iter_lines(self):
-            yield from SSE_LINES
-
-    monkeypatch.setattr(native._client, "stream", lambda *a, **k: FakeResp())
-
-    deltas: list[str] = []
-    text = native.generate("sys", "user-unique-stream", on_token_delta=deltas.append)
-
-    assert text == "Ola mundo"
-    assert deltas == ["Ola", " ", "mundo"]
-
-
-def test_mock_provider_ignora_on_token_delta():
-    """MockLLMProvider não emite deltas sintéticos (fallback silencioso)."""
-    deltas: list[str] = []
-    out = MockLLMProvider().generate("sys", "user", on_token_delta=deltas.append)
-    assert out == "[MOCK Provider] Resposta para: user"
-    assert deltas == []
 
 
 @pytest.mark.asyncio

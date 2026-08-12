@@ -16,7 +16,7 @@ from lf.runner.opencode.llm import (
     call_llm_via_opencode,
 )
 from lf.runner.opencode.models import OpenCodeResult
-from lf.runner.opencode.runner import OpenCodeRunner, detect_changed_files
+from lf.runner.opencode.runner import DEFAULT_OPENCODE_MODEL, OpenCodeRunner, detect_changed_files
 
 
 class SampleSchemaModel(BaseModel):
@@ -101,7 +101,10 @@ def test_call_llm_cache_hit_and_miss(tmp_path):
     cache = SQLiteLLMCache(db_path=db_file)
 
     prompt_key = "sys_cache\n\nuser_cache"
-    cache.set(prompt_key, json.dumps({"id": "MOCK-001", "title": "Cached Title"}))
+    # A chave agora inclui model+temperature (mesma resolução do call site em
+    # call_llm_via_opencode) — sem isso o seed não colide com a lookup.
+    seed_model = os.environ.get("OPENCODE_MODEL", DEFAULT_OPENCODE_MODEL)
+    cache.set(prompt_key, json.dumps({"id": "MOCK-001", "title": "Cached Title"}), model=seed_model, temperature=0.3)
 
     with patch("lf.runner.opencode.llm.SQLiteLLMCache", return_value=cache):
         # Cache hit com schema
@@ -115,7 +118,7 @@ def test_call_llm_cache_hit_and_miss(tmp_path):
         assert res["title"] == "Cached Title"
 
         # Cache hit sem schema
-        cache.set("text_sys\n\ntext_user", "Plain text cached")
+        cache.set("text_sys\n\ntext_user", "Plain text cached", model=seed_model, temperature=0.3)
         res_text = call_llm_via_opencode(
             system_prompt="text_sys",
             user_prompt="text_user",
@@ -128,15 +131,20 @@ def test_call_llm_cache_hit_and_miss(tmp_path):
 def test_call_llm_openrouter_success(tmp_path):
     with patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-test-key"}):
         with patch("lf.pipeline.llm_factory.call_openrouter_api") as mock_api:
-            mock_api.return_value = (json.dumps({
-                "id": "OR-001",
-                "title": "OpenRouter Result",
-                "count": 5,
-                "score": 4.5,
-                "is_active": True,
-                "items": ["a"],
-                "metadata": {"key": "val"}
-            }), {"prompt_tokens": 50, "completion_tokens": 30})
+            mock_api.return_value = (
+                json.dumps(
+                    {
+                        "id": "OR-001",
+                        "title": "OpenRouter Result",
+                        "count": 5,
+                        "score": 4.5,
+                        "is_active": True,
+                        "items": ["a"],
+                        "metadata": {"key": "val"},
+                    }
+                ),
+                {"prompt_tokens": 50, "completion_tokens": 30},
+            )
 
             res = call_llm_via_opencode(
                 system_prompt="sys",
@@ -154,15 +162,17 @@ def test_call_llm_openrouter_failure_fallback_opencode(tmp_path):
             with patch.object(OpenCodeRunner, "run") as mock_runner_run:
                 mock_runner_run.return_value = OpenCodeResult(
                     exit_code=0,
-                    stdout=json.dumps({
-                        "id": "FB-001",
-                        "title": "Fallback Result",
-                        "count": 1,
-                        "score": 1.0,
-                        "is_active": True,
-                        "items": [],
-                        "metadata": {}
-                    }),
+                    stdout=json.dumps(
+                        {
+                            "id": "FB-001",
+                            "title": "Fallback Result",
+                            "count": 1,
+                            "score": 1.0,
+                            "is_active": True,
+                            "items": [],
+                            "metadata": {},
+                        }
+                    ),
                     stderr="",
                 )
 

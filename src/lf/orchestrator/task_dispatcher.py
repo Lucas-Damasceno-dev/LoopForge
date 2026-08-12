@@ -17,7 +17,6 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.syntax import Syntax
-from rich.table import Table
 
 from lf.api.events import event_bus
 from lf.config.schema import TaskSchema
@@ -26,7 +25,6 @@ from lf.guardrails.circuit_breaker import CircuitBreaker
 from lf.ontology.state_machine.definition import TaskState
 from lf.ontology.state_machine.labels import get_git_label
 from lf.pipeline.graph import build_graph
-from lf.pipeline.llm_factory import resolve_default_model
 from lf.runner.git.checkpoint import GitCheckpointManager
 from lf.runner.git.pr import create_github_pr
 
@@ -198,10 +196,6 @@ class TaskDispatcher:
             "error": None,
             "feedback_history": [],
             "mock_llm": self.mock_llm,
-            "llm_provider": "openrouter" if os.getenv("OPENROUTER_API_KEY") else "google",
-            # Fix 2: fonte única do modelo default (env → config → constante).
-            "llm_model_name": resolve_default_model(),
-            "llm_temperature": 0.3,
             # Fix 1: run_id/task_id preenchidos no dispatch (a thread canônica
             # `run-{uuid}` só é derivada depois do _build_initial_state); o nó
             # developer usa o run_id p/ dimensionar custos em llm_costs. O
@@ -706,66 +700,6 @@ class TaskDispatcher:
             else:
                 console.print("[dim]Nenhuma especificação disponível.[/dim]")
 
-        # 3. Se estamos pausados antes do APPSEC, mostra o relatório de testes do QA
-        elif next_node == "appsec":
-            report = state.get("test_report", {})
-            summary = report.get("summary", {})
-            table = Table(title="🧪 Relatório de Testes Executados (QA)")
-            table.add_column("Total", justify="right")
-            table.add_column("Passaram", justify="right", style="green")
-            table.add_column("Falharam", justify="right", style="red")
-            table.add_column("Duração (s)", justify="right", style="yellow")
-            table.add_row(
-                str(summary.get("total_tests", 0)),
-                str(summary.get("tests_passed", 0)),
-                str(summary.get("tests_failed", 0)),
-                f"{summary.get('duration_seconds', 0.0):.2f}s",
-            )
-            console.print(table)
-
-        # 4. Se estamos pausados antes do DEVOPS, mostra a revisão do APPSEC
-        elif next_node == "devops":
-            sec_review = state.get("security_review", {})
-            vulns = sec_review.get("vulnerabilities", [])
-            table = Table(title="🛡️ Auditoria de Segurança (AppSec)")
-            table.add_column("ID", style="dim")
-            table.add_column("Severidade")
-            table.add_column("Regra", style="cyan")
-            table.add_column("Descrição")
-
-            for v in vulns:
-                sev = str(v.get("severity", "Low")).upper()
-                if sev == "CRITICAL":
-                    sev_fmt = f"[bold red]{sev}[/bold red]"
-                elif sev == "HIGH":
-                    sev_fmt = f"[bold magenta]{sev}[/bold magenta]"
-                elif sev == "MEDIUM":
-                    sev_fmt = f"[yellow]{sev}[/yellow]"
-                else:
-                    sev_fmt = f"[cyan]{sev}[/cyan]"
-                table.add_row(
-                    str(v.get("id", "-")), sev_fmt, str(v.get("rule_id", "-")), str(v.get("description", "-"))
-                )
-            console.print(table)
-
-        # 5. Se estamos pausados antes do PARALLEL AUDIT, mostra resumo da auditoria final
-        elif next_node == "parallel_audit":
-            sec_review = state.get("security_review", {})
-            ops_report = state.get("devops_report", {})
-            vulns = sec_review.get("vulnerabilities", [])
-            console.print("[bold magenta]🔎 Auditoria Final (AppSec + DevOps):[/bold magenta]")
-            table = Table(title="🛡️ Vulnerabilidades (AppSec)")
-            table.add_column("ID", style="dim")
-            table.add_column("Severidade")
-            table.add_column("Descrição")
-            for v in vulns:
-                sev = str(v.get("severity", "Low")).upper()
-                sev_fmt = f"[bold red]{sev}[/bold red]" if sev == "CRITICAL" else f"[yellow]{sev}[/yellow]"
-                table.add_row(str(v.get("id", "-")), sev_fmt, str(v.get("description", "-")))
-            console.print(table)
-            deployable = ops_report.get("deployable") or ops_report.get("status")
-            console.print(f"[cyan]Deployabilidade (DevOps):[/cyan] {deployable if deployable else ops_report}")
-
         console.print("\n[bold]Ações Disponíveis:[/bold]")
         console.print("  [green]c[/green] — Continuar / Aprovar")
         console.print("  [yellow]r[/yellow] — Retentar nó anterior")
@@ -1194,6 +1128,7 @@ class TaskDispatcher:
                 if not approved:
                     result["error"] = "Review mode rejected by user"
 
+            degraded = bool(result.get("degraded"))
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
             self._upsert_pipeline_run(
@@ -1211,6 +1146,12 @@ class TaskDispatcher:
                 {
                     "status": final_status,
                     "error": result.get("error"),
+                    "degraded": degraded,
+                    "note": (
+                        "Execução degradada: fallback/mock em uso (LLM indisponível ou modo mock)."
+                        if degraded
+                        else None
+                    ),
                 },
                 thread_id=thread_id,
                 run_id=pipeline_run_id,
@@ -1218,7 +1159,10 @@ class TaskDispatcher:
             self._cleanup_task_workdir(result)
 
             if self.notify:
-                status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
+                if degraded:
+                    status_label = "Concluído com Sucesso (degradado — fallback/mock)!"
+                else:
+                    status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
                 _send_notification(
                     "🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url
                 )
@@ -1330,6 +1274,7 @@ class TaskDispatcher:
                 if not approved:
                     result["error"] = "Review mode rejected by user"
 
+            degraded = bool(result.get("degraded"))
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
             self._upsert_pipeline_run(
@@ -1347,6 +1292,12 @@ class TaskDispatcher:
                 {
                     "status": final_status,
                     "error": result.get("error"),
+                    "degraded": degraded,
+                    "note": (
+                        "Execução degradada: fallback/mock em uso (LLM indisponível ou modo mock)."
+                        if degraded
+                        else None
+                    ),
                 },
                 thread_id=thread_id,
                 run_id=pipeline_run_id,
@@ -1354,7 +1305,10 @@ class TaskDispatcher:
             self._cleanup_task_workdir(result)
 
             if self.notify:
-                status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
+                if degraded:
+                    status_label = "Concluído com Sucesso (degradado — fallback/mock)!"
+                else:
+                    status_label = "Concluído com Sucesso!" if not result.get("error") else "Falhou."
                 _send_notification(
                     "🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url
                 )
@@ -1462,6 +1416,7 @@ class TaskDispatcher:
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
+            degraded = bool(result.get("degraded"))
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
             self._upsert_pipeline_run(
@@ -1479,6 +1434,12 @@ class TaskDispatcher:
                 {
                     "status": final_status,
                     "error": result.get("error"),
+                    "degraded": degraded,
+                    "note": (
+                        "Execução degradada: fallback/mock em uso (LLM indisponível ou modo mock)."
+                        if degraded
+                        else None
+                    ),
                 },
                 thread_id=thread_id,
                 run_id=pipeline_run_id,

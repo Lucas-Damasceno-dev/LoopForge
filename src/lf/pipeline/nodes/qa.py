@@ -9,7 +9,6 @@ import json
 import os
 import shutil
 import subprocess
-import time
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
@@ -289,30 +288,6 @@ def _find_contract_test_files(product_dir: str, stack: str) -> list[Path]:
     for pattern in patterns:
         files.extend(root.glob(pattern))
     return files
-
-
-def _exec_cmd(cmd: list[str], cwd: str, name: str, result: dict) -> None:
-    start = time.time()
-    try:
-        proc = subprocess.run(
-            cmd,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        duration = int((time.time() - start) * 1000)
-        result["duration_ms"] += duration
-        result["total"] += 1
-
-        if proc.returncode == 0:
-            result["passed"] += 1
-        else:
-            stderr = proc.stderr[-500:] if proc.stderr else proc.stdout[-500:]
-            result["errors"].append(f"{name}: exit {proc.returncode} — {stderr[:200]}")
-    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        result["total"] += 1
-        result["errors"].append(f"{name}: runner indisponível ({e})")
 
 
 def _build_report_from_harness(

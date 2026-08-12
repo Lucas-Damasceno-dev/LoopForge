@@ -5,7 +5,6 @@ Compila schemas JSON em Pydantic models dinâmicos.
 
 from __future__ import annotations
 
-import contextlib
 import json
 from pathlib import Path
 from typing import Any
@@ -111,11 +110,3 @@ class ArtifactValidator:
             return self._load_json(schema_id)
         except FileNotFoundError:
             return None
-
-
-# Módulo de Ontologia
-# from __future__ import annotations
-
-# Importação condicional para evitar erros de importação
-with contextlib.suppress(ImportError):
-    pass
