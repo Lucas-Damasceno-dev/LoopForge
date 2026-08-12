@@ -1,17 +1,17 @@
-# 📊 Project Executive Summary: Corrigir bug na função de cálculo de impostos
+# 📊 Project Executive Summary: Retry exhausted scenario
 
-![QA Status](https://img.shields.io/badge/QA-PASS-brightgreen)
+![QA Status](https://img.shields.io/badge/QA-FAIL-red)
 ![Security Audit](https://img.shields.io/badge/AppSec-PASS-brightgreen)
 ![Stack](https://img.shields.io/badge/Stack-PYTHON-blue)
 
-> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-12 04:17:48 UTC
+> **Stack:** `python` | **Status QA:** `FAIL` (0/10) | **Data:** 2026-08-12 04:46:29 UTC
 
 ## 🏗️ Diagrama de Arquitetura do Projeto Gerado
 ```mermaid
 graph TD
     Client[Client / User] --> API[API Service (PYTHON)]
     API --> Logic[Business Logic Core]
-    Logic --> Tests[QA Test Suite (PASS)]
+    Logic --> Tests[QA Test Suite (FAIL)]
 ```
 
 ## 🌐 Endpoints & Interface
