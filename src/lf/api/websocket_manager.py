@@ -67,9 +67,17 @@ class WebSocketConnectionManager:
         await websocket.send_json(message)
 
     async def broadcast(self, message: dict[str, Any]):
-        """Envia para as conexões globais (/ws/streaming), removendo as desconectadas."""
+        """Envia para as conexões globais (/ws/streaming), removendo as desconectadas.
+
+        Sockets registrados em canal de run (``run_connections``) recebem apenas
+        via ``send_to_run`` e são ignorados aqui (isolamento M-06: o feed global
+        não vaza eventos de outras runs para o canal da run).
+        """
+        run_sockets = {ws for conns in self.run_connections.values() for ws in conns}
         disconnected = []
         for connection in self.active_connections:
+            if connection in run_sockets:
+                continue
             try:
                 await connection.send_json(message)
             except Exception:
