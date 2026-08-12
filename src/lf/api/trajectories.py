@@ -20,6 +20,7 @@ export desserializa via ``saver.serde`` (JsonPlusSerializer, tag msgpack) e o
 import re-serializa o estado JSON de volta para o formato do saver.
 """
 
+import asyncio
 import json
 import logging
 import sqlite3
@@ -28,7 +29,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from lf.api.auth import verify_authentication

@@ -753,6 +753,16 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     app.include_router(evals_router, dependencies=[Depends(verify_authentication)])
 
+    # ─── Git (ADE — GitPanel) ─────────────────────────────────────────
+    from lf.api.git import git_router
+
+    app.include_router(git_router, dependencies=[Depends(verify_authentication)])
+
+    # ─── Prompts (ADE — PromptPanel) ──────────────────────────────────
+    from lf.api.prompts import prompts_router
+
+    app.include_router(prompts_router, dependencies=[Depends(verify_authentication)])
+
     # ─── SPA React (M-16/B4) ─────────────────────────────────────────
     # Monta o dist da SPA em /app se disponível (env LF_SPA_DIST ou pacote
     # embutido lf.ade.static.dist na B5); sem dist, apenas loga warning.

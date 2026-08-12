@@ -135,9 +135,35 @@ class AdeRunner(BaseModel):
     )
 
 
+class AdeApiKey(BaseModel):
+    """API key com roles RBAC (Tier2).
+
+    ``roles`` default ``["admin"]`` preserva o comportamento legado: uma key
+    configurada sem roles explícitas tem acesso total.
+    """
+
+    name: str
+    key: str
+    roles: list[Literal["admin", "runner", "viewer"]] = ["admin"]
+
+
 class AdeConfig(BaseModel):
     budget: AdeBudget = Field(default_factory=AdeBudget)
     mcp_servers: list[AdeMcpServer] = Field(default_factory=list)
     providers: AdeProviders = Field(default_factory=AdeProviders)
     hitl: AdeHITL = Field(default_factory=AdeHITL)
     runner: AdeRunner = Field(default_factory=AdeRunner)
+    api_keys: list[AdeApiKey] = Field(
+        default_factory=list,
+        description="API keys com roles RBAC (admin/runner/viewer). Se vazio, vale só o env LF_API_KEY (admin).",
+    )
+
+    @field_validator("api_keys")
+    @classmethod
+    def _api_keys_unicas(cls, v: list[AdeApiKey]) -> list[AdeApiKey]:
+        seen: set[str] = set()
+        for item in v:
+            if item.key in seen:
+                raise ValueError(f"API key duplicada em api_keys: '{item.key}'")
+            seen.add(item.key)
+        return v
