@@ -86,9 +86,19 @@ async def test_second_run_queued_until_first_finishes():
         final2 = await _wait_status(ac, run2_id, {"completed", "failed"})
         assert final2 == "completed", f"run2 deveria completar, está {final2}"
 
-        # Eventos run_updated publicados via EventBus em cada transição da run2
-        events = await event_bus.list_events(run2_id)
-        statuses = [e["payload"].get("status") for e in events if e["event"] == "run_updated"]
+        # Eventos run_updated publicados via EventBus em cada transição da run2.
+        # O publish do evento é commit separado do status (app.py `_set_run_status`:
+        # grava pipeline_runs, depois insere no journal): o GET pode ver
+        # "completed" ANTES do run_updated(completed) ficar visível. Poll bounded
+        # (mesmo padrão de _wait_status) até o evento terminal aparecer.
+        statuses: list[str] = []
+        deadline = asyncio.get_running_loop().time() + 5.0
+        while asyncio.get_running_loop().time() < deadline:
+            events = await event_bus.list_events(run2_id)
+            statuses = [e["payload"].get("status") for e in events if e["event"] == "run_updated"]
+            if statuses and statuses[-1] == "completed":
+                break
+            await asyncio.sleep(0.1)
         assert statuses[0] == "queued", f"primeiro run_updated deveria ser queued: {statuses}"
         assert "running" in statuses, f"esperava transição running: {statuses}"
         assert statuses[-1] == "completed", f"último run_updated deveria ser completed: {statuses}"
