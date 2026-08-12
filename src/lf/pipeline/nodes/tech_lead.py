@@ -2,6 +2,7 @@
 Nó Tech Lead: valida user stories, decide a melhor stack tecnológica e gera especificação técnica.
 Usa template tech_spec_template.md do The Foundry e Pydantic para feedback.
 """
+
 from __future__ import annotations
 
 import os
@@ -10,8 +11,23 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
+
+
+DEFAULT_PROMPT = """Você é um Tech Lead. Revise as user stories e recomende a melhor stack.
+
+Analise o problema e recomende a melhor stack (linguagem + framework + ferramentas). Considere:
+- Tipo de projeto e escopo
+- Performance e segurança necessárias
+- Ecossistema e produtividade
+
+Responda com:
+- needs_feedback: true se alguma história precisa de revisão
+- feedback_message: feedback detalhado
+- approved_stories: IDs das histórias aprovadas
+- recommended_stack: linguagem ou stack recomendada (ex: python, rust, java, javascript, go)"""
 
 
 def _truncate_template_at_section_boundary(tech_spec_template: str, max_chars: int = 1500) -> str:
@@ -33,34 +49,45 @@ def _truncate_template_at_section_boundary(tech_spec_template: str, max_chars: i
         section_end = len(tech_spec_template) if next_header is None else header.start() + 1 + next_header.start()
         if section_end <= max_chars:
             return tech_spec_template[:section_end]
-    return tech_spec_template[:headers[-1].start()]
+    return tech_spec_template[: headers[-1].start()]
 
 
 class ValidationResult(BaseModel):
     """Resultado da validação do Tech Lead sobre as user stories."""
+
     needs_feedback: bool = Field(..., description="True se user stories precisam de revisão")
     feedback_message: str = Field(..., description="Feedback detalhado para o PM")
     approved_stories: list[str] = Field(default_factory=list, description="IDs das histórias aprovadas")
     recommended_stack: str = Field("python", description="Stack recomendada (ex: python, rust, java, javascript, go)")
-    stack_rationale: str = Field("Stack selecionada com base no escopo e maturidade do ecossistema.", description="Justificativa técnica da escolha da stack")
+    stack_rationale: str = Field(
+        "Stack selecionada com base no escopo e maturidade do ecossistema.",
+        description="Justificativa técnica da escolha da stack",
+    )
 
 
 def _extract_stack_from_text(text: str) -> str:
     """Extrai a linguagem/stack principal recomendada no texto da tech spec."""
     import re
+
     text_lower = text.lower()
 
     # 1. Detecção de framework/stack específico primeiro (mais preciso).
     #    'typescript' antes do grupo JS para priorizá-lo quando presente.
     framework_map = [
         ("typescript", "typescript"),
-        ("fastapi", "python"), ("django", "python"), ("flask", "python"),
-        ("pandas", "python"), ("pytest", "python"),
-        ("spring", "java"), ("junit", "java"),
+        ("fastapi", "python"),
+        ("django", "python"),
+        ("flask", "python"),
+        ("pandas", "python"),
+        ("pytest", "python"),
+        ("spring", "java"),
+        ("junit", "java"),
         ("actix", "rust"),
         ("gin", "go"),
-        ("express", "javascript"), ("react", "javascript"),
-        ("next.js", "javascript"), ("node", "javascript"),
+        ("express", "javascript"),
+        ("react", "javascript"),
+        ("next.js", "javascript"),
+        ("node", "javascript"),
     ]
     for marker, stack in framework_map:
         if marker in text_lower:
@@ -91,8 +118,10 @@ def tech_lead(state: GraphState) -> dict:
     now_date = now_iso.split("T")[0]
 
     # Carrega template tech_spec.md do Foundry se disponível
-    template_path = Path(state.get("ontology_path", "examples/the-foundry")) / \
-                    "company_context/shared_knowledge/artifact_templates/tech_spec_template.md"
+    template_path = (
+        Path(state.get("ontology_path", "examples/the-foundry"))
+        / "company_context/shared_knowledge/artifact_templates/tech_spec_template.md"
+    )
     if template_path.exists():
         tech_spec_template = template_path.read_text(encoding="utf-8")
     else:
@@ -139,12 +168,10 @@ Responda com:
             decided_stack = validation.get("recommended_stack", "python")
 
         if validation.get("needs_feedback"):
-            feedback_msg = validation.get('feedback_message', '')
+            feedback_msg = validation.get("feedback_message", "")
             print("--- AVISO: Tech Lead solicita feedback: ---")
             print(f"--- {feedback_msg[:500]} ---")
-            new_feedback.append(
-                {"from": "tech_lead", "message": feedback_msg, "timestamp": now_iso}
-            )
+            new_feedback.append({"from": "tech_lead", "message": feedback_msg, "timestamp": now_iso})
     except Exception as e:
         print(f"--- ERRO TL validação: {e} ---")
         if not decided_stack:
@@ -155,13 +182,12 @@ Responda com:
 
     try:
         truncated_template = _truncate_template_at_section_boundary(tech_spec_template, 1500)
-        truncated_stories = "\n".join(
-            f"{us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:5]
-        )
+        truncated_stories = "\n".join(f"{us.get('id', '')}: {us.get('title', '')}" for us in user_stories[:5])
         # 🧠 Injeta lições da memória no Tech Lead
         memory_txt = ""
         try:
             from ...memory.manager import MemoryManager
+
             mem = MemoryManager()
             lessons = mem.search_relevant_lessons(query=idea, stack=decided_stack, limit=3)
             memory_txt = mem.format_lessons_for_prompt(lessons)
@@ -184,7 +210,8 @@ Especifique obrigatoriamente a estrutura de diretórios sugerida no projeto conf
 - Go: internal/domain/, internal/service/, internal/handler/, internal/repository/, pkg/
 
 Template (use como guia):
-""" + truncated_template,
+"""
+            + truncated_template,
             user_prompt=user_prompt_str,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
@@ -202,8 +229,10 @@ Template (use como guia):
             f.write(tech_spec)
         print(f"--- INFO: Tech spec salva em {path} ---")
 
-    if 'validation' in locals() and isinstance(validation, dict):
-        rationale = validation.get("stack_rationale", f"Stack '{decided_stack}' escolhida por adequação técnica aos requisitos.")
+    if "validation" in locals() and isinstance(validation, dict):
+        rationale = validation.get(
+            "stack_rationale", f"Stack '{decided_stack}' escolhida por adequação técnica aos requisitos."
+        )
     else:
         rationale = f"Stack '{decided_stack}' selecionada por requisitos de arquitetura."
 
@@ -221,14 +250,17 @@ def _mock_tech_spec(user_stories: list[dict], template: str, date: str, stack: s
     epic_id = user_stories[0].get("epic_id", "UNKNOWN") if user_stories else "UNKNOWN"
     stories_list = "\n".join(f"- {us.get('id', '')}: {us.get('title', '')}" for us in user_stories)
 
-    return template.format(
-        title=f"Especificação Técnica para Épico {epic_id}",
-        description="Descrição técnica",
-        architecture="Arquitetura a ser definida",
-        stack=f"Stack decidida pelo Tech Lead: {stack}",
-        user_stories=stories_list,
-        decisions="Decisões arquiteturais",
-    ) if "{title}" in template else f"""# Especificação Técnica - {epic_id}
+    return (
+        template.format(
+            title=f"Especificação Técnica para Épico {epic_id}",
+            description="Descrição técnica",
+            architecture="Arquitetura a ser definida",
+            stack=f"Stack decidida pelo Tech Lead: {stack}",
+            user_stories=stories_list,
+            decisions="Decisões arquiteturais",
+        )
+        if "{title}" in template
+        else f"""# Especificação Técnica - {epic_id}
 
 **Data:** {date}
 **Status:** Approved
@@ -242,3 +274,4 @@ def _mock_tech_spec(user_stories: list[dict], template: str, date: str, stack: s
 ## Decisões
 - Implementar projeto multi-arquivo completo com testes automatizados.
 """
+    )
