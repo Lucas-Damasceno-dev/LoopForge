@@ -37,10 +37,12 @@ class WebSocketConnectionManager:
             self.run_connections.setdefault(run_id, []).append(websocket)
 
     def disconnect(self, run_id: str | None, websocket: WebSocket | None = None):
-        """Remove a conexão dos registros global e por run.
+        """Remove a conexão dos registros global e de TODOS os canais de run.
 
         Aceita tanto ``disconnect(websocket)`` (forma legada) quanto
-        ``disconnect(run_id, websocket)``.
+        ``disconnect(run_id, websocket)``. O ``run_id`` informado é apenas
+        conveniência: a ws é removida de qualquer canal onde estiver, evitando
+        entradas stale (M-06) quando o run_id passado não bate com o registro.
         """
         if websocket is None:
             # Forma legada: primeiro arg carrega o WebSocket.
@@ -49,19 +51,12 @@ class WebSocketConnectionManager:
             run_id = None
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-        if run_id:
-            conns = self.run_connections.get(run_id, [])
+        # Remove de todos os canais de run onde a ws estiver registrada.
+        for rid, conns in list(self.run_connections.items()):
             if websocket in conns:
                 conns.remove(websocket)
                 if not conns:
-                    del self.run_connections[run_id]
-        else:
-            for rid, conns in list(self.run_connections.items()):
-                if websocket in conns:
-                    conns.remove(websocket)
-                    if not conns:
-                        del self.run_connections[rid]
-                    break
+                    del self.run_connections[rid]
 
     async def send_personal_message(self, message: dict[str, Any], websocket: WebSocket):
         await websocket.send_json(message)
