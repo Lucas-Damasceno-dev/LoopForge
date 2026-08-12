@@ -10,6 +10,8 @@ Padrão de test_api_evals: LF_API_TEST=1 + init_db em tmp_path hermético.
 A raiz dos workdirs (_RUNS_ROOT) é monkeypatchada para tmp_path.
 """
 
+from pathlib import Path
+
 import git as gitlib
 import pytest
 import pytest_asyncio
