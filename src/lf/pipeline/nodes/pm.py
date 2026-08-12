@@ -76,21 +76,15 @@ def product_manager(state: GraphState) -> dict:
 
     print("--- INFO: PM usando OpenCode via subprocesso ---")
 
-    system_prompt = f"""Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
+    system_prompt = get_effective_prompt("pm", DEFAULT_PROMPT.format(epic_id=epic.get("id", "E-001")))
 
-Cada user story DEVE ter TODOS os campos:
-- id: {epic.get("id", "E-001")}-USXXX (sequencial)
-- title: descritivo
-- epic_id: {epic.get("id", "E-001")}
-- as_a: persona (ex: "motorista de van", "pai de aluno")
-- i_want_to: funcionalidade concreta
-- so_that: benefício
-- acceptance_criteria: lista de strings Given-When-Then
-- priority: Medium (padrão)
-- status: Pending (padrão)
-- dates: use a data atual
+    # 🧬 Injeção opcional de genoma do projeto (config genome_injection, off por padrão)
+    from ...pipeline.genome_injection import inject_genome
 
-Responda APENAS com o JSON. NÃO inclua texto explicativo."""
+    system_prompt = inject_genome(
+        system_prompt,
+        project_dir=str(state.get("project_dir") or state.get("output_dir") or "."),
+    )
 
     epic_context = f"""Épico:
 Título: {epic.get("title", "")}
