@@ -17,7 +17,7 @@ from lf.api.app import create_app
 @pytest_asyncio.fixture(autouse=True)
 async def setup_test_db():
     """Configura banco SQLite de teste limpo para cada teste (padrão test_api.py)."""
-    from lf.api.database import Base, engine, close_db, init_db
+    from lf.api.database import Base, close_db, engine, init_db
 
     os.environ["LF_API_TEST"] = "1"
     os.environ["LF_API_REQUIRE_AUTH"] = "false"
@@ -67,7 +67,10 @@ async def test_memory_crud_flow(client: AsyncClient):
     assert lesson["run_id"] == "run-1"
     assert lesson["lesson_text"] == "Li\u00e7\u00e3o de exemplo."
 
-    r2 = await client.post("/api/v1/memory/lessons", json=_lesson(run_id="run-2", stack="java", idea="Padrões GoF"))
+    r2 = await client.post(
+        "/api/v1/memory/lessons",
+        json=_lesson(run_id="run-2", stack="java", idea="Padrões GoF", text="Lição sobre Java e interfaces."),
+    )
     assert r2.status_code == 201
     assert r2.json()["id"] == 2
 

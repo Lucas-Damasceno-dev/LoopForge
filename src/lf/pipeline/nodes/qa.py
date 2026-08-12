@@ -248,10 +248,7 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
     # rodar limpo, mas a checagem --check vira feedback corrigível pro Developer.
     format_issues = runner.run_format_check(target_dir)
     res = runner.run(target_dir)
-    if hasattr(res, "__dataclass_fields__"):
-        result = cast("dict", asdict(res))
-    else:
-        result = cast("dict", res)
+    result = cast("dict", asdict(res)) if hasattr(res, "__dataclass_fields__") else cast("dict", res)
     if format_issues:
         result["format_issues"] = format_issues
     return result

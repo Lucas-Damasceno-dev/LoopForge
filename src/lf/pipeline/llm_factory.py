@@ -1,10 +1,11 @@
+import asyncio
 import contextlib
 import json
 import os
 import re
 import sqlite3
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
@@ -64,8 +65,14 @@ def call_openrouter_api(
     base_url: str | None = None,
     system_prompt: str | None = None,
     max_retries: int = 2,
+    on_token_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict | None]:
-    """Helper para chamadas OpenRouter API via httpx com retentativas automáticas e backoff."""
+    """Helper para chamadas OpenRouter API via httpx com retentativas automáticas e backoff.
+
+    Quando ``on_token_delta`` é fornecido, a chamada usa streaming (SSE) e cada
+    chunk incremental é repassado ao callback — sem custo extra de latência,
+    pois o texto final é consolidado a partir dos próprios chunks.
+    """
     import time
 
     import httpx
@@ -86,10 +93,11 @@ def call_openrouter_api(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    streaming = on_token_delta is not None
     payload = {
         "model": target_model,
         "messages": messages,
-        "stream": False,
+        "stream": streaming,
     }
 
     # Timeout configurável via OPENROUTER_TIMEOUT (segundos). Sem a env, usa o
@@ -102,6 +110,43 @@ def call_openrouter_api(
     for attempt in range(max_retries + 1):
         try:
             timeout_val = base_timeout * (1.0 + attempt * 0.5)
+            if streaming:
+                assert on_token_delta is not None
+                chunks: list[str] = []
+                usage = None
+                with httpx.Client(timeout=timeout_val) as client:
+                    with client.stream("POST", url, headers=headers, json=payload) as resp:
+                        if resp.status_code != 200:
+                            last_error = RuntimeError(
+                                f"OpenRouter API request failed with status {resp.status_code}: "
+                                f"{(resp.text or '')[:200]}"
+                            )
+                            continue
+                        for line in resp.iter_lines():
+                            line = line.strip()
+                            if not line.startswith("data: "):
+                                continue
+                            data_line = line[6:]
+                            if data_line == "[DONE]":
+                                break
+                            try:
+                                cdata = json.loads(data_line)
+                            except Exception:
+                                continue
+                            choices = cdata.get("choices", [])
+                            if choices:
+                                delta = choices[0].get("delta", {})
+                                content = delta.get("content") or choices[0].get("message", {}).get("content")
+                                if content:
+                                    chunks.append(content)
+                                    on_token_delta(content)
+                            if cdata.get("usage"):
+                                usage = cdata["usage"]
+                text = "".join(chunks)
+                if not text:
+                    empty_content = True
+                    raise RuntimeError("OpenRouter API retornou content vazio (streaming)")
+                return text, usage
             resp = httpx.post(url, headers=headers, json=payload, timeout=timeout_val)
             if resp.status_code == 200:
                 raw_text = resp.text if hasattr(resp, "text") and isinstance(resp.text, str) else ""

@@ -75,6 +75,10 @@ class APISettings(BaseSettings):
     # separadas por vírgula, ex.: "http://localhost:5173,https://app.example.com".
     cors_origins: str = "*"
 
+    # Rate limiting leve in-memory (sliding window por IP ou X-API-Key):
+    # requests por minuto. 0 = desabilitado. Env: LF_API_RATE_LIMIT_PER_MIN.
+    rate_limit_per_min: int = 300
+
     # Pool de conexões (usado quando PostgreSQL for fornecido)
     db_pool_size: int = 5
     db_max_overflow: int = 10

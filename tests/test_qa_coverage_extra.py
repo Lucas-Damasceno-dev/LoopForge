@@ -135,6 +135,9 @@ def test_run_harness_prefers_output_dir(monkeypatch, tmp_path):
 
             return TestHarnessResult(total=1, passed=1, failed=0, output="ok", success=True)
 
+        def run_format_check(self, target_dir):
+            return []
+
     captured = {}
     project_dir = tmp_path / "project"
     output_dir = tmp_path / "runs" / "proj-001"
@@ -158,6 +161,9 @@ def test_run_harness_falls_back_to_project_dir(monkeypatch, tmp_path):
             from lf.runner.harness.runner import TestHarnessResult
 
             return TestHarnessResult(total=1, passed=1, failed=0, output="ok", success=True)
+
+        def run_format_check(self, target_dir):
+            return []
 
     captured = {}
     project_dir = tmp_path / "project"

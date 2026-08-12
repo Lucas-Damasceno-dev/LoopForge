@@ -7,7 +7,7 @@ from lf.config.schema import AdeConfig, AdeMcpServer
 from lf.mcp.permissions import MCPPermissionDenied
 from lf.mcp.registry import MCPRegistry
 
-FAKE_SERVER_SRC = r'''
+FAKE_SERVER_SRC = r"""
 import asyncio
 import json
 
@@ -50,7 +50,7 @@ async def main():
 
 
 asyncio.run(main())
-'''
+"""
 
 
 @pytest.fixture
@@ -63,8 +63,11 @@ def fake_server_script(tmp_path) -> Path:
 @pytest.mark.asyncio
 async def test_registry_lists_and_calls_tool(fake_server_script, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    cfg = AdeConfig(mcp_servers=[AdeMcpServer(name="fake", command=sys.executable,
-                                              args=[str(fake_server_script)], tools_allowlist=["echo"])])
+    cfg = AdeConfig(
+        mcp_servers=[
+            AdeMcpServer(name="fake", command=sys.executable, args=[str(fake_server_script)], tools_allowlist=["echo"])
+        ]
+    )
     registry = MCPRegistry(cfg)
     await registry.start_all()
     try:
@@ -81,8 +84,11 @@ async def test_registry_lists_and_calls_tool(fake_server_script, tmp_path, monke
 @pytest.mark.asyncio
 async def test_permission_denied_raises(fake_server_script, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    cfg = AdeConfig(mcp_servers=[AdeMcpServer(name="fake", command=sys.executable,
-                                              args=[str(fake_server_script)], tools_allowlist=["other"])])
+    cfg = AdeConfig(
+        mcp_servers=[
+            AdeMcpServer(name="fake", command=sys.executable, args=[str(fake_server_script)], tools_allowlist=["other"])
+        ]
+    )
     registry = MCPRegistry(cfg)
     await registry.start_all()
     try:
@@ -90,3 +96,39 @@ async def test_permission_denied_raises(fake_server_script, tmp_path, monkeypatc
             await registry.call_tool("fake", "echo", {"text": "x"})
     finally:
         await registry.stop_all()
+
+
+@pytest.mark.asyncio
+async def test_list_tools_surfaces_allowlist_deny_by_default(fake_server_script, tmp_path, monkeypatch):
+    """list_tools expõe `allowed` por tool (deny-by-default: fora da allowlist
+    = False; allowlist vazia = tudo negado)."""
+    monkeypatch.chdir(tmp_path)
+    # allowlist só com "other" → a tool real "echo" deve vir allowed=False.
+    cfg = AdeConfig(
+        mcp_servers=[
+            AdeMcpServer(name="fake", command=sys.executable, args=[str(fake_server_script)], tools_allowlist=["other"])
+        ]
+    )
+    registry = MCPRegistry(cfg)
+    await registry.start_all()
+    try:
+        tools = await registry.list_tools("fake")
+        assert len(tools) == 1
+        assert tools[0]["name"] == "echo"
+        assert tools[0]["allowed"] is False
+    finally:
+        await registry.stop_all()
+
+    # allowlist contendo a tool → allowed=True.
+    cfg2 = AdeConfig(
+        mcp_servers=[
+            AdeMcpServer(name="fake", command=sys.executable, args=[str(fake_server_script)], tools_allowlist=["echo"])
+        ]
+    )
+    registry2 = MCPRegistry(cfg2)
+    await registry2.start_all()
+    try:
+        tools2 = await registry2.list_tools("fake")
+        assert tools2[0]["allowed"] is True
+    finally:
+        await registry2.stop_all()

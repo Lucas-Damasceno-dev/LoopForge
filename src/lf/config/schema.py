@@ -122,8 +122,22 @@ class AdeHITL(BaseModel):
     on_timeout: Literal["continue", "abort", "pause"] = "continue"
 
 
+class AdeRunner(BaseModel):
+    """Configurações do runner de subprocesso (P2-5).
+
+    ``subprocess_timeout_seconds`` substitui o timeout hardcoded (120s era
+    insuficiente para modelos de reasoning — default sobe para 300s).
+    0 = sem timeout.
+    """
+
+    subprocess_timeout_seconds: int = Field(
+        300, ge=0, description="Timeout do subprocesso opencode em segundos (0 = sem timeout)"
+    )
+
+
 class AdeConfig(BaseModel):
     budget: AdeBudget = Field(default_factory=AdeBudget)
     mcp_servers: list[AdeMcpServer] = Field(default_factory=list)
     providers: AdeProviders = Field(default_factory=AdeProviders)
     hitl: AdeHITL = Field(default_factory=AdeHITL)
+    runner: AdeRunner = Field(default_factory=AdeRunner)
