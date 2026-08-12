@@ -11,7 +11,7 @@ Auth aplicada no include (app.py), padrão dos demais routers.
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ..memory.manager import MemoryManager
+from ..memory.manager import MemoryManager, cross_project_enabled
 
 memory_router = APIRouter(prefix="/api/v1/memory", tags=["Memory"])
 
