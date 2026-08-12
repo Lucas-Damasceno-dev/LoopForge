@@ -848,7 +848,7 @@ async def _execute_pipeline_in_background(
     """
     q = app.state.run_queue
     async with q.lock:
-        if run_id == q.active or run_id in q.pending:
+        if run_id in q.active or run_id in q.pending:
             return
         q.params[run_id] = {
             "idea": idea,
@@ -990,8 +990,8 @@ async def _run_pipeline(
             {"error": str(e)},
         )
     finally:
-        # M-21: libera a vaga e promove a próxima da fila (FIFO).
+        # M-21: libera a vaga e promove as próximas da fila (FIFO).
         q = app.state.run_queue
         async with q.lock:
-            q.active = None
+            q.active.discard(run_id)
         await _promote_next(app)
