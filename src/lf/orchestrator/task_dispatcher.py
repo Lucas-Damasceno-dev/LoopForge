@@ -96,6 +96,7 @@ class TaskDispatcher:
         webhook_url: str | None = None,
         hitl_timeout_seconds: int | None = None,
         hitl_on_timeout: str | None = None,
+        subprocess_timeout_seconds: int | None = None,
     ):
         self.mock_llm = mock_llm
         self.interactive = interactive
@@ -115,6 +116,15 @@ class TaskDispatcher:
 
             hitl_on_timeout = load_ade_config().hitl.on_timeout
         self.hitl_on_timeout = hitl_on_timeout
+        # P2-5: timeout de subprocesso configurável (ade.yaml
+        # runner.subprocess_timeout_seconds; 0 = sem timeout). Antes era
+        # hardcoded (120s) nas entradas interativas do gate — insuficiente
+        # para modelos de reasoning. Fonte única: mesmo padrão do hitl acima.
+        if subprocess_timeout_seconds is None:
+            from lf.config.loader import load_ade_config
+
+            subprocess_timeout_seconds = load_ade_config().runner.subprocess_timeout_seconds
+        self.subprocess_timeout_seconds = subprocess_timeout_seconds
         # C4 (M-11): gates HITL já anunciados (dedup do evento hitl_gate_reached
         # por run+nó — re-entrada no MESMO gate não re-publica).
         self._announced_hitl_gates: set[tuple[str, str]] = set()
@@ -528,12 +538,16 @@ class TaskDispatcher:
         """Aplica o state_patch ao estado do checkpoint (C3/M-12).
 
         No caminho HITL síncrono o grafo é compilado com ``SqliteSaver``
-        (``aupdate_state`` lança NotImplementedError com saver síncrono), então
+        (métodos ``a*`` do saver síncrono lançam NotImplementedError), então
         usa ``update_state`` direto — o mesmo padrão dos demais actions do gate
         (retry/adjust_prompt). Para grafo compilado com ``AsyncSqliteSaver``
         (padrão do resume async), delega ``aupdate_state`` a um loop dedicado
-        via ``asyncio.run`` (equivalente ao ``asyncio.to_thread`` do padrão
-        async).
+        via thread + ``asyncio.run`` (equivalente ao ``asyncio.to_thread`` do
+        padrão async) — seguro mesmo com loop já ativo na thread atual.
+
+        A detecção é por ``isinstance`` (não por nome da classe): o
+        ``SqliteSaver`` síncrono DEFINE ``aupdate_state`` como stub que levanta
+        NotImplementedError, então ``hasattr``/nome de classe enganariam.
 
         NOTA (documentado): canais fora do ``GraphState`` TypedDict são
         descartados pelo LangGraph — ``update_state`` só persiste chaves que são
@@ -542,11 +556,45 @@ class TaskDispatcher:
         """
         if not patch:
             return
-        saver_name = type(getattr(app, "checkpointer", None)).__name__
-        if "Async" in saver_name:
-            asyncio.run(app.aupdate_state(config, patch))
-        else:
-            app.update_state(config, patch)
+        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+        checkpointer = getattr(app, "checkpointer", None)
+        if isinstance(checkpointer, AsyncSqliteSaver):
+            self._run_async_checkpoint_update(app.aupdate_state, config, patch)
+            return
+        app.update_state(config, patch)
+
+    @staticmethod
+    def _run_async_checkpoint_update(aupdate_state, config: dict, patch: dict) -> None:
+        """Executa ``aupdate_state`` em loop dedicado, sem RuntimeError.
+
+        ``asyncio.run`` com loop ativo na thread atual levanta RuntimeError. O
+        ``AsyncSqliteSaver`` liga ``self.loop`` ao loop de criação (os shims
+        sync delega-via-``run_coroutine_threadsafe``), mas ``aupdate_state`` em
+        si não usa ``self.loop`` — rodar o coroutine numa thread própria com
+        ``asyncio.run`` é o equivalente direto do ``asyncio.to_thread``.
+        """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(aupdate_state(config, patch))
+            return
+
+        import threading
+
+        errors: list[BaseException] = []
+
+        def _worker() -> None:
+            try:
+                asyncio.run(aupdate_state(config, patch))
+            except Exception as exc:
+                errors.append(exc)
+
+        worker = threading.Thread(target=_worker, daemon=True)
+        worker.start()
+        worker.join()
+        if errors:
+            raise errors[0]
 
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
         """Manipula interrupção humana (HITL) exibindo os artefatos do nó RECÉM-CONCLUÍDO e o gate do PRÓXIMO nó."""
@@ -833,7 +881,9 @@ class TaskDispatcher:
             cat = cat_map.get(cat_choice.strip(), "general")
 
             msg = (
-                self._get_input_with_timeout("➜ Mensagem detalhada de feedback: ", timeout=120)
+                self._get_input_with_timeout(
+                    "➜ Mensagem detalhada de feedback: ", timeout=self.subprocess_timeout_seconds
+                )
                 or "Ajustar implementação."
             )
 
@@ -906,7 +956,11 @@ class TaskDispatcher:
         )
 
         console.print("\n[bold yellow]Deseja aplicar todas as mudanças propostas no disco?[/bold yellow]")
-        choice = self._get_input_with_timeout("➜ Aplicar alterações? [s/N]: ", timeout=120).strip().lower()
+        choice = (
+            self._get_input_with_timeout("➜ Aplicar alterações? [s/N]: ", timeout=self.subprocess_timeout_seconds)
+            .strip()
+            .lower()
+        )
 
         if choice in ("s", "sim", "y", "yes"):
             console.print("[bold green]✅ Mudanças Aprovadas! Aplicando no projeto...[/bold green]")

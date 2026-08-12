@@ -2,8 +2,10 @@ import asyncio
 import contextlib
 import json
 import os
+import queue
 import re
 import sqlite3
+import threading
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
@@ -343,6 +345,60 @@ class CostTracker:
 # --- LLM PROVIDER ABSTRACTION LAYER ---
 
 
+# V1.1/ADR-0007 — streaming token a token. `TokenDeltaCallback` recebe chunks
+# incrementais do provedor; `TokenDeltaPublisher` os publica como eventos
+# `token_delta` no EventBus (envelope v1: {seq, event, run_id, timestamp,
+# payload}). Não-invasivo por design: sem callback registrado, nenhum evento é
+# emitido e o pipeline segue o fluxo atual; falhas de publicação são
+# descartadas em silêncio (nunca derruba nem atrasa o pipeline).
+TokenDeltaCallback = Callable[[str], None]
+
+
+class TokenDeltaPublisher:
+    """Publica deltas de streaming como eventos ``token_delta`` serializados.
+
+    Os nós síncronos do LangGraph rodam em thread do ThreadPoolExecutor (sem
+    loop asyncio) — por isso o publisher mantém UMA thread daemon com loop
+    asyncio próprio e consome uma queue thread-safe. ``__call__`` apenas
+    enfileira (put_nowait, não bloqueia o pipeline) e o drain serializado
+    garante seq monotônico por run. Nunca levanta exceção — falha silenciosa
+    por design.
+    """
+
+    def __init__(self, run_id: str, node: str) -> None:
+        self.run_id = run_id
+        self.node = node
+        self._queue: queue.Queue[str] = queue.Queue()
+        self._thread: threading.Thread | None = None
+
+    def __call__(self, content: str) -> None:
+        if not content:
+            return
+        self._queue.put_nowait(content)
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(target=self._run_loop, name="token-delta-publisher", daemon=True)
+            self._thread.start()
+
+    def _run_loop(self) -> None:
+        asyncio.run(self._drain())
+
+    async def _drain(self) -> None:
+        """Consome a queue na ordem de chegada, publicando cada delta no EventBus."""
+        loop = asyncio.get_running_loop()
+        while True:
+            content = await loop.run_in_executor(None, self._queue.get)
+            try:
+                await self._publish(content)
+            except Exception:
+                pass
+
+    async def _publish(self, content: str) -> None:
+        # Import tardio evita ciclo api↔pipeline (llm_factory não importa fastapi).
+        from lf.api.events import event_bus
+
+        await event_bus.publish(self.run_id, "token_delta", {"node": self.node, "content": content})
+
+
 class BaseLLMProvider(ABC):
     @property
     @abstractmethod
@@ -360,6 +416,7 @@ class BaseLLMProvider(ABC):
         mock: bool = False,
         cache: bool = True,
         circuit_breaker: Any = None,
+        on_token_delta: TokenDeltaCallback | None = None,
     ) -> Any:
         pass
 
@@ -379,6 +436,7 @@ class OpenCodeCLIProvider(BaseLLMProvider):
         mock: bool = False,
         cache: bool = True,
         circuit_breaker: Any = None,
+        on_token_delta: TokenDeltaCallback | None = None,
     ) -> Any:
         from ..runner.opencode import call_llm_via_opencode
 
@@ -391,6 +449,7 @@ class OpenCodeCLIProvider(BaseLLMProvider):
             mock=mock,
             cache=cache,
             circuit_breaker=circuit_breaker,
+            on_token_delta=on_token_delta,
         )
 
 
@@ -409,11 +468,12 @@ class OpenRouterProvider(BaseLLMProvider):
         mock: bool = False,
         cache: bool = True,
         circuit_breaker: Any = None,
+        on_token_delta: TokenDeltaCallback | None = None,
     ) -> Any:
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
         if mock:
             return f"[MOCK OpenRouter] Response for: {user_prompt[:50]}"
-        text, usage = call_openrouter_api(full_prompt, model=model)
+        text, usage = call_openrouter_api(full_prompt, model=model, on_token_delta=on_token_delta)
         # Passa token counts reais da API se disponíveis
         pt = usage.get("prompt_tokens") if usage else None
         ct = usage.get("completion_tokens") if usage else None

@@ -17,8 +17,10 @@ class OpenCodeRunner:
 
         Args:
             timeout_seconds: Timeout do subprocesso opencode em segundos.
-                None (padrão) = sem timeout. Se não informado, honra a env
-                OPENCODE_TIMEOUT (se definida e > 0).
+                None (padrão) = resolve por precedência: env OPENCODE_TIMEOUT
+                > ade.yaml ``runner.subprocess_timeout_seconds`` (default 300s,
+                P2-5 — 120s era insuficiente para modelos de reasoning).
+                Valor <= 0 = sem timeout.
         """
         if timeout_seconds is None:
             env_timeout = os.environ.get("OPENCODE_TIMEOUT")
@@ -29,7 +31,24 @@ class OpenCodeRunner:
                         timeout_seconds = parsed
                 except ValueError:
                     pass
+            if timeout_seconds is None:
+                timeout_seconds = self._default_timeout_seconds()
         self.timeout = timeout_seconds
+
+    @staticmethod
+    def _default_timeout_seconds() -> int | None:
+        """Timeout default do subprocesso (ade.yaml ``runner.subprocess_timeout_seconds``).
+
+        P2-5: default 300s, configurável via ``.loopforge/ade.yaml``; 0 = sem
+        timeout (None). Nunca derruba o runner se a config falhar (fallback 300).
+        """
+        try:
+            from lf.config.loader import load_ade_config
+
+            configured = load_ade_config().runner.subprocess_timeout_seconds
+            return configured if configured > 0 else None
+        except Exception:
+            return 300
 
     def run(
         self,

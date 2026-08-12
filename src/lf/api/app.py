@@ -36,6 +36,7 @@ from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
 from lf.api.events import event_bus
 from lf.api.models import HumanDecisionModel, PipelineRun
+from lf.api.rate_limit import RateLimitMiddleware
 from lf.api.schemas import (
     HealthResponse,
     HumanDecisionCreate,
@@ -155,6 +156,13 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         process_time = time.time() - start_time
         response.headers["X-Process-Time"] = f"{process_time:.4f}s"
         return response
+
+    # ─── Middleware: Rate Limit (in-memory, por IP/X-API-Key) ────────
+    # Janela deslizante por minuto (LF_API_RATE_LIMIT_PER_MIN; 0 = desabilitado).
+    # O middleware é HTTP-only: WebSockets não passam por ele, e /health e
+    # preflights OPTIONS (CORS) são ignorados.
+    if settings.rate_limit_per_min > 0:
+        app.add_middleware(RateLimitMiddleware, limit_per_min=settings.rate_limit_per_min)
 
     # ─── Dashboard Web UI ───────────────────────────────────────────
     if ui_enabled:

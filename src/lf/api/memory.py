@@ -60,7 +60,12 @@ def list_lessons_endpoint(
     """
     manager = MemoryManager()
     if query and query.strip():
-        lessons = manager.search_relevant_lessons(query.strip(), stack=stack, limit=limit)
+        lessons = manager.search_relevant_lessons(
+            query.strip(),
+            stack=stack,
+            limit=limit,
+            only_relevant=True,
+        )
         lessons.sort(key=lambda item: item["created_at"], reverse=True)
     else:
         lessons = manager.list_lessons(stack=stack, limit=limit)

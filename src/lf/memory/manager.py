@@ -136,8 +136,20 @@ class MemoryManager:
             conn.commit()
         return cur.rowcount > 0
 
-    def search_relevant_lessons(self, query: str, stack: str | None = None, limit: int = 3) -> list[dict]:
-        """Busca lições aprendidas passadas relevantes por stack e termos da query."""
+    def search_relevant_lessons(
+        self,
+        query: str,
+        stack: str | None = None,
+        limit: int = 3,
+        only_relevant: bool = False,
+    ) -> list[dict]:
+        """Busca lições aprendidas passadas relevantes por stack e termos da query.
+
+        Com ``only_relevant=True`` (API de memória), descarta lições com score 0
+        (nenhuma palavra-chave encontrada) — o pipeline de execução mantém o
+        comportamento atual (default False) e recebe contexto por stack mesmo
+        sem match de palavras-chave.
+        """
         keywords = [w.lower().strip() for w in query.split() if len(w) > 3]
 
         with self._get_connection() as conn:
@@ -154,6 +166,9 @@ class MemoryManager:
             text = f"{r['idea']} {r['lesson_text']}".lower()
             score = sum(1 for kw in keywords if kw in text)
             results.append((score, dict(r)))
+
+        if only_relevant:
+            results = [item for item in results if item[0] > 0]
 
         results.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in results[:limit]]
