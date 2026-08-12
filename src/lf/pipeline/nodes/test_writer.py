@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 from .developer import _parse_multi_file_response
@@ -122,13 +123,16 @@ def test_writer(state: GraphState) -> dict:
             for c in criteria:
                 stories_lines.append(f"  - {c}")
 
-    system_prompt = (
-        "Você é um Engenheiro de Testes Sênior. Escreva UMA SÚITE DE TESTES UNITÁRIOS "
-        "(somente testes, NUNCA código de implementação) que cubra cada acceptance criterion "
-        "de cada user story. Para cada critério, deve existir pelo menos 1 teste que FALHA "
-        "quando o requisito não está implementado. Use o framework de testes da stack: pytest "
-        "(python), junit (java), cargotest (rust), gotest (go), vitest (js/ts). Responda no "
-        "formato multi-arquivos '### FILE: tests/...' seguido por bloco de código."
+    system_prompt = get_effective_prompt(
+        "test_writer",
+        (
+            "Você é um Engenheiro de Testes Sênior. Escreva UMA SÚITE DE TESTES UNITÁRIOS "
+            "(somente testes, NUNCA código de implementação) que cubra cada acceptance criterion "
+            "de cada user story. Para cada critério, deve existir pelo menos 1 teste que FALHA "
+            "quando o requisito não está implementado. Use o framework de testes da stack: pytest "
+            "(python), junit (java), cargotest (rust), gotest (go), vitest (js/ts). Responda no "
+            "formato multi-arquivos '### FILE: tests/...' seguido por bloco de código."
+        ),
     )
     user_prompt = (
         f"Stack: {stack}\n\n"
