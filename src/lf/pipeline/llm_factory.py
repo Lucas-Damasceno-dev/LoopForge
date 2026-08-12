@@ -505,7 +505,9 @@ class MockLLMProvider(BaseLLMProvider):
         mock: bool = True,
         cache: bool = False,
         circuit_breaker: Any = None,
+        on_token_delta: TokenDeltaCallback | None = None,
     ) -> Any:
+        # Mock não gera streaming real — sem deltas sintéticos (V1.1/ADR-0007).
         mock_text = f"[MOCK Provider] Resposta para: {user_prompt[:80]}"
         if schema_model:
             return schema_model.model_construct()
