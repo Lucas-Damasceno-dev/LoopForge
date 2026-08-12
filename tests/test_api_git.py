@@ -65,7 +65,7 @@ def _client():
 @pytest.mark.asyncio
 async def test_get_git_info_returns_branch_head_status_and_log():
     """Repo git da run → 200 com branch, HEAD, status curto e log (máx 20)."""
-    _make_git_repo(tmp_dir := gitlib.Path("run_run-1"))
+    _make_git_repo(tmp_dir := Path("run_run-1"))
     repo = gitlib.Repo(tmp_dir)
 
     async with _client() as client:
@@ -90,7 +90,7 @@ async def test_get_git_info_returns_branch_head_status_and_log():
 @pytest.mark.asyncio
 async def test_get_git_info_empty_repo_returns_empty_lists():
     """Repo sem commits → 200 com branch setada, head/status/log vazios."""
-    _make_git_repo(tmp_dir := gitlib.Path("run_fresh"), commits=0)
+    _make_git_repo(tmp_dir := Path("run_fresh"), commits=0)
     repo = gitlib.Repo(tmp_dir)
 
     async with _client() as client:
@@ -115,7 +115,7 @@ async def test_get_git_info_unknown_run_returns_404():
 @pytest.mark.asyncio
 async def test_get_git_info_dir_without_git_returns_404():
     """Diretório existe mas não é repo git → 404 com mensagem clara."""
-    (gitlib.Path("run_plain")).mkdir(parents=True)
+    (Path("run_plain")).mkdir(parents=True)
 
     async with _client() as client:
         resp = await client.get("/api/v1/git/plain")

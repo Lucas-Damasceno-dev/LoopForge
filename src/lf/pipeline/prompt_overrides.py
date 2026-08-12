@@ -11,6 +11,7 @@ próprio nó quanto pelo GET /api/v1/prompts para listar os defaults.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import tempfile
