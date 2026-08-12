@@ -44,7 +44,14 @@ class MCPRegistry:
     async def list_tools(self, server: str) -> list[dict]:
         if self._status.get(server) != "connected":
             raise MCPUnavailable(f"Servidor MCP {server} não conectado")
-        return await self._server(server).list_tools()
+        spec = next((s for s in self.config.mcp_servers if s.name == server), None)
+        allowlist = spec.tools_allowlist if spec is not None else []
+        tools = await self._server(server).list_tools()
+        # Superfície da allowlist deny-by-default: cada tool expõe `allowed`
+        # (False quando fora da allowlist — allowlist vazia = tudo negado).
+        for t in tools:
+            t["allowed"] = t["name"] in allowlist
+        return tools
 
     async def call_tool(self, server: str, name: str, args: dict[str, Any]) -> Any:
         spec = next((s for s in self.config.mcp_servers if s.name == server), None)
