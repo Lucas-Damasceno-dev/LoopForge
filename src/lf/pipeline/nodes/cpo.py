@@ -8,7 +8,9 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime
+from typing import Optional
 
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from ...pipeline.prompt_overrides import get_effective_prompt
@@ -47,7 +49,7 @@ class EpicSchema(BaseModel):
     dates: dict = Field(..., description="created_at, started_at, completed_at")
 
 
-def cpo(state: GraphState, config: dict | None = None) -> dict:
+def cpo(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # noqa: UP045
     """Recebe a ideia e gera um épico estruturado."""
     print("---EXECUTANDO NÓ: CPO---")
 

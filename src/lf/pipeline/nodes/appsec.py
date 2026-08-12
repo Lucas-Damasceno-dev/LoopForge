@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime
+from typing import Optional
 
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from ...guardrails.security_scanner import SecurityScanner
@@ -33,7 +35,7 @@ class SecurityReviewReport(BaseModel):
     execution_timestamp: str = Field(...)
 
 
-def appsec(state: GraphState, config: dict | None = None) -> dict:
+def appsec(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # noqa: UP045
     """Nó AppSec: Executa scanner estático e revisão contextual via LLM."""
     print("---EXECUTANDO NÓ: AppSec (Security Review)---")
 

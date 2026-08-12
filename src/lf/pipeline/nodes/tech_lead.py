@@ -8,7 +8,9 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Optional
 
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from ...pipeline.prompt_overrides import get_effective_prompt
@@ -99,7 +101,7 @@ def _extract_stack_from_text(text: str) -> str:
     return "python"
 
 
-def tech_lead(state: GraphState, config: dict | None = None) -> dict:
+def tech_lead(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # noqa: UP045
     """Valida user stories, decide a stack do projeto e gera tech spec."""
     print("---EXECUTANDO NÓ: Tech Lead---")
 

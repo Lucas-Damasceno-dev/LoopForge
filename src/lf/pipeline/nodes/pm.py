@@ -8,7 +8,9 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime
+from typing import Optional
 
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
 from ...pipeline.prompt_overrides import get_effective_prompt
@@ -53,7 +55,7 @@ class UserStoryList(BaseModel):
     stories: list[UserStorySchema]
 
 
-def product_manager(state: GraphState, config: dict | None = None) -> dict:
+def product_manager(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # noqa: UP045
     """Recebe épico e gera user stories."""
     print("---EXECUTANDO NÓ: Product Manager---")
 

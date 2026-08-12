@@ -6,6 +6,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Optional
+
+from langchain_core.runnables import RunnableConfig
 
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
@@ -104,7 +107,7 @@ def _extract_module_inventory(files_map: dict[str, str]) -> list[str]:
     return modules
 
 
-def test_writer(state: GraphState, config: dict | None = None) -> dict:
+def test_writer(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # noqa: UP045
     """Gera testes-contrato independentes e grava em output_dir/tests/."""
     print("---EXECUTANDO NÓ: Test Writer---")
 
