@@ -15,7 +15,6 @@ from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 
-
 DEFAULT_PROMPT = """Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
 
 Preencha TODOS os campos obrigatórios:

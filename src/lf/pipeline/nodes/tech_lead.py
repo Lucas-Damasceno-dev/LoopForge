@@ -15,7 +15,6 @@ from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 
-
 DEFAULT_PROMPT = """Você é um Tech Lead. Revise as user stories e recomende a melhor stack.
 
 Analise o problema e recomende a melhor stack (linguagem + framework + ferramentas). Considere:

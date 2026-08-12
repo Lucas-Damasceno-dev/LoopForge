@@ -12,6 +12,15 @@ from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 from .developer import _parse_multi_file_response
 
+DEFAULT_PROMPT = (
+    "Você é um Engenheiro de Testes Sênior. Escreva UMA SÚITE DE TESTES UNITÁRIOS "
+    "(somente testes, NUNCA código de implementação) que cubra cada acceptance criterion "
+    "de cada user story. Para cada critério, deve existir pelo menos 1 teste que FALHA "
+    "quando o requisito não está implementado. Use o framework de testes da stack: pytest "
+    "(python), junit (java), cargotest (rust), gotest (go), vitest (js/ts). Responda no "
+    "formato multi-arquivos '### FILE: tests/...' seguido por bloco de código."
+)
+
 # Primeiro segmento de imports que NÃO representa módulo interno da aplicação:
 # stdlib e bibliotecas de terceiros comuns. Módulos fora desta denylist com >=2
 # segmentos (ex.: `app.services.payment`) são considerados internos e entram
@@ -123,17 +132,7 @@ def test_writer(state: GraphState) -> dict:
             for c in criteria:
                 stories_lines.append(f"  - {c}")
 
-    system_prompt = get_effective_prompt(
-        "test_writer",
-        (
-            "Você é um Engenheiro de Testes Sênior. Escreva UMA SÚITE DE TESTES UNITÁRIOS "
-            "(somente testes, NUNCA código de implementação) que cubra cada acceptance criterion "
-            "de cada user story. Para cada critério, deve existir pelo menos 1 teste que FALHA "
-            "quando o requisito não está implementado. Use o framework de testes da stack: pytest "
-            "(python), junit (java), cargotest (rust), gotest (go), vitest (js/ts). Responda no "
-            "formato multi-arquivos '### FILE: tests/...' seguido por bloco de código."
-        ),
-    )
+    system_prompt = get_effective_prompt("test_writer", DEFAULT_PROMPT)
     user_prompt = (
         f"Stack: {stack}\n\n"
         f"User Stories com critérios:\n{chr(10).join(stories_lines)}\n\n"

@@ -15,7 +15,6 @@ from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 
-
 DEFAULT_PROMPT = """Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
 
 Cada user story DEVE ter TODOS os campos:

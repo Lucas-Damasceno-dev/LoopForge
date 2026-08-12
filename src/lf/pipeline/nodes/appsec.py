@@ -13,7 +13,6 @@ from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode
 
-
 DEFAULT_PROMPT = "Você é um engenheiro de AppSec sênior especializado em segurança de código."
 
 

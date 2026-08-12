@@ -59,14 +59,18 @@ async def test_parallel_runs_default_max_two():
 
         r1_id, r2_id, r3_id = ids
 
-        # Estado da fila (janela imediatamente após o 3º POST, padrão do
-        # test_run_queue): r1 e r2 ativas, r3 aguardando slot.
+        # Estado da fila: r1 e r2 ocupam os 2 slots, r3 aguarda. O mock é
+        # rápido — se uma run terminar antes da checagem, r3 já terá sido
+        # promovida (corrida benigna: a promoção é verificada a seguir).
+        # Contrato determinístico = status das respostas do POST (acima).
         q = app.state.run_queue
-        assert q.active == {r1_id, r2_id}, f"esperado {{r1,r2}} ativas, veio {q.active}"
-        assert r3_id in q.pending, "r3 deveria estar enfileirada"
-
-        # r3 não executa enquanto os 2 slots estiverem ocupados.
-        assert (await ac.get(f"/api/runs/{r3_id}")).json()["status"] == "queued"
+        for _ in range(5):
+            if r3_id in q.pending and len(q.active) == 2 and {r1_id, r2_id} <= q.active:
+                break
+            await asyncio.sleep(0.2)
+        if r3_id in q.pending:
+            assert len(q.active) == 2 and {r1_id, r2_id} <= q.active, f"esperado {{r1,r2}} ativas, veio {q.active}"
+            assert (await ac.get(f"/api/runs/{r3_id}")).json()["status"] == "queued"
 
         # Quando uma das ativas termina, r3 promove a running e completa.
         status1 = await _wait_status(ac, r1_id, {"completed", "failed"})
@@ -105,9 +109,17 @@ async def test_parallel_runs_custom_max_three(monkeypatch):
 
         r1_id, r2_id, r3_id, r4_id = ids
 
+        # Mesma ressalva do teste default: o mock é rápido e r4 pode já ter
+        # sido promovida na janela da checagem (corrida benigna).
         q = app.state.run_queue
-        assert q.active == {r1_id, r2_id, r3_id}, f"esperado {{r1,r2,r3}} ativas, veio {q.active}"
-        assert r4_id in q.pending, "r4 deveria estar enfileirada"
+        for _ in range(5):
+            if r4_id in q.pending and len(q.active) == 3 and {r1_id, r2_id, r3_id} <= q.active:
+                break
+            await asyncio.sleep(0.2)
+        if r4_id in q.pending:
+            assert len(q.active) == 3 and {r1_id, r2_id, r3_id} <= q.active, (
+                f"esperado {{r1,r2,r3}} ativas, veio {q.active}"
+            )
 
         # Ao liberar slot, r4 promove e completa.
         status1 = await _wait_status(ac, r1_id, {"completed", "failed"})
