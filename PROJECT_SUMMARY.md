@@ -1,10 +1,10 @@
-# 📊 Project Executive Summary: Two Sum & Array Manipulation
+# 📊 Project Executive Summary: Corrigir bug na função de cálculo de impostos
 
 ![QA Status](https://img.shields.io/badge/QA-PASS-brightgreen)
 ![Security Audit](https://img.shields.io/badge/AppSec-PASS-brightgreen)
 ![Stack](https://img.shields.io/badge/Stack-PYTHON-blue)
 
-> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-12 19:55:22 UTC
+> **Stack:** `python` | **Status QA:** `PASS` (10/10) | **Data:** 2026-08-12 19:59:12 UTC
 
 ## 🏗️ Diagrama de Arquitetura do Projeto Gerado
 ```mermaid
