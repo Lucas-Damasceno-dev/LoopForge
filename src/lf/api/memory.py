@@ -59,16 +59,18 @@ def list_lessons_endpoint(
     created_at DESC para apresentação consistente no painel.
     """
     manager = MemoryManager()
+    cross_project = cross_project_enabled()
     if query and query.strip():
         lessons = manager.search_relevant_lessons(
             query.strip(),
             stack=stack,
             limit=limit,
             only_relevant=True,
+            cross_project=cross_project,
         )
         lessons.sort(key=lambda item: item["created_at"], reverse=True)
     else:
-        lessons = manager.list_lessons(stack=stack, limit=limit)
+        lessons = manager.list_lessons(stack=stack, limit=limit, cross_project=cross_project)
     return lessons
 
 
