@@ -29,9 +29,10 @@ def _make_git_repo(repo_dir, *, commits: int = 2) -> None:
         cw.set_value("user", "name", "Test Bot")
         cw.set_value("user", "email", "bot@test.dev")
 
-    (repo_dir / "main.py").write_text("print('v0')\n", encoding="utf-8")
-    repo.index.add(["main.py"])
-    repo.index.commit("feat: init")
+    if commits > 0:
+        (repo_dir / "main.py").write_text("print('v0')\n", encoding="utf-8")
+        repo.index.add(["main.py"])
+        repo.index.commit("feat: init")
 
     if commits > 1:
         (repo_dir / "app.py").write_text("print('app')\n", encoding="utf-8")
@@ -39,7 +40,8 @@ def _make_git_repo(repo_dir, *, commits: int = 2) -> None:
         repo.index.commit("feat: app")
 
     # working tree sujo: modificado + untracked
-    (repo_dir / "main.py").write_text("print('v1 changed')\n", encoding="utf-8")
+    if commits > 0:
+        (repo_dir / "main.py").write_text("print('v1 changed')\n", encoding="utf-8")
     (repo_dir / "draft.txt").write_text("rascunho\n", encoding="utf-8")
 
 

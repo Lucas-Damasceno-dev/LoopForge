@@ -69,21 +69,7 @@ def cpo(state: GraphState) -> dict:
 
     now_iso = datetime.now(UTC).isoformat()
 
-    system_prompt = """Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
-
-Preencha TODOS os campos obrigatórios:
-- id: gere E-001
-- title: título descritivo em português
-- description: problema de negócio
-- business_objectives: lista de objetivos
-- hypothesis: hipótese a ser validada
-- scope_in: itens dentro do escopo
-- scope_out: itens fora do escopo
-- success_metrics: métricas de sucesso
-- stakeholders: {"owner": "CPO", "consulted": ["Product Manager", "UX/UI Designer", "CTO"]}
-- dates: use a data atual
-
-Foque no valor de negócio. Não inclua implementação técnica."""
+    system_prompt = get_effective_prompt("cpo", DEFAULT_PROMPT)
 
     complexity = state.get("complexity_level", "standard")
     complexity_prompt = ""
@@ -93,6 +79,14 @@ Foque no valor de negócio. Não inclua implementação técnica."""
         complexity_prompt = "\nNÍVEL DE ESCOPO (AVANÇADO): Crie um épico completo, detalhado, com múltiplos módulos, métricas avançadas e análise de casos de borda."
 
     system_prompt = system_prompt + complexity_prompt
+
+    # 🧬 Injeção opcional de genoma do projeto (config genome_injection, off por padrão)
+    from ...pipeline.genome_injection import inject_genome
+
+    system_prompt = inject_genome(
+        system_prompt,
+        project_dir=str(state.get("project_dir") or state.get("output_dir") or "."),
+    )
 
     try:
         epic = call_llm_via_opencode(
