@@ -570,6 +570,7 @@ class NativeLLMProvider(BaseLLMProvider):
         mock: bool = False,
         cache: bool = True,
         circuit_breaker: Any = None,
+        on_token_delta: TokenDeltaCallback | None = None,
     ) -> Any:
         from lf.pipeline.cache import SQLiteLLMCache
 
@@ -591,12 +592,15 @@ class NativeLLMProvider(BaseLLMProvider):
             "model": model,
             "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
             "temperature": temperature,
-            "stream": False,
+            "stream": on_token_delta is not None,
         }
         try:
-            resp = self._client.post(f"{self.base_url}/chat/completions", json=payload, headers=self._headers())
-            resp.raise_for_status()
-            text = self._parse_sse(resp.text)
+            if on_token_delta is not None:
+                text = self._generate_streaming(payload, on_token_delta)
+            else:
+                resp = self._client.post(f"{self.base_url}/chat/completions", json=payload, headers=self._headers())
+                resp.raise_for_status()
+                text = self._parse_sse(resp.text)
         except Exception:
             return self._fallback_generate(
                 system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker
