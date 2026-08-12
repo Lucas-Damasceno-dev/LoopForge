@@ -615,6 +615,33 @@ class NativeLLMProvider(BaseLLMProvider):
             CostTracker().track(model, full_prompt, text)
         return text
 
+    def _generate_streaming(self, payload: dict, on_token_delta: TokenDeltaCallback) -> str:
+        """POST síncrono com ``stream=True``: repassa cada delta ao callback.
+
+        O texto final é consolidado a partir dos próprios chunks (nada de
+        conteúdo sintético); o cache guarda apenas o payload final (requisito
+        de streaming). Sem deltas incrementais → o callback não é invocado.
+        """
+        text: list[str] = []
+        with self._client.stream(
+            "POST", f"{self.base_url}/chat/completions", json=payload, headers=self._headers()
+        ) as resp:
+            resp.raise_for_status()
+            for line in resp.iter_lines():
+                if not line.startswith("data:"):
+                    continue
+                chunk = line[5:].strip()
+                if chunk == "[DONE]":
+                    break
+                try:
+                    delta = json.loads(chunk).get("choices", [{}])[0].get("delta", {}).get("content", "")
+                except Exception:
+                    delta = ""
+                if delta:
+                    text.append(delta)
+                    on_token_delta(delta)
+        return "".join(text)
+
     def _fallback_generate(self, system_prompt, user_prompt, model, schema_model, mock, cache, circuit_breaker):
         try:
             return OpenCodeCLIProvider().generate(
