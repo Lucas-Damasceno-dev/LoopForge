@@ -19,6 +19,29 @@ _console = Console()
 _LLM_ERROR_MARKERS = ("Model not found", "UnknownError", "Unexpected server error", "model_not_found")
 
 
+def resolve_run_id(state: dict | None = None, config: dict | None = None) -> str | None:
+    """Deriva o run_id da run para dimensionar custos (Fix 1, coluna llm_costs.run_id).
+
+    Precedência:
+    1. Estado (canal ``run_id`` do GraphState — o TaskDispatcher já inclui
+       run_id/task_id no estado inicial; se outra lane declarar o canal no
+       TypedDict, sobrevive ao checkpoint);
+    2. Config do LangGraph (thread_id canônico ``run-{uuid}``, ADR-0003) — mesmo
+       parsing de ``TaskDispatcher._resolve_telemetry_run_id`` (formato legado
+       ``run-{uuid}-task-{uuid[:8]}`` também tratado).
+
+    Retorna None quando indisponível (ex.: run CLI com thread fora do padrão
+    ``run-``) — o custo entra no ledger sem dimensão de run, como antes.
+    """
+    if state and state.get("run_id"):
+        return str(state.get("run_id"))
+    if config:
+        thread_id = (config.get("configurable") or {}).get("thread_id")
+        if isinstance(thread_id, str) and thread_id.startswith("run-"):
+            return thread_id[len("run-") :].split("-task-", 1)[0]
+    return None
+
+
 def _raise_if_llm_error_marker(raw_response_text: str, result=None) -> None:
     """Gate: resposta LLM contendo marcador de erro vira RuntimeError.
 
@@ -54,6 +77,7 @@ def call_llm_via_opencode(
     project_root: str | Path | None = None,
     on_token_delta: Callable[[str], None] | None = None,
     node: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]: ...
 
 
@@ -70,6 +94,7 @@ def call_llm_via_opencode(
     project_root: str | Path | None = None,
     on_token_delta: Callable[[str], None] | None = None,
     node: str | None = None,
+    run_id: str | None = None,
 ) -> str: ...
 
 
@@ -85,6 +110,7 @@ def call_llm_via_opencode(
     project_root: str | Path | None = None,
     on_token_delta: Callable[[str], None] | None = None,
     node: str | None = None,
+    run_id: str | None = None,
 ) -> str | dict[str, Any]:
     """Chama OpenCode como LLM para geração de texto/estruturado.
 
@@ -106,6 +132,10 @@ def call_llm_via_opencode(
             incremento incremental — fallback silencioso).
         node: Nome do nó do pipeline (ex.: "cpo") para dimensionar o custo
             registrado no CostTracker (coluna ``node`` de llm_costs).
+        run_id: Id da run (ex.: uuid da linha em pipeline_runs) para gravar na
+            coluna ``run_id`` de llm_costs — habilita o GET /api/v1/runs/{id}/cost
+            (Fix 1). None (default) mantém o comportamento legado (custo sem
+            dimensão de run).
 
     Returns:
         str se não tiver schema_model, dict se tiver schema_model
@@ -233,6 +263,7 @@ Responda SOMENTE o objeto JSON puro."""
                 response_text=raw_response_text,
                 estimated=True,
                 node=node,
+                run_id=run_id,
             )
         except Exception:
             pass
@@ -254,6 +285,7 @@ Responda SOMENTE o objeto JSON puro."""
                 completion_tokens=completion_tokens,
                 estimated=not (prompt_tokens and completion_tokens),
                 node=node,
+                run_id=run_id,
             )
         except Exception:
             pass

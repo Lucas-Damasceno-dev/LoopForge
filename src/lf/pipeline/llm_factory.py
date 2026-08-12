@@ -19,9 +19,42 @@ from .cache import SQLiteLLMCache, _connect_sqlite, _semantic_normalize_prompt
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["SQLiteLLMCache", "_semantic_normalize_prompt"]
+__all__ = [
+    "SQLiteLLMCache",
+    "_semantic_normalize_prompt",
+    "DEFAULT_LLM_MODEL",
+    "resolve_default_model",
+]
 
-DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "auto/best-free")
+# Fonte única do modelo LLM default (Fix 2): os 5 defaults divergentes
+# (runner.py, llm_factory.py, init.py, task_dispatcher.py e schema.py) agora
+# convergem para esta constante canônica via resolve_default_model().
+DEFAULT_LLM_MODEL = "oc/deepseek-v4-flash-free"
+
+
+def resolve_default_model() -> str:
+    """Resolve o modelo LLM default com precedência única (Fix 2).
+
+    OPENROUTER_MODEL → OPENCODE_MODEL → config .loopforge.json (llm_model)
+    → DEFAULT_LLM_MODEL (constante canônica — antes havia 5 defaults
+    divergentes espalhados). Config resolve em call-time; falha silenciosa
+    para a constante quando o arquivo de config está ausente/inválido.
+    """
+    env_model = os.getenv("OPENROUTER_MODEL") or os.getenv("OPENCODE_MODEL")
+    if env_model:
+        return env_model
+    try:
+        from lf.config.loader import load_config
+
+        cfg = load_config()
+        if cfg and getattr(cfg, "llm_model", None):
+            return cfg.llm_model
+    except Exception:
+        pass
+    return DEFAULT_LLM_MODEL
+
+
+DEFAULT_OPENROUTER_MODEL = resolve_default_model()
 DEFAULT_OPENROUTER_KEY = ""
 _DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -492,10 +525,11 @@ class OpenRouterProvider(BaseLLMProvider):
         # Passa token counts reais da API se disponíveis
         pt = usage.get("prompt_tokens") if usage else None
         ct = usage.get("completion_tokens") if usage else None
-        # M-08/M-09: run_id/node não estão disponíveis neste caller (o estado
-        # do pipeline não carrega run_id; o plumbing run_id→nó é feito no
-        # dispatcher/app em outra lane). Ficam None — o custo ainda entra no
-        # ledger agregado de llm_costs, sem dimensão de run.
+        # M-08/M-09: o caminho canônico de custo COM run_id é
+        # call_llm_via_opencode (os nós passam run_id via estado/config — ver
+        # resolve_run_id em lf/runner/opencode/llm.py). Este caller direto
+        # (execute_llm) não recebe run_id/node: ficam None — o custo ainda
+        # entra no ledger agregado de llm_costs, sem dimensão de run.
         CostTracker().track(model, full_prompt, text, prompt_tokens=pt, completion_tokens=ct)
         if schema_model:
             try:
@@ -624,8 +658,8 @@ class NativeLLMProvider(BaseLLMProvider):
         if cache:
             llm_cache.set(full_prompt, text)
         # M-08/M-09: run_id/node indisponíveis neste caller (ver comentário em
-        # OpenRouterProvider.generate) — ficam None, custo real sem dimensão
-        # de run até o plumbing run_id→nó (outra lane).
+        # OpenRouterProvider.generate) — o plumbing com run_id acontece no
+        # caminho call_llm_via_opencode (resolve_run_id); aqui ficam None.
         with contextlib.suppress(Exception):
             CostTracker().track(model, full_prompt, text)
         return text

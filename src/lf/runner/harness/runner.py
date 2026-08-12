@@ -177,16 +177,19 @@ class TestHarnessRunner:
         if self.auto_format:
             self.run_auto_formatter(cwd)
         cmd = self._detect_command(cwd)
-        # Timeout configurável via LF_TEST_TIMEOUT (segundos). Vazio/0 = sem timeout.
-        timeout: int | None = None
+        # Timeout configurável via LF_TEST_TIMEOUT (segundos). Vazio = sem override.
+        # Default 300s: sem timeout explícito, uma suíte travada segurava o
+        # pipeline pra sempre. LF_TEST_TIMEOUT=0 mantém o contrato antigo de
+        # desativar o timeout explicitamente.
         raw_timeout = os.environ.get("LF_TEST_TIMEOUT")
         if raw_timeout:
             try:
                 parsed_timeout = int(raw_timeout)
-                if parsed_timeout > 0:
-                    timeout = parsed_timeout
+                timeout = parsed_timeout if parsed_timeout > 0 else None
             except ValueError:
-                pass
+                timeout = None
+        else:
+            timeout = 300
         try:
             env = os.environ.copy()
             venv_bin = _find_venv_bin(cwd)

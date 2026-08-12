@@ -131,8 +131,7 @@ def qa(state: GraphState) -> dict:
         )
     contract_tests = state.get("contract_tests")
     if contract_tests:
-        tests_dir = Path(product_dir) / "tests"
-        contract_test_files = list(tests_dir.glob("test_*.py")) + list(tests_dir.glob("*_test.py"))
+        contract_test_files = _find_contract_test_files(product_dir, state.get("stack", ""))
         if not contract_test_files:
             report["summary"]["status"] = "FAIL"
             report["summary"]["tests_failed"] = max(report["summary"].get("tests_failed", 1), 1)
@@ -252,6 +251,44 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
     if format_issues:
         result["format_issues"] = format_issues
     return result
+
+
+def _find_contract_test_files(product_dir: str, stack: str) -> list[Path]:
+    """Descobre arquivos de teste do contrato conforme a stack decidida.
+
+    Antes só reconhecia `test_*.py`/`*_test.py` em tests/ → stack java/rust/go
+    com contract_tests dava falso FAIL "contrato não encontrado". Padrões por
+    stack seguem o TechStackRegistry (pytest, junit/maven, cargotest, gotest,
+    vitest/npm). Stack desconhecida/vazia mantém o comportamento original.
+    """
+    root = Path(product_dir)
+    stack_lower = (stack or "").lower().strip()
+
+    if any(m in stack_lower for m in ("java", "spring", "maven", "gradle")):
+        patterns = ["src/test/**/*.java"]
+    elif any(m in stack_lower for m in ("rust", "cargo", "actix")):
+        patterns = ["tests/**/*.rs", "src/**/*_test.rs", "**/*_test.rs"]
+    elif any(m in stack_lower for m in ("go", "golang", "gin")):
+        patterns = ["**/*_test.go"]
+    elif any(m in stack_lower for m in ("javascript", "typescript", "node", "express", "react", "next", "js", "ts")):
+        patterns = [
+            "**/*.test.js",
+            "**/*.test.ts",
+            "**/*.test.jsx",
+            "**/*.test.tsx",
+            "**/*.spec.js",
+            "**/*.spec.ts",
+            "**/*.spec.jsx",
+            "**/*.spec.tsx",
+        ]
+    else:
+        # python ou stack desconhecida: comportamento original (tests/test_*.py)
+        patterns = ["tests/test_*.py", "tests/*_test.py"]
+
+    files: list[Path] = []
+    for pattern in patterns:
+        files.extend(root.glob(pattern))
+    return files
 
 
 def _exec_cmd(cmd: list[str], cwd: str, name: str, result: dict) -> None:

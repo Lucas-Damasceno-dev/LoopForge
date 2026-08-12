@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
-from ...runner.opencode import call_llm_via_opencode
+from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
 
 DEFAULT_PROMPT = """Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
 

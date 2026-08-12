@@ -121,6 +121,14 @@ def parallel_audit(state: GraphState) -> dict:
     # Gera o artefato final lessons.md
     # `{**state, ...}` deixa o tipo como dict[str, Any]; updated_state É o
     # GraphState (spread do estado original + campos de auditoria) — cast honesto.
+    # run_id/task_id (canais declarados no state.py) são repassados ao lessons
+    # quando presentes no estado, para o MemoryManager/Retro indexarem a run.
+    run_id = state.get("run_id")
+    task_id = state.get("task_id")
+    if run_id is not None:
+        updated_state["run_id"] = run_id
+    if task_id is not None:
+        updated_state["task_id"] = task_id
     generate_lessons_md(cast(GraphState, updated_state))
 
     return updated_state

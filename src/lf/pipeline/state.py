@@ -1,13 +1,20 @@
 """
 GraphState TypedDict — o estado compartilhado entre todos os nós do pipeline.
 """
+
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 
 class GraphState(TypedDict):
-    """Estado central do grafo LangGraph. Todos os nós leem/escrevem aqui."""
+    """Estado central do grafo LangGraph. Todos os nós leem/escrevem aqui.
+
+    Chaves novas (stack_rationale, security_report, devops_report, run_id,
+    task_id, auto_create_devops_files) são declaradas como NotRequired: são
+    escritas/consumidas por nós específicos e nem sempre existem no estado
+    inicial. Antes eram canais silenciosamente descartados pelo LangGraph.
+    """
 
     # Entrada do usuário
     idea: str
@@ -23,6 +30,17 @@ class GraphState(TypedDict):
     security_review: dict
     devops_manifest: dict
 
+    # Artefatos de auditoria e identificação da run — canais declarados para o
+    # LangGraph NÃO descartar (antes eram escritos pelos nós e nunca persistiam
+    # no checkpoint: stack_rationale do tech_lead, security_report/devops_report
+    # do parallel_audit, run_id/task_id lidos pelo lessons, e o opt-in
+    # auto_create_devops_files do devops).
+    stack_rationale: NotRequired[str]
+    security_report: NotRequired[str]
+    devops_report: NotRequired[str]
+    run_id: NotRequired[str]
+    task_id: NotRequired[str]
+    auto_create_devops_files: NotRequired[bool]
 
     # Metadados do projeto (carregados do ontology)
     ontology_path: str  # caminho pra examples/the-foundry/
@@ -38,7 +56,6 @@ class GraphState(TypedDict):
     error: str | None
     feedback_history: list[dict]
 
-
     # Config de LLM
     mock_llm: bool
     llm_provider: str
@@ -49,7 +66,7 @@ class GraphState(TypedDict):
     is_interactive: bool
     read_only: bool
     routing_mode: str  # "full", "fast", "patch", "review-only", "explore"
-    task_type: str     # "feature", "bugfix", "refactor", "simple", "full", "fast"
+    task_type: str  # "feature", "bugfix", "refactor", "simple", "full", "fast"
     complexity_level: str  # "mvp", "standard", "advanced"
 
     # Schema esperado para validação do próximo artefato

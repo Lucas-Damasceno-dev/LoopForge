@@ -21,7 +21,7 @@ def generate_lessons_md(state: GraphState) -> str:
     attempts = state.get("attempt_count", 1)
     test_report = state.get("test_report", {})
     sec_report = state.get("security_review") or state.get("security_report", {})
-    state.get("devops_report") or state.get("devops_manifest", {})
+    ops_report = state.get("devops_report") or state.get("devops_manifest", {})
     idea = state.get("idea", "Desenvolvimento de Projeto")
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
@@ -67,7 +67,7 @@ def generate_lessons_md(state: GraphState) -> str:
             lesson_text = f"{lesson_prefix} | Nota: stack {stack} com suítes sem falhas detalhadas."
 
         lesson_text = lesson_text[:600]
-        mem.save_lesson(run_id=str(state.get("task_id", "run")), stack=stack, idea=idea, lesson_text=lesson_text)
+        mem.save_lesson(run_id=str(state.get("task_id") or "run"), stack=stack, idea=idea, lesson_text=lesson_text)
     except Exception as exc:
         logger.warning("Falha ao salvar lição aprendida: %s", exc)
 
@@ -84,6 +84,26 @@ def generate_lessons_md(state: GraphState) -> str:
     sec_warnings_txt = (
         "\n".join(vulns) if vulns else "- Nenhuma vulnerabilidade crítica detectada no escaneamento estático."
     )
+
+    # Resumo DevOps a partir do devops_report/devops_manifest declarados no estado
+    if isinstance(ops_report, dict) and ops_report:
+        ops_status = ops_report.get("status", "READY")
+        ops_score = ops_report.get("deployability_score", "-")
+        ops_docker = "sim" if ops_report.get("dockerfile_created") else "não"
+        ops_ci = "sim" if ops_report.get("ci_workflow_created") else "não"
+        ops_recs = ops_report.get("recommendations", [])
+        ops_recs_txt = ""
+        if isinstance(ops_recs, list):
+            ops_recs_txt = "\n".join(f"- {r}" for r in ops_recs[:5])
+        devops_txt = (
+            f"- **Status de Deployabilidade:** `{ops_status}` (score {ops_score})\n"
+            f"- **Dockerfile gerado:** {ops_docker}\n"
+            f"- **Workflow CI gerado:** {ops_ci}\n"
+        )
+        if ops_recs_txt:
+            devops_txt += f"- **Recomendações:**\n{ops_recs_txt}\n"
+    else:
+        devops_txt = "- Nenhum relatório DevOps disponível nesta execução."
 
     # Run/Test commands based on stack
     run_cmds = _get_run_commands_by_stack(stack)
@@ -106,6 +126,11 @@ def generate_lessons_md(state: GraphState) -> str:
 
 ## 🛡️ Análise de Segurança (AppSec)
 {sec_warnings_txt}
+
+---
+
+## 🚀 Deployabilidade (DevOps)
+{devops_txt}
 
 ---
 
@@ -148,6 +173,9 @@ graph TD
 ## 🛡️ Auditoria & Segurança
 {sec_warnings_txt}
 
+## 🚀 Deployabilidade (DevOps)
+{devops_txt}
+
 ## 🚀 Instruções de Execução Rápida
 ```bash
 {run_cmds}
@@ -172,9 +200,10 @@ graph TD
         from ...memory.manager import MemoryManager
 
         mem = MemoryManager()
-        # GraphState (TypedDict total=True) não declara `run_id`; `.get` devolve
-        # object. str() preserva o valor em runtime (str de str é identidade).
-        run_id = str(state.get("run_id", "run_latest"))
+        # run_id vem do canal declarado no estado (quando o dispatcher injeta);
+        # fallback compatível com o default histórico "run_latest". O thread_id
+        # do config não chega aqui (generate_lessons_md não recebe config).
+        run_id = str(state.get("run_id") or "run_latest")
         mem.save_lesson(run_id=run_id, stack=stack, idea=idea, lesson_text=content[:500])
     except Exception as exc:
         logger.warning("Falha ao persistir no MemoryManager: %s", exc)
@@ -187,7 +216,7 @@ graph TD
 
             retro_parser = AgDRParser()
             session_rec = retro_parser.parse_events([])
-            session_rec.session_id = str(state.get("run_id", "run_latest"))
+            session_rec.session_id = str(state.get("run_id") or "run_latest")
             session_rec.goal = idea
             session_rec.status = qa_status
             session_rec.attempts = attempts
