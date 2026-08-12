@@ -171,6 +171,72 @@ def _state_to_json(state: dict) -> tuple[dict | None, str | None]:
         return None, summary[:2000]
 
 
+def _preview_value(key: str, value: Any, limit: int = 500) -> str:
+    """Preview JSON-safe truncado de um valor de estado (diff — time-travel).
+
+    Campos sensíveis (chave com password/token/secret/api_key) são mascarados
+    com ``<redacted>``. Valores não-serializáveis caem em ``default=str``;
+    se a serialização e o ``str()`` falharem, usa um marcador de tipo. O texto
+    é truncado em ``limit`` chars (payload pequeno nos diffs).
+    """
+    if any(s in key.lower() for s in _SENSITIVE_KEYS):
+        return "<redacted>"
+    try:
+        text = json.dumps(value, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        try:
+            text = str(value)
+        except Exception:
+            return f"<unserializable {type(value).__name__}>"
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+async def _load_checkpoint_state(saver, thread_id: str, checkpoint_id: str) -> dict | None:
+    """channel_values de um checkpoint (None se não existir na thread)."""
+    value = await saver.aget_tuple({"configurable": {"thread_id": thread_id, "checkpoint_id": checkpoint_id}})
+    if value is None:
+        return None
+    return value.checkpoint.get("channel_values", {}) or {}
+
+
+async def _list_checkpoint_details(thread_id: str) -> list[dict]:
+    """Metadados dos checkpoints da thread em ordem cronológica (?detail=1).
+
+    Reaproveita o mesmo percurso de ``_serialize_checkpoints`` (alist DESC →
+    reversed) mas sem o estado completo: devolve id, parent, ts, step e node —
+    o mínimo para a UI de seleção do diff (time-travel profundo).
+    """
+    from lf.pipeline.checkpointer import create_async_checkpointer
+
+    saver = create_async_checkpointer(_trajectories_db())
+    try:
+        await saver.setup()
+        tuples = []
+        async for item in saver.alist({"configurable": {"thread_id": thread_id}}):
+            tuples.append(item)
+        details = []
+        for item in reversed(tuples):  # alist é DESC (head primeiro) → cronológico
+            meta = item.metadata or {}
+            cp = item.checkpoint or {}
+            cfg = (item.config or {}).get("configurable", {})
+            parent_cfg = (item.parent_config or {}).get("configurable", {}) if item.parent_config else {}
+            writes = meta.get("writes") or {}
+            node = next(iter(writes.keys())) if isinstance(writes, dict) and writes else None
+            details.append(
+                {
+                    "thread_id": thread_id,
+                    "checkpoint_id": cfg.get("checkpoint_id"),
+                    "parent_checkpoint_id": parent_cfg.get("checkpoint_id"),
+                    "ts": cp.get("ts"),
+                    "step": meta.get("step"),
+                    "node": node,
+                }
+            )
+        return details
+    finally:
+        await saver.conn.close()
+
+
 async def _serialize_checkpoints(saver, thread_id: str) -> list[dict]:
     """Checkpoints da thread em ordem cronológica (estado completo em JSON)."""
     tuples = []
@@ -434,14 +500,21 @@ async def _build_export(run_id: str, thread_id: str) -> dict:
 
 
 @trajectories_router.get("/{thread_id}/checkpoints")
-def list_checkpoints(thread_id: str):
+def list_checkpoints(thread_id: str, detail: bool = False):
     """Lista os thread_ids do banco de trajetórias filtrados pelo segmento.
 
     Rota síncrona (def) porque ``TaskDispatcher.list_checkpoints()`` usa
     ``asyncio.run`` internamente — chamado de dentro de um async def o
     evento já estaria rodando e levantaria RuntimeError.
+
+    ``?detail=1`` (BC: default inalterado) enriquece com os metadados dos
+    checkpoints da thread (checkpoint_id, parent_checkpoint_id, ts, step,
+    node) em ordem cronológica — necessário para a UI de diff (time-travel
+    profundo). O branch detail roda em ``asyncio.run`` próprio (threadpool).
     """
-    return [{"thread_id": t} for t in _list_thread_ids() if t == thread_id]
+    if not detail:
+        return [{"thread_id": t} for t in _list_thread_ids() if t == thread_id]
+    return asyncio.run(_list_checkpoint_details(thread_id))
 
 
 @trajectories_router.get("/{thread_id}/checkpoints/{checkpoint_id}")
