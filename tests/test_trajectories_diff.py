@@ -119,11 +119,16 @@ class _BadStr:
 
 @pytest.mark.asyncio
 async def test_diff_sanitiza_nao_serializaveis_e_mascara_sensiveis():
-    """(c) Sanitização: valor não-serializável vira marcador; api_key → redacted."""
+    """(c) Sanitização: valor não-JSON (bytes) sanitizado; api_key → redacted.
+
+    O estado real do grafo carrega valores não-JSON (bytes, objetos) — o
+    checkpointer serializa em msgpack, mas o diff devolve previews string
+    (json.dumps default=str) sem quebrar o payload.
+    """
     thread = f"run-{uuid.uuid4()}"
     states = [
         {"good": "ok"},
-        {"bad": _BadStr(), "api_key": "sk-123-secret"},
+        {"bad": b"\x00\x01", "api_key": "sk-123-secret"},
     ]
     await _seed_thread(thread, ("seed-1", "seed-2"), states)
 
@@ -133,10 +138,26 @@ async def test_diff_sanitiza_nao_serializaveis_e_mascara_sensiveis():
         r = await ac.get(f"/api/v1/trajectories/{thread}/diff", params={"from": "seed-1", "to": "seed-2"})
         assert r.status_code == 200
         data = r.json()
-        # valor não-serializável sanitizado (não quebra o payload)
-        assert data["added"]["bad"] == "<unserializable _BadStr>"
+        # bytes → preview string (json.dumps default=str), payload não quebra
+        bad = data["added"]["bad"]
+        assert isinstance(bad, str)
+        assert bad.startswith('"b')
         # chave sensível mascarada mesmo com valor serializável
         assert data["added"]["api_key"] == "<redacted>"
+
+
+def test_preview_value_fallback_e_mascaramento():
+    """(c2) _preview_value: str() falho → marcador de tipo; sensível → redacted."""
+    from lf.api.trajectories import _preview_value
+
+    assert _preview_value("bad", _BadStr()) == "<unserializable _BadStr>"
+    assert _preview_value("api_key", "sk-123") == "<redacted>"
+    assert _preview_value("ApiToken", {"v": 1}) == "<redacted>"
+    # valor serializável passa direto (JSON com espaços do json.dumps)
+    assert _preview_value("k", {"x": 1}) == '{"x": 1}'
+    # truncamento em 500 chars + ellipsis
+    big = _preview_value("k", "x" * 600)
+    assert len(big) == 501 and big.endswith("…")
 
 
 @pytest.mark.asyncio

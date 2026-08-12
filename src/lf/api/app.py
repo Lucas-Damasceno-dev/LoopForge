@@ -843,7 +843,8 @@ async def _execute_pipeline_in_background(
 ) -> None:
     """Enfileira a run na fila E3 (FIFO) e dispara a promoção se houver vaga.
 
-    M-21: runs novas nascem `queued` e só executam quando a anterior terminar.
+    M-21 (E3): runs novas nascem `queued` e só executam quando houver slot
+    livre (até ``max_concurrent`` simultâneas).
     Idempotente: uma run já ativa/enfileirada não é enfileirada de novo.
     """
     q = app.state.run_queue
