@@ -48,7 +48,9 @@ async def client(tmp_path, monkeypatch):
         yield ac
 
 
-def _lesson(run_id: str = "run-1", stack: str = "python", idea: str = "API REST", text: str = "Li\u00e7\u00e3o de exemplo.") -> dict:
+def _lesson(
+    run_id: str = "run-1", stack: str = "python", idea: str = "API REST", text: str = "Li\u00e7\u00e3o de exemplo."
+) -> dict:
     """Payload padrão de criação de lição."""
     return {"run_id": run_id, "stack": stack, "idea": idea, "lesson_text": text}
 
