@@ -67,10 +67,22 @@ async def init_db(settings: APISettings | None = None) -> None:
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     # Garante que todos os modelos ORM estejam registrados no Base.metadata
-    from lf.api import models  # noqa: F401
+    from lf.api import events, models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Semeadura da tabela de sequência de eventos (event_seq): runs legadas
+        # com eventos já persistidos continuam com seq contíguo (o próximo
+        # publish segue do MAX atual). Idempotente via ON CONFLICT DO NOTHING.
+        from sqlalchemy import text
+
+        await conn.execute(
+            text(
+                "INSERT INTO event_seq (run_id, last_seq) "
+                "SELECT run_id, MAX(seq) FROM events GROUP BY run_id "
+                "ON CONFLICT (run_id) DO NOTHING"
+            )
+        )
         # Migração aditiva de pipeline_runs (ADR-0003/M-02): colunas
         # thread_id/parent_run_id + backfill. PRAGMA table_info é SQLite-only.
         if is_sqlite:

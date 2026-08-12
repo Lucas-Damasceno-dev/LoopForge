@@ -9,11 +9,12 @@ O backfill REST (GET /runs/{id}/events) consumirá ``list_events``.
 import asyncio
 import json
 import logging
+import threading
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import JSON, DateTime, Integer, String, func, select
+from sqlalchemy import JSON, DateTime, Integer, String, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +44,20 @@ class Event(Base):
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+
+
+class EventSeq(Base):
+    """Contador de seq por run (tabela de sequência) para alocação atômica.
+
+    Uma linha por run_id; o próximo seq é alocado com ``UPDATE ... RETURNING``
+    (incremento atômico sob o lock de escrita do SQLite), em vez do antigo
+    COUNT+1 que duplicava seq em publishes concorrentes.
+    """
+
+    __tablename__ = "event_seq"
+
+    run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    last_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 def _load_checkpoints_for_thread(thread_id: str) -> list[dict]:
@@ -105,11 +120,32 @@ class EventBus:
 
     def __init__(self) -> None:
         self._mem_seq: dict[str, int] = {}
+        self._mem_lock = threading.Lock()
 
     async def _next_seq(self, session: AsyncSession, run_id: str) -> int:
-        """Próximo seq da run: COUNT+1 sobre os eventos persistidos no journal."""
-        result = await session.execute(select(func.count(Event.id)).where(Event.run_id == run_id))
-        return int(result.scalar_one()) + 1
+        """Próximo seq da run, alocado atomicamente via UPDATE...RETURNING.
+
+        Mecanismo: tabela ``event_seq`` (contador por run). O upsert cria a
+        linha (last_seq=0) e o ``UPDATE ... RETURNING last_seq`` incrementa e
+        devolve o novo valor — tudo na MESMA transação do INSERT do evento,
+        então rollback desfaz o incremento (seq permanece contíguo). O SQLite
+        serializa escritores (WAL + busy_timeout=5000): UPDATEs concorrentes na
+        mesma linha esperam o lock e devolvem valores distintos — seq único e
+        estritamente crescente por run, mesmo multi-processo. O antigo COUNT+1
+        era não-atômico e duplicava seq em publishes concorrentes.
+        """
+        await session.execute(
+            text("INSERT INTO event_seq (run_id, last_seq) VALUES (:rid, 0) ON CONFLICT (run_id) DO NOTHING"),
+            {"rid": run_id},
+        )
+        result = await session.execute(
+            text("UPDATE event_seq SET last_seq = last_seq + 1 WHERE run_id = :rid RETURNING last_seq"),
+            {"rid": run_id},
+        )
+        row = result.first()
+        if row is None:
+            raise RuntimeError(f"Falha ao alocar seq atômico para a run {run_id}")
+        return int(row[0])
 
     def _to_envelope(self, event: Event) -> dict:
         """Monta o envelope v1: {seq, event, run_id, timestamp, payload}."""
@@ -155,8 +191,10 @@ class EventBus:
                 envelope = self._to_envelope(event)
         else:
             # Fallback sem DB inicializado (ex.: CLI puro): seq em memória.
-            seq = self._mem_seq.get(run_id, 0) + 1
-            self._mem_seq[run_id] = seq
+            # Lock: protege contra publishes concorrentes multi-thread.
+            with self._mem_lock:
+                seq = self._mem_seq.get(run_id, 0) + 1
+                self._mem_seq[run_id] = seq
             envelope = {
                 "seq": seq,
                 "event": event_type,
