@@ -20,11 +20,25 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
 from ...guardrails.circuit_breaker import CircuitBreaker
+from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
 from ...runner.opencode.runner import DEFAULT_OPENCODE_MODEL
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_PROMPT = """Você é um Desenvolvedor Sênior.
+Stack definida pelo Tech Lead: {stack}. Gere um projeto completo nesta stack com todos os arquivos necessários (código principal, manifesto de dependências, testes).
+
+REGRAS OBRIGATÓRIAS DE QUALIDADE:
+1. Responda no formato multi-arquivos com o cabeçalho '### FILE: caminho/do/arquivo' seguido por bloco de código markdown.
+2. Inclua o manifesto de dependências relevante (ex: pyproject.toml, package.json, Cargo.toml, go.mod).
+3. Inclua a suíte de testes unitários da stack em diretório apropriado (ex: tests/).
+4. TRATAMENTO DE ERROS RIGOROSO: Proibido o uso de `unwrap()`, `expect()` ou `panic!` em Rust (use `anyhow` ou `thiserror`). Proibido `try/except` silencioso ou `pass` em Python.
+5. DOCUMENTAÇÃO OBRIGATÓRIA: Toda função, método e struct/classe pública DEVE conter docstrings estruturadas no formato nativo da linguagem ('///' em Rust, docstrings em Python, '/** */' em TypeScript).
+6. CONFIGURAÇÃO E AMBIENTE: Inclua um módulo de configuração tipado (ex: `config.py` com `pydantic-settings` ou `config.rs`) e crie o arquivo `.env.example` documentando todas as variáveis de ambiente.
+7. CRITÉRIOS DE ACEITAÇÃO: Cada acceptance criterion das user stories DEVE ser coberto por pelo menos 1 teste unitário na suíte. Antes de gerar o código, derive os testes a partir dos critérios de aceitação fornecidos."""
 
 
 def _truncate_tech_spec(spec: str, max_chars: int = 2000) -> str:
@@ -418,17 +432,7 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
             for criterion in acceptance_criteria:
                 story_lines.append(f"  - {criterion}")
 
-    system_prompt = f"""Você é um Desenvolvedor Sênior.
-Stack definida pelo Tech Lead: {stack}. Gere um projeto completo nesta stack com todos os arquivos necessários (código principal, manifesto de dependências, testes).
-
-REGRAS OBRIGATÓRIAS DE QUALIDADE:
-1. Responda no formato multi-arquivos com o cabeçalho '### FILE: caminho/do/arquivo' seguido por bloco de código markdown.
-2. Inclua o manifesto de dependências relevante (ex: pyproject.toml, package.json, Cargo.toml, go.mod).
-3. Inclua a suíte de testes unitários da stack em diretório apropriado (ex: tests/).
-4. TRATAMENTO DE ERROS RIGOROSO: Proibido o uso de `unwrap()`, `expect()` ou `panic!` em Rust (use `anyhow` ou `thiserror`). Proibido `try/except` silencioso ou `pass` em Python.
-5. DOCUMENTAÇÃO OBRIGATÓRIA: Toda função, método e struct/classe pública DEVE conter docstrings estruturadas no formato nativo da linguagem ('///' em Rust, docstrings em Python, '/** */' em TypeScript).
-6. CONFIGURAÇÃO E AMBIENTE: Inclua um módulo de configuração tipado (ex: `config.py` com `pydantic-settings` ou `config.rs`) e crie o arquivo `.env.example` documentando todas as variáveis de ambiente.
-7. CRITÉRIOS DE ACEITAÇÃO: Cada acceptance criterion das user stories DEVE ser coberto por pelo menos 1 teste unitário na suíte. Antes de gerar o código, derive os testes a partir dos critérios de aceitação fornecidos."""
+    system_prompt = get_effective_prompt("developer", DEFAULT_PROMPT.format(stack=stack))
 
     prompt_parts = [
         f"Ideia do Projeto: {idea}",
@@ -486,10 +490,15 @@ REGRAS OBRIGATÓRIAS DE QUALIDADE:
 
     # 🧠 Consulta MemoryManager para obter lições aprendidas passadas relevantes
     try:
-        from ...memory.manager import MemoryManager
+        from ...memory.manager import MemoryManager, cross_project_enabled
 
         mem = MemoryManager()
-        relevant = mem.search_relevant_lessons(query=f"{idea} {stack}", stack=stack, limit=3)
+        relevant = mem.search_relevant_lessons(
+            query=f"{idea} {stack}",
+            stack=stack,
+            limit=3,
+            cross_project=cross_project_enabled(),
+        )
         formatted_lessons = mem.format_lessons_for_prompt(relevant)
         if formatted_lessons:
             prompt_parts.append(f"\n\n{formatted_lessons}")

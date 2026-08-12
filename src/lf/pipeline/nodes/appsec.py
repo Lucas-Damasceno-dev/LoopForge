@@ -1,4 +1,5 @@
 """Nó AppSec: revisão de segurança estática e contextual com LLM do código gerado."""
+
 from __future__ import annotations
 
 import json
@@ -8,8 +9,12 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
 from ...guardrails.security_scanner import SecurityScanner
+from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode
+
+
+DEFAULT_PROMPT = "Você é um engenheiro de AppSec sênior especializado em segurança de código."
 
 
 class SecurityVulnerability(BaseModel):
@@ -86,7 +91,7 @@ def appsec(state: GraphState) -> dict:
                     f"Código:\n```python\n{code_snippet}\n```"
                 )
                 llm_res = call_llm_via_opencode(
-                    system_prompt="Você é um engenheiro de AppSec sênior especializado em segurança de código.",
+                    system_prompt=get_effective_prompt("appsec", DEFAULT_PROMPT),
                     user_prompt=prompt,
                     mock=state.get("mock_llm", False),
                 )
@@ -128,7 +133,9 @@ def appsec(state: GraphState) -> dict:
                 "next_agent": "FINISH",
             }
 
-        print(f"--- AVISO: Vulnerabilidades encontradas (tentativa {appsec_attempt}/{max_retries}). Notificando Developer. ---")
+        print(
+            f"--- AVISO: Vulnerabilidades encontradas (tentativa {appsec_attempt}/{max_retries}). Notificando Developer. ---"
+        )
         new_feedback = list(state.get("feedback_history", [])) + [
             {
                 "from": "appsec",
@@ -136,11 +143,15 @@ def appsec(state: GraphState) -> dict:
                 "timestamp": now_iso,
             }
         ]
-        return {**state, "security_review": review, "appsec_attempt_count": appsec_attempt, "feedback_history": new_feedback, "next_agent": "developer"}
-
+        return {
+            **state,
+            "security_review": review,
+            "appsec_attempt_count": appsec_attempt,
+            "feedback_history": new_feedback,
+            "next_agent": "developer",
+        }
 
     return {**state, "security_review": review, "next_agent": "devops"}
-
 
 
 def _mock_security_review(review_id: str, timestamp: str) -> dict:
