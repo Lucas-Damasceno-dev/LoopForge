@@ -46,6 +46,7 @@ def call_llm_via_opencode(
     cache: bool = True,
     circuit_breaker=None,
     project_root: str | Path | None = None,
+    on_token_delta: Callable[[str], None] | None = None,
 ) -> str | dict | list:
     """Chama OpenCode como LLM para geração de texto/estruturado.
 
@@ -61,6 +62,10 @@ def call_llm_via_opencode(
         project_root: Diretório da run (cwd do subprocesso opencode). Default:
             os.getcwd(). Subprocessos opencode herdam PWD, então passar o dir
             correto impede que o agente escreva no repo real.
+        on_token_delta: Callback opcional p/ streaming token a token
+            (V1.1/ADR-0007). Repassado ao provider HTTP quando a API key
+            OpenRouter está disponível; o caminho subprocesso ignora (sem
+            incremento incremental — fallback silencioso).
 
     Returns:
         str se não tiver schema_model, dict se tiver schema_model
@@ -140,6 +145,7 @@ Responda SOMENTE o objeto JSON puro."""
                     model=model_name,
                     api_key=openrouter_key,
                     system_prompt=system_prompt,
+                    on_token_delta=on_token_delta,
                 )
             except RuntimeError:
                 # Gate já levantou (erro de modelo/servidor) — não cai no
