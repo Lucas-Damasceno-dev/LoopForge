@@ -339,7 +339,10 @@ def _check_syntax_and_types(files_map: dict[str, str], stack: str, project_dir: 
     return errors
 
 
-def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:
+# O LangGraph só injeta `config` com a forma `Optional[RunnableConfig]` (string
+# exata em langgraph/_internal/_runnable.py, KWARGS_CONFIG_KEYS); `X | None`
+# não casa e o parâmetro NÃO é injetado — daí o UP045 suprimido na assinatura.
+def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # noqa: UP045
     """Gera projeto completo multi-arquivo na stack decidida pelo Tech Lead.
 
     ``config`` (injetado pelo LangGraph) carrega o ``thread_id`` canônico
