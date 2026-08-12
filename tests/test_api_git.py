@@ -101,7 +101,8 @@ async def test_get_git_info_empty_repo_returns_empty_lists():
     body = resp.json()
     assert body["branch"] == repo.active_branch.name
     assert body["head"] is None
-    assert body["status"] == []
+    # sem commits, draft.txt aparece apenas como untracked (??)
+    assert body["status"] == [{"path": "draft.txt", "status": "??"}]
     assert body["log"] == []
 
 

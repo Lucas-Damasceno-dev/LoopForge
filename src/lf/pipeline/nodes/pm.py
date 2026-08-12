@@ -10,8 +10,26 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
+from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode import call_llm_via_opencode
+
+
+DEFAULT_PROMPT = """Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
+
+Cada user story DEVE ter TODOS os campos:
+- id: {epic_id}-USXXX (sequencial)
+- title: descritivo
+- epic_id: {epic_id}
+- as_a: persona (ex: "motorista de van", "pai de aluno")
+- i_want_to: funcionalidade concreta
+- so_that: benefício
+- acceptance_criteria: lista de strings Given-When-Then
+- priority: Medium (padrão)
+- status: Pending (padrão)
+- dates: use a data atual
+
+Responda APENAS com o JSON. NÃO inclua texto explicativo."""
 
 
 class UserStorySchema(BaseModel):
