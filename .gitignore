@@ -9,12 +9,33 @@ venv/
 dist/
 !src/lf/ade/static/dist/
 *.egg-info/
+build/
+target/
 
 # LoopForge runtime data
 .loopforge/
 .opencode/
 scratch/
 examples/.loopforge/
+
+# LoopForge run artifacts
+/generated_code.*
+/lessons.md
+/tech_spec_*.md
+/test_report_*.json
+/us_*.json
+/devops_manifest_*.json
+/SESSION_CONTEXT_MEMO.md
+/copilot-credits-sprint.md
+/Dockerfile.proposed
+/ci.yml.proposed
+/package.json
+
+# Local tooling
+/.coverage
+/.genome/
+/.registry/
+/.retro/
 
 # Deepwork tracking
 .slim/deepwork/

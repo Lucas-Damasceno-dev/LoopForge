@@ -1,3 +1,0 @@
-"""
-LoopForge Orchestrator Subsystem
-"""

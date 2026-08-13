@@ -9,7 +9,7 @@
 
 ## Test & Verify
 
-- Active test suite: `tests/` (97 files).
+- Active test suite: `tests/` (107 files).
 - Local & CI: `pytest tests/`. CI targets `tests/`.
 - CI pipeline order: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests/`.
 - CI matrix: Python 3.11 + 3.12.
@@ -17,12 +17,15 @@
 ## Architecture
 
 - LangGraph `StateGraph` with nodes: **CPO → PM → Tech Lead → Test Writer → Developer → QA → Parallel Audit (AppSec + DevOps concurrently)** — `NodeRegistry` em `src/lf/pipeline/graph.py`: cpo, pm, tech_lead, test_writer, developer, qa, appsec, devops, parallel_audit. `lessons` **não é nó**: é função/artefato (`generate_lessons_md` em `src/lf/pipeline/nodes/lessons.py`) executado dentro do nó `parallel_audit`.
-- Two routing modes (decided by `entry_router` in `graph.py`):
+- Five routing modes (decided by `entry_router` in `graph.py`):
   - **full**: CPO→PM→TL→Dev→QA→Audit (default for features)
   - **fast**: Developer→QA→Audit (for bugfix/refactor/simple tasks)
-- Graph state: `src/lf/pipeline/state.py` (`GraphState` TypedDict).
+  - **patch**: Developer→QA→Audit (patch/bugfix/simple — mesmo caminho do fast)
+  - **review-only**: QA→Parallel Audit (task_type "review")
+  - **explore**: Tech Lead spike (task_type "explore")
+- Graph state: `src/lf/pipeline/state.py` (`GraphState` TypedDict) — além dos artefatos, declara canais `NotRequired`: `stack_rationale`, `security_report`, `devops_report`, `run_id`, `task_id`, `auto_create_devops_files`, `degraded`/`degraded_reason`, e o snapshot serializável `circuit_breaker`.
 - Graph builder: `src/lf/pipeline/graph.py` — `build_graph()`, `router()`, `should_retry()`.
-- After QA, `should_retry` decides: pass → parallel_audit, fail with retries left → developer, fail exhausted → END.
+- After QA, `should_retry` decides: pass → parallel_audit, fail with retries left → developer, fail exhausted → parallel_audit (auditoria final + lessons; o erro de retries esgotados é gravado DENTRO do nó `parallel_audit` — `should_retry` é aresta condicional e não pode mutar estado).
 - Parallel audit runs AppSec + DevOps simultaneously via `ThreadPoolExecutor`.
 
 ## Key Source Layout
@@ -39,18 +42,20 @@
 
 ## LLM & Environment
 
-- Primary provider: **OpenRouter** (`OPENROUTER_API_KEY`). Default model: `oc/deepseek-v4-flash-free` (or `OPENROUTER_MODEL`).
-- Fallback: Google GenAI (`GEMINI_API_KEY`).
-- Mock mode: `--mock` flag or `OPENCODE_MOCK=1`. When set or `opencode` binary not found, returns mock responses (no subprocess).
-- OpenCode subprocess uses: `script -q -c "opencode run 'PROMPT' -m MODEL --pure" /dev/null`.
-- Timeout cascades: subprocess 5min → circuit breaker (3 failures) → human gate (NodeInterrupt).
+- Primary provider: **OpenRouter** (`OPENROUTER_API_KEY`). Default model: `oc/deepseek-v4-flash-free`.
+- Model default resolve via `resolve_default_model()` em `src/lf/pipeline/llm_factory.py:30` — precedência: `OPENROUTER_MODEL` → `OPENCODE_MODEL` → config `llm_model` → constante `DEFAULT_LLM_MODEL`. Sem fallback GenAI/Google.
+- Fallback de execução: subprocesso `opencode` quando o provider HTTP falha; mock via `--mock` flag ou `OPENCODE_MOCK=1`. Quando set ou `opencode` binary not found, retorna mock responses (no subprocess).
+- OpenCode subprocess uses: `script -q -c "opencode run 'PROMPT' -m MODEL --dir {root} --pure" /dev/null` — `--dir` força o chdir do opencode para o output_dir da run.
+- Timeout do subprocesso mata a ÁRVORE inteira de processos (killpg + descendentes via /proc), não só o `script`.
+- Timeout cascades: subprocess 5min (configurável em ade.yaml `runner.subprocess_timeout_seconds`) → circuit breaker (5 falhas consecutivas OU 20 iterações OU custo máximo; reset 300s p/ half-open) → human gate (NodeInterrupt).
 
 ## Runtime Config & Data
 
 - Config: `.loopforge.json` — loaded/saved by `src/lf/config/loader.py` (supports JSON and YAML).
+- AdeConfig: `.loopforge/ade.yaml` (via `load_ade_config` em `src/lf/config/loader.py`) — governa budget (`budget.max_usd`, fonte única do CircuitBreaker), HITL (`hitl.timeout_seconds`, `hitl.on_timeout`), runner (`runner.subprocess_timeout_seconds`, `runner.max_concurrent_runs`) e `api_keys` RBAC. Arquivo ausente → `AdeConfig()` com defaults.
 - Checkpoints (trajectories): `.loopforge/trajectories.db` (LangGraph `AsyncSqliteSaver` — ativo desde a ADE). `.loopforge/checkpoints.sqlite` (~66 MB) é arquivo **legado** da época do `SqliteSaver`: o engine não o usa mais; NÃO apagar, apenas ignorar (`.loopforge/` é gitignored).
-- LLM cache: `.loopforge/llm_cache.sqlite` (SHA256 keyed by prompt, shared with `SQLiteLLMCache`).
-- Telemetry: `.loopforge/telemetry.sqlite`.
+- LLM cache: `.loopforge/llm_cache.sqlite` — chave SHA256 de `model|temperature|prompt` (normalizado semanticamente), TTL 30 dias (`.loopforge/` gitignored; shared with `SQLiteLLMCache`).
+- Telemetry: `.loopforge/telemetry.sqlite` (inclui `llm_costs` com `run_id`/`node` por run — base do `GET /runs/{id}/cost` e overrides em `budget_overrides`).
 - Ontology: `examples/the-foundry/` (The Foundry — personas, schemas, state machine).
 - Output artifact: `generated_code.py` at repo root (gitignored).
 
@@ -73,17 +78,18 @@ QA node uses `TestHarnessRunner` to run tests.
 
 - Enabled via `-i` / `--interactive` flag.
 - Gates interrupt at developer, qa, and parallel_audit nodes (configurable in `build_graph()`).
-- Actions: approve, retry, adjust prompt (with feedback category), abort.
-- HITL timeout: 300s (default behavior on timeout: abort).
+- Actions: approve, retry, adjust prompt (feedback category), adjust_state remoto (patch de estado via `POST /runs/{id}/decide`), continue, pause, abort.
+- HITL timeout: 300s (configurável em `hitl.timeout_seconds`; comportamento no timeout: `on_timeout` default **continue** — opções: continue/abort/pause).
 - Decisions recorded in `.loopforge/telemetry.sqlite` (`human_decisions` table).
 
 ## Conventions & Quirks
 
 - **Language**: Portuguese for docs, comments, CLI output — maintain this.
 - **Console output**: Uses `rich` (Console, Table, Syntax, Prompt).
-- **Events**: `lf run` emits WebSocket events (`pipeline_started`, `node_execution`, `pipeline_finished`).
+- **Events**: `lf run` emite eventos WebSocket (`pipeline_started`, `node_execution`, `pipeline_finished`, `pipeline_failed`, `pipeline_error`, `pipeline_resumed`, `hitl_gate_reached`, `human_decision_expired`, `human_decision_submitted`, `token_delta`; a API emite `run_created`, `run_updated`). Seq por run é atômica (tabela `event_seq`, incremento via UPDATE...RETURNING em `src/lf/api/events.py`).
+- **Status da run**: `queued` → `running` → `completed`/`failed`/`paused`; fila E3 controlada por `runner.max_concurrent_runs` (excedente fica `queued`).
 - **Resume**: `lf resume` or `lf run --resume <task_id>` — loads checkpoint from `.loopforge/trajectories.db`.
 - **Circuit breaker** in `TaskDispatcher` gates on `max_total_cost` from config `budget_limit_usd`.
 - **Worktrees** managed in `.slim/worktrees/` — git worktrees for isolated feature work.
 - **CI**: Ruff select rules are `E,F,W,I,N,UP,SIM` only. Mypy scans `src/lf` only. Coverage threshold: 75%.
-- **Dependencies**: `uv.lock` present (managed by `uv`), but CI uses `pip install -e .`. No `setup.py`/`setup.cfg`. The `pyproject.toml` is minimal (build-system only) — if adding deps, update `uv.lock` via `uv add` or manually manage `pyproject.toml`.
+- **Dependencies**: `uv.lock` present (managed by `uv`), but CI uses `pip install -e .`. No `setup.py`/`setup.cfg`. `pyproject.toml` tem `[project]` completo com deps (click, langgraph, langgraph-checkpoint-sqlite, pydantic, pydantic-settings, gitpython, alembic, rich, httpx, fastapi, uvicorn, aiosqlite, plyer, jinja2, mcp, pyyaml, tiktoken), extras `dev` (pytest, pytest-asyncio, pytest-cov, mypy, ruff), `[tool.ruff]` (line-length 120; select E,F,W,I,N,UP,SIM; ignore E501, SIM117, E402, F401), `[tool.mypy]` (mypy_path packages/*, ignore_missing_imports) — se adicionar dep, rode `uv add` e atualize `uv.lock`.

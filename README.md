@@ -2,11 +2,11 @@
 
 **Autonomous Agent Governance and Pipeline Orchestrator**
 
-LoopForge é um motor autônomo de *Loop Engineering* e orquestrador de governança para agentes de IA. Construído em Python 3.12+ com **LangGraph**, **Pydantic v2**, **FastAPI**, **WebSockets** e a ontologia do **The Foundry**, ele gerencia o ciclo de desenvolvimento autônomo de software com resiliência industrial, auditoria paralela (AppSec + DevOps), governança de orçamento e pontuação ELO de benchmarks.
+LoopForge é um motor autônomo de *Loop Engineering* e orquestrador de governança para agentes de IA. Construído em Python 3.11+ com **LangGraph**, **Pydantic v2**, **FastAPI**, **WebSockets** e a ontologia do **The Foundry**, ele gerencia o ciclo de desenvolvimento autônomo de software com resiliência industrial, auditoria paralela (AppSec + DevOps), governança de orçamento e pontuação ELO de benchmarks.
 
 > **Versão Atual:** 6.0.0  
 > **Arquitetura Base:** Python + LangGraph (`StateGraph`)  
-> **Provedores de LLM:** OpenRouter (`inclusionai/ling-3.0-flash:free`), Google GenAI (Gemini), OpenCode  
+> **Provedor de LLM:** OpenRouter (HTTP direto; fallback de execução via subprocesso `opencode`; mock offline via `OPENCODE_MOCK=1`)  
 > **License:** MIT  
 
 ---
@@ -27,17 +27,17 @@ Abaixo está a galeria de projetos reais **100% gerados autonomamente** pela pip
 
 | Módulo | Descrição | Status |
 |---|---|---|
-| **LangGraph Multi-Agent DAG** | 9 nós autônomos: **CPO**, **PM**, **Tech Lead**, **Developer**, **QA**, **AppSec**, **DevOps**, **Parallel Audit**, **Lessons** | ✅ |
+| **LangGraph Multi-Agent DAG** | 8 nós autônomos: **CPO**, **PM**, **Tech Lead**, **Test Writer**, **Developer**, **QA**, **AppSec**, **DevOps** + **Parallel Audit** (auditoria simultânea) e artefato final `lessons.md` | ✅ |
 | **Stack Decidida pelo Tech Lead** | O Tech Lead avalia a ideia e define a melhor stack (`rust`, `java`, `python`, `go`, `js`) sem engessar a CLI | ✅ |
 | **Auditoria Simultânea Paralela** | Execução concorrente de **AppSec** (Security Review) e **DevOps** (CI/CD) via ThreadPoolExecutor | ✅ |
 | **Benchmark ELO System** | Suíte de 10 problemas curados para medição quantitativa da qualidade e rating ELO (`lf benchmark`) | ✅ |
 | **FastAPI REST & WebSockets UI** | Painel Web interativo ao vivo em tempo real com recepção de logs e HITL | ✅ |
 | **GitHub Action & `lf pr`** | Integração contínua para CI/CD (`action.yml`) e criação autônoma de Pull Requests (`lf pr`) | ✅ |
 | **Otimização de Custos LLM** | Cache semântico SQLite e compressão inteligente de prompts no `llm_factory` | ✅ |
-| **Human-in-the-Loop (HITL)** | Gates interativos nos nós developer, QA e parallel_audit com ações approve/retry/adjust/abort | ✅ |
+| **Human-in-the-Loop (HITL)** | Gates interativos nos nós developer, QA e parallel_audit com ações approve/retry/adjust/adjust_state/continue/pause/abort | ✅ |
 | **Review Mode** | Pausa antes de salvar artefatos em disco para revisão manual | ✅ |
 | **Notificações Desktop & Webhook** | Alertas via notify-send + webhooks Slack/Discord | ✅ |
-| **Circuit Breaker** | 3 guardas: falhas consecutivas, iterações máximas, custo máximo USD | ✅ |
+| **Circuit Breaker** | 3 guardas: 5 falhas consecutivas, 20 iterações máximas, custo máximo USD | ✅ |
 | **Memory Manager** | Banco SQLite de lições aprendidas com busca por stack e keywords | ✅ |
 | **Security Scanner** | Varredura estática de segurança no nó AppSec | ✅ |
 | **Sub-pacotes do Ecossistema** | Codebase Genome, Agentic Interface Registry, Agentic Retro | ✅ |
@@ -47,7 +47,7 @@ Abaixo está a galeria de projetos reais **100% gerados autonomamente** pela pip
 ## 💻 Instalação
 
 ### Pré-requisitos
-- **Python** >= 3.12
+- **Python** >= 3.11
 - **pip** ou **uv**
 
 ```bash
@@ -89,7 +89,7 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 
 | Comando | Descrição |
 |---|---|
-| `lf run` | Executa o pipeline autônomo dos agentes (`--idea`, `--stack`, `--pr`, `--mock`, `-i`, `--review-mode`, `--notify`, `--wizard`, `--webhook-url`) |
+| `lf run` | Executa o pipeline autônomo dos agentes (`--idea`, `--stack`, `--pr`, `--mock`, `-i`, `--review-mode`, `--notify`, `--wizard`, `--webhook-url`, `--resume`, `--mvp`, `--advanced`, `--report-cost`) |
 | `lf serve` | Inicia o servidor REST API e a Web Dashboard UI ao vivo com WebSockets |
 | `lf benchmark` | Executa a suíte de benchmarks curados e reporta a pontuação ELO do pipeline |
 | `lf resume` | Retoma execuções de pipeline pausadas a partir de checkpoints no LangGraph |
@@ -99,12 +99,12 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 | `lf init` | Inicializa um novo projeto LoopForge |
 | `lf plan` | Gerencia planos de tarefas do pipeline |
 | `lf status` | Exibe o status da execução atual |
-| `lf release` | Gera changelog e release notes |
+| `lf release` | Gera changelog e release notes a partir do git log (última tag → HEAD; versão explícita ou patch bump; `--dry-run`) |
 | `lf completion` | Gera script de shell completion (bash/zsh/fish) |
-| `lf generate-tests` | Geração automática de testes via agente |
+| `lf generate-tests` | Gera suítes de teste baseline para módulos sem cobertura (stacks `python` e `node`/vitest) |
 | `lf audit` | Auditoria completa do pipeline |
 | `lf export` | Exporta artefatos gerados |
-| `lf studio` | Interface web studio interativa |
+| `lf studio` | Visualizador TUI de telemetria em tempo real (lê `.loopforge/telemetry.sqlite`; teclas `R`/`Q`; `--db-path`) |
 
 ---
 
@@ -115,7 +115,7 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 pytest tests/
 ```
 
-- **97 arquivos de teste** em `tests/` (suite ativa)
+- **107 arquivos de teste** em `tests/` (suite ativa)
 - Cobertura de Decisão Autônoma de Stack, Auditoria Paralela AppSec+DevOps, WebSockets Live, ELO Rating e Lessons Generator
 - CI pipeline: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests/`
 
@@ -140,7 +140,7 @@ LoopForge fornece uma **GitHub Action reutilizável** (`action.yml`) com inputs:
 |---|---|
 | `idea` | Ideia/funcionalidade a ser desenvolvida |
 | `stack` | Stack tecnológica (opcional) |
-| `routing_mode` | full, fast, review-only, explore |
+| `routing_mode` | full, fast, patch, review-only, explore |
 | `openrouter_api_key` | API Key do OpenRouter |
 | `mock_llm` | Usar modo mock (boolean) |
 
