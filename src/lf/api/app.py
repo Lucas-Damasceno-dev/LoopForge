@@ -728,6 +728,12 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         return await _record_decision_impl(run_id, payload, session)
 
     @app.get(
+        "/api/v1/runs/{run_id}/decisions",
+        response_model=list[HumanDecisionResponse],
+        tags=["Human-in-the-Loop"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    @app.get(
         "/api/runs/{run_id}/decisions",
         response_model=list[HumanDecisionResponse],
         tags=["Human-in-the-Loop"],
@@ -737,7 +743,12 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         run_id: str,
         session: AsyncSession = Depends(get_session),
     ):
-        """Lista todo o histórico de decisões humanas (HITL) para uma execução."""
+        """Lista todo o histórico de decisões humanas (HITL) para uma execução.
+
+        Bug 2 (fix): o front ADE chama ``/api/v1/runs/{id}/decisions``; o
+        decorator v1 (canônico) e o legado ``/api/runs/...`` compartilham a
+        MESMA implementação (padrão M-18 dos demais aliases v1/legado).
+        """
         from sqlalchemy import select
 
         result = await session.execute(

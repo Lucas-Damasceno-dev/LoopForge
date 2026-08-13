@@ -1,4 +1,68 @@
+import pytest
+
 from lf.pipeline import llm_factory
+
+
+def test_call_openrouter_api_streaming_non200_sem_erro_read(monkeypatch):
+    """Bug 1: stream com status != 200 lia resp.text SEM resp.read().
+
+    O fake simula o httpx real: acessar `.text` de resposta streaming sem
+    `read()` lança RuntimeError("...without having called `read()`"). O fix
+    chama `resp.read()` antes — o erro final deve ser o status 429, nunca o
+    erro de read().
+    """
+
+    class Resp:
+        status_code = 429
+        _read_called = False
+
+        def read(self):
+            self._read_called = True
+            return b"rate limited"
+
+        @property
+        def text(self):
+            if not self._read_called:
+                raise RuntimeError("Attempted to access streaming response content, without having called `read()`")
+            return "rate limited"
+
+    class FakeStream:
+        def __init__(self):
+            self._resp = Resp()
+
+        def __enter__(self):
+            return self._resp
+
+        def __exit__(self, *args):
+            return False
+
+    class FakeClient:
+        def __init__(self, timeout=None):
+            self._stream = FakeStream()
+
+        def stream(self, *args, **kwargs):
+            return self._stream
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    monkeypatch.setattr(llm_factory, "DEFAULT_OPENROUTER_KEY", "k")
+    monkeypatch.setattr("httpx.Client", lambda *a, **k: FakeClient(timeout=k.get("timeout")))
+    monkeypatch.setattr("time.sleep", lambda *a, **k: None)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        llm_factory.call_openrouter_api(
+            "p",
+            model="m",
+            max_retries=1,
+            on_token_delta=lambda _t: None,  # ativa o branch streaming (Bug 1)
+        )
+    assert "429" in str(excinfo.value), f"erro inesperado: {excinfo.value}"
+    assert "read()" not in str(excinfo.value), f"vazou erro de read(): {excinfo.value}"
 
 
 def test_compress_prompt_vazio_e_truncado():

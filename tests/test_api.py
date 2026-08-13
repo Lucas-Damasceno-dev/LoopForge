@@ -17,6 +17,7 @@ from lf.cli.commands.serve import serve_cmd
 async def setup_test_db():
     """Configura banco SQLite limpo para cada teste."""
     from lf.api.database import Base, engine
+
     os.environ["LF_API_TEST"] = "1"
     os.environ["LF_API_REQUIRE_AUTH"] = "false"
     db_file = ".loopforge/test_api.sqlite"
@@ -84,6 +85,18 @@ async def test_list_runs_with_data(client: AsyncClient):
     data = resp.json()
     assert data["total"] == 2
     assert len(data["items"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_decisions_v1_e_legado(client: AsyncClient):
+    """Bug 2: front ADE usa GET /api/v1/runs/{id}/decisions — alias v1 + legado → 200."""
+    resp_v1 = await client.get("/api/v1/runs/run-inexistente/decisions")
+    assert resp_v1.status_code == 200, resp_v1.text
+    assert resp_v1.json() == []
+
+    resp_legacy = await client.get("/api/runs/run-inexistente/decisions")
+    assert resp_legacy.status_code == 200, resp_legacy.text
+    assert resp_legacy.json() == []
 
 
 @pytest.mark.asyncio

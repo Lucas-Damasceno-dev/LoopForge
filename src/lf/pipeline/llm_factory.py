@@ -163,6 +163,10 @@ def call_openrouter_api(
                     client.stream("POST", url, headers=headers, json=payload) as resp,
                 ):
                     if resp.status_code != 200:
+                        # Bug 1 (fix): em resposta streaming, acessar `.text` sem
+                        # `read()` levanta RuntimeError do httpx — consome o corpo
+                        # ANTES de montar a mensagem de erro (retry/backoff mantidos).
+                        resp.read()
                         last_error = RuntimeError(
                             f"OpenRouter API request failed with status {resp.status_code}: {(resp.text or '')[:200]}"
                         )
