@@ -15,7 +15,8 @@ _console = Console()
 
 # Marcadores de erro de modelo/servidor que NÃO são resposta LLM válida. O
 # wrapper `script` mascara o exit code do subprocesso (success=True mesmo com
-# falha), então o gate precisa checar o TEXTO da resposta, não o código de saída.
+# falha), então o texto "Model not found"/"UnknownError"
+# chegava como resposta válida, fazendo o Developer seguir para QA com código vazio.
 #
 # Critério anti-falso-positivo (conteúdo LLM legítimo NÃO pode disparar o gate):
 # - Substring EXATA (case-sensitive) apenas em "registro de erro" do
@@ -27,34 +28,38 @@ _console = Console()
 #   "error", código com `raise ValueError("error: x")` indentado) não dispara;
 # - "Traceback (most recent call last)" só conta quando cai no stderr do
 #   subprocesso: no stdout pode ser conteúdo legítimo (ex.: exemplo de código
-#   Python gerado); em stderr é quase sempre crash do runtime.
-_LLM_ERROR_MARKERS = (
-    # Erros de modelo
+#   Python gerado); em stderr é quase sempre crash do runtime;
+# - Marcadores de auth/CLI em stdout só disparam quando NÃO houver artefatos de
+#   código legítimos (### FILE: ou blocos multi-linha markdown com código).
+_LLM_FATAL_MARKERS = (
+    # Erros de modelo e provedor
     "Model not found",
     "model_not_found",
     "is not a valid model",
-    # Erros de API/servidor/auth
     "UnknownError",
     "Unexpected server error",
-    "401 Unauthorized",
-    "Unauthorized",
-    "Invalid API key",
-    "API key is invalid",
-    "No auth credentials",
-    "Missing Bearer token",
-    # Rate limit / contexto (frases específicas; "exceeded" sozinho é genérico
-    # demais e apareceria em conteúdo legítimo)
     "Rate limit exceeded",
     "rate_limit",
     "exceeded your current quota",
     "maximum context length",
     "context length exceeded",
     "maximum context",
-    # Falhas do CLI/runner
+)
+
+_LLM_AUTH_CLI_MARKERS = (
+    # Erros de auth / execução de CLI que podem aparecer em mensagens do runtime
+    "401 Unauthorized",
+    "Unauthorized",
+    "Invalid API key",
+    "API key is invalid",
+    "No auth credentials",
+    "Missing Bearer token",
     "Command failed",
     "failed to run",
     "FATAL",
 )
+
+_LLM_ERROR_MARKERS = _LLM_FATAL_MARKERS + _LLM_AUTH_CLI_MARKERS
 
 # Prefixos que casam apenas no INÍCIO da linha (erros de CLI).
 _LLM_ERROR_LINE_PREFIXES = ("error:", "Error:", "fatal:")
@@ -99,29 +104,57 @@ def _raise_if_llm_error_marker(raw_response_text: str, result=None) -> None:
         haystack += "\n" + (getattr(result, "stdout", "") or "")
         stderr_text = getattr(result, "stderr", "") or ""
         haystack += "\n" + stderr_text
+
+    # 1. Qualquer marcador de erro no stderr é sempre falha do processo/runner
     for marker in _LLM_ERROR_MARKERS:
-        if marker in haystack:
+        if marker in stderr_text:
             raise RuntimeError(
                 "LLM Engine falhou: resposta contém erro de modelo/servidor. "
                 "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
                 f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
             )
-    # Prefixos de linha: casamento no INÍCIO da linha — a palavra "error" no
-    # meio de conteúdo legítimo (código, docstring, teste) não dispara o gate.
-    for line in haystack.splitlines():
-        stripped = line.strip()
-        if any(stripped.startswith(prefix) for prefix in _LLM_ERROR_LINE_PREFIXES):
-            raise RuntimeError(
-                "LLM Engine falhou: resposta contém erro de CLI. "
-                "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
-                f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
-            )
-    # Traceback só via stderr: no stdout pode ser conteúdo LLM legítimo
-    # (ex.: exemplo de código Python); em stderr é quase sempre crash do runtime.
+
+    # 2. Traceback no stderr: crash do runtime
     if any(marker in stderr_text for marker in _LLM_STDERR_ONLY_MARKERS):
         raise RuntimeError(
             f"LLM Engine falhou: subprocesso crashou (traceback no stderr). Resposta: {raw_response_text[:300]}"
         )
+
+    # 3. Marcadores e prefixos em stdout:
+    # Falhas reais de CLI / provedor produzem mensagens curtas (< 500 caracteres).
+    # Documentos longos gerados pela LLM (specs arquiteturais, múltiplos arquivos com ### FILE:,
+    # READMEs e código com regras de auth/rate-limit/tratamento de erros) contêm termos legítimos de domínio
+    # e NÃO devem ser barrados pelo gate.
+    cleaned_text = (raw_response_text or "").strip()
+    is_short_output = len(cleaned_text) < 500
+    has_code_artifacts = "### FILE:" in cleaned_text or "```" in cleaned_text
+
+    if is_short_output and not has_code_artifacts:
+        for line in haystack.splitlines():
+            stripped = line.strip()
+            if any(stripped.startswith(prefix) for prefix in _LLM_ERROR_LINE_PREFIXES):
+                raise RuntimeError(
+                    "LLM Engine falhou: resposta contém erro de CLI. "
+                    "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
+                    f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
+                )
+
+        for marker in _LLM_ERROR_MARKERS:
+            if marker in haystack:
+                raise RuntimeError(
+                    "LLM Engine falhou: resposta contém erro de modelo/servidor. "
+                    "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
+                    f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
+                )
+    else:
+        # Em saídas estruturadas, apenas marcadores inequívocos de modelo/provedor inexistente barram
+        for marker in ("Model not found", "model_not_found", "is not a valid model", "UnknownError", "Unexpected server error"):
+            if marker in haystack:
+                raise RuntimeError(
+                    "LLM Engine falhou: resposta contém erro de modelo/servidor. "
+                    "Verifique OPENROUTER_MODEL / OPENCODE_MODEL / .loopforge.json "
+                    f"(ex.: 'oc/deepseek-v4-flash-free'). Resposta: {raw_response_text[:300]}"
+                )
 
 
 T = TypeVar("T", bound=BaseModel)

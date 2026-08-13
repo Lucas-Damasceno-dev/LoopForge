@@ -199,3 +199,46 @@ def test_gate_success_output_with_error_words_passes():
         "def test_error_handling():\n    assert True\n",
         OpenCodeResult(exit_code=0, stdout="def test_error_handling():\n    pass", stderr=""),
     )
+
+
+def test_gate_generated_code_with_auth_keywords_passes():
+    """Código multi-arquivo legítimo contendo termos de auth (Unauthorized, Invalid API key) NÃO dispara o gate."""
+    code_payload = (
+        "### FILE: app/auth.py\n"
+        "from fastapi import HTTPException\n\n"
+        "def authenticate(key: str):\n"
+        "    if not key:\n"
+        "        raise HTTPException(status_code=401, detail='401 Unauthorized')\n"
+        "    if key == 'bad':\n"
+        "        raise HTTPException(status_code=401, detail='Invalid API key')\n"
+        "### FILE: README.md\n"
+        "# Auth Docs\n"
+        "- Missing Bearer token results in 401 Unauthorized.\n"
+    )
+    # Não deve levantar exceção
+    _raise_if_llm_error_marker(code_payload)
+    _raise_if_llm_error_marker(code_payload, OpenCodeResult(exit_code=0, stdout=code_payload, stderr=""))
+
+
+def test_gate_tech_spec_markdown_with_error_and_rate_limit_passes():
+    """Documento Markdown longo de especificação com seções de erro/rate-limit NÃO dispara o gate."""
+    spec_payload = (
+        "# Especificação Técnica: API de Calculadora\n\n"
+        "## Visão Geral\n"
+        "Esta especificação técnica detalha os requisitos arquiteturais da API.\n"
+        "O sistema deve ser resiliente e seguir padrões de mercado.\n\n"
+        "## Tratamento de Erros\n"
+        "Error: Parâmetros inválidos devem retornar HTTP 422 Unprocessable Entity.\n"
+        "Error: Divisão por zero deve retornar HTTP 400 Bad Request.\n\n"
+        "## Requisitos Não Funcionais\n"
+        "- Taxa máxima de requisições: rate_limit configurado para 100 req/min.\n"
+        "- Autenticação: 401 Unauthorized para chaves inválidas.\n"
+        "- Logging: Registrar eventos com níveis INFO, WARN e ERROR.\n"
+        "Mais detalhes sobre o ciclo de vida e deploy contínuo nesta seção com texto extenso para passar de 500 caracteres.\n"
+    )
+    assert len(spec_payload) > 500
+    # Não deve levantar exceção
+    _raise_if_llm_error_marker(spec_payload)
+    _raise_if_llm_error_marker(spec_payload, OpenCodeResult(exit_code=0, stdout=spec_payload, stderr=""))
+
+
