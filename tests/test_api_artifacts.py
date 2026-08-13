@@ -316,3 +316,41 @@ async def test_artifacts_e2e_pipeline_mock():
         # degraded=True (só no fallback por erro) — assert fixo em False (o
         # in (True, False) anterior era vácuo: degraded já é bool).
         assert data["degraded"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_run_files_and_export_zip(tmp_path):
+    """GET /runs/{id}/files e GET /runs/{id}/export retornam arquivos e zip da run."""
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await _insert_run(RUN_ID)
+
+        # Sem diretório de saída: retorna lista vazia de arquivos e 404 no export
+        r_empty = await ac.get(f"/api/v1/runs/{RUN_ID}/files")
+        assert r_empty.status_code == 200
+        assert r_empty.json()["files"] == []
+
+        # Cria arquivos no diretório temporário da run
+        run_dir = Path(f"/tmp/loopforge/run_{RUN_ID}")
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            (run_dir / "app").mkdir(parents=True, exist_ok=True)
+            (run_dir / "app" / "main.py").write_text("print('hello')", encoding="utf-8")
+            (run_dir / "README.md").write_text("# Project", encoding="utf-8")
+
+            r_files = await ac.get(f"/api/v1/runs/{RUN_ID}/files")
+            assert r_files.status_code == 200
+            files = r_files.json()["files"]
+            paths = [f["path"] for f in files]
+            assert "app/main.py" in paths
+            assert "README.md" in paths
+
+            r_export = await ac.get(f"/api/v1/runs/{RUN_ID}/export")
+            assert r_export.status_code == 200
+            assert r_export.headers["content-type"] == "application/zip"
+            assert "attachment" in r_export.headers["content-disposition"]
+            assert len(r_export.content) > 0
+        finally:
+            import shutil
+            shutil.rmtree(run_dir, ignore_errors=True)
+

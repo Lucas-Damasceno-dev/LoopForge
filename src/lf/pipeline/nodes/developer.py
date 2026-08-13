@@ -419,7 +419,7 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
                 print(
                     f"--- INFO: Developer pulou {skipped_tests_count} arquivo(s) tests/ (contrato de testes ativo) ---"
                 )
-        _write_project_files(mock_files, [output_dir, project_dir])
+        _write_project_files(mock_files, [output_dir, project_dir], stack=stack)
         if incremental:
             _bump_slice_attempt(slices, slice_index)
             slice_status = "pending"  # aguarda veredito do QA
@@ -638,7 +638,7 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
         _cleanup_stale_project_dirs([output_dir, project_dir], stack=stack)
 
     if not state.get("read_only", False):
-        _write_project_files(files_map, [output_dir, project_dir])
+        _write_project_files(files_map, [output_dir, project_dir], stack=stack)
 
     # 🔍 Gate Único de Qualidade: Validação sintática AST/Compiler após gravação dos arquivos
     syntax_errors = _check_syntax_and_types(files_map, stack, project_dir)
@@ -894,7 +894,7 @@ def _cleanup_stale_project_dirs(target_dirs: list[str], stack: str = "", artifac
                     print(f"--- AVISO: Não foi possível remover '{file_path}': {exc} ---")
 
 
-def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> None:
+def _write_project_files(files_map: dict[str, str], target_dirs: list[str], stack: str = "") -> None:
     unique_dirs = list({str(Path(d).resolve()): d for d in target_dirs if d}.values())
     for base_dir in unique_dirs:
         base_path = Path(base_dir).resolve()
@@ -914,6 +914,14 @@ def _write_project_files(files_map: dict[str, str], target_dirs: list[str]) -> N
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"--- INFO: Arquivo do projeto salvo: {full_path} ({len(content)} chars) ---")
+
+        # Auto-formatação automática da stack antes do QA
+        try:
+            from lf.runner.harness.runner import TestHarnessRunner
+
+            TestHarnessRunner(stack=stack, auto_format=True).run_auto_formatter(base_dir)
+        except Exception:
+            pass
 
 
 def _is_tests_path(rel_path: str) -> bool:

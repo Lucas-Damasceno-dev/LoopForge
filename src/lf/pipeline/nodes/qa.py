@@ -364,9 +364,9 @@ def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> di
             subprocess.run("go mod tidy", shell=True, cwd=target_dir, capture_output=True, timeout=60)
 
     runner = TestHarnessRunner(stack=stack, auto_format=True)
-    # Onda 2 (2.1): gate de formatação ANTES dos testes — o código deve chegar
-    # formatado no QA. O auto-fix do runner continua como salvaguarda pro teste
-    # rodar limpo, mas a checagem --check vira feedback corrigível pro Developer.
+    # Executa auto-formatação da stack (ruff format, cargo fmt, gofmt, prettier)
+    if hasattr(runner, "run_auto_formatter"):
+        runner.run_auto_formatter(target_dir)
     format_issues = runner.run_format_check(target_dir)
     res = runner.run(target_dir)
     result = cast("dict", asdict(res)) if hasattr(res, "__dataclass_fields__") else cast("dict", res)

@@ -187,3 +187,20 @@ class ArtifactsResponse(BaseModel):
     degraded_reason: str | None = None
     circuit_breaker: CircuitBreakerSnapshot | None = None
     lessons: list[ArtifactLesson] = Field(default_factory=list)
+
+
+class RunFileItem(BaseModel):
+    """Arquivo gerado no diretório de saída da run."""
+
+    path: str
+    size: int
+    content: str | None = None
+    is_binary: bool = False
+
+
+class RunFilesResponse(BaseModel):
+    """GET /api/v1/runs/{id}/files — lista e conteúdo dos arquivos gerados."""
+
+    run_id: str
+    files: list[RunFileItem] = Field(default_factory=list)
+
