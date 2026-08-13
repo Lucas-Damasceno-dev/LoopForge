@@ -261,6 +261,6 @@ async def test_artifacts_e2e_pipeline_mock():
         assert "parallel_audit" in data["node_artifacts"]
         assert "circuit_breaker" in data and data["circuit_breaker"] is not None
         # mock devolve resposta normal (sem exceção), então os nós NÃO marcam
-        # degraded=True (só no fallback por erro) — aceita False (divergência
-        # documentada no report da task).
-        assert data["degraded"] in (True, False)  # mock → sem fallback degradado
+        # degraded=True (só no fallback por erro) — assert fixo em False (o
+        # in (True, False) anterior era vácuo: degraded já é bool).
+        assert data["degraded"] is False
