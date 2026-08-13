@@ -574,10 +574,13 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         run = await session.get(PipelineRun, run_id)
         if not run:
             raise HTTPException(status_code=404, detail="Run not found")
-        events = await event_bus.list_events(run_id, after_seq=after_seq, limit=limit)
-        # next_after_seq = último seq retornado quando o limite foi atingido
-        # (pode haver mais páginas); None quando não há mais eventos.
-        next_after_seq = events[-1]["seq"] if events and len(events) == limit else None
+        # Busca limit+1 para DETECTAR página cheia de verdade (has_more): a
+        # heurística antiga (len == limit) marcava next_after_seq mesmo quando a
+        # última página tinha EXATAMENTE limit eventos e não havia mais nada.
+        raw = await event_bus.list_events(run_id, after_seq=after_seq, limit=limit + 1)
+        events = raw[:limit]
+        has_more = len(raw) > limit
+        next_after_seq = events[-1]["seq"] if events and has_more else None
         return {"run_id": run_id, "events": events, "next_after_seq": next_after_seq}
 
     @app.get(

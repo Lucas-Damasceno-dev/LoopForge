@@ -14,6 +14,7 @@ import tty
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 from rich.syntax import Syntax
@@ -125,6 +126,19 @@ class TaskDispatcher:
 
             subprocess_timeout_seconds = load_ade_config().runner.subprocess_timeout_seconds
         self.subprocess_timeout_seconds = subprocess_timeout_seconds
+        # Item 4.1 roadmap: sandbox em git worktree (.slim/worktrees/) — geração
+        # e testes rodam isolados; merge na main apenas após aprovação QA+AppSec.
+        # Fonte única: ade.yaml runner.sandbox_enabled (mesmo padrão do hitl).
+        from lf.config.loader import load_ade_config
+
+        ade_config = load_ade_config()
+        self.sandbox_enabled = ade_config.runner.sandbox_enabled
+        if self.sandbox_enabled and ade_config.runner.max_concurrent_runs > 1:
+            logger.warning(
+                "Sandbox habilitada com runner.max_concurrent_runs > 1: runs paralelas no MESMO repo "
+                "competem por branches/worktrees — mitigação recomendada: flock por worktree "
+                "(serialização) ou max_concurrent_runs=1."
+            )
         # C4 (M-11): gates HITL já anunciados (dedup do evento hitl_gate_reached
         # por run+nó — re-entrada no MESMO gate não re-publica).
         self._announced_hitl_gates: set[tuple[str, str]] = set()
@@ -136,6 +150,16 @@ class TaskDispatcher:
         if self.circuit_breaker is not None:
             return self.circuit_breaker
         return CircuitBreaker(max_total_cost=_default_budget_usd())
+
+    def _ade_pipeline(self) -> Any:
+        """Config pipeline do ade.yaml (v7 5.1) resolvida em call-time.
+
+        Mesmo padrão do hitl/subprocesso no __init__: fonte única
+        ``ade.yaml pipeline.*``; arquivo ausente → AdePipeline() com defaults.
+        """
+        from lf.config.loader import load_ade_config
+
+        return load_ade_config().pipeline
 
     def _get_graph(self, checkpointer=None):
         """Retorna grafo compilado (cache por sessão)."""
@@ -207,6 +231,17 @@ class TaskDispatcher:
             "routing_mode": getattr(task, "routing_mode", "full"),
             "task_type": getattr(task, "task_type", "feature"),
             "complexity_level": getattr(task, "complexity_level", "standard"),
+            # Milestone v7 5.1: entrega incremental por user story. A flag vem do
+            # task OU do ade.yaml (pipeline.incremental_slices); os slices em si
+            # são derivados das user_stories no nó PM (build_slices).
+            "incremental_slices": bool(getattr(task, "incremental_slices", False))
+            or bool(self._ade_pipeline().incremental_slices),
+            "slices": [],
+            "slice_index": 0,
+            "slice_status": "",
+            "slice_test_report": {},
+            "test_scope": "full",
+            "slice_max_retries": int(self._ade_pipeline().slice_max_retries),
             "is_interactive": self.interactive,
             "expected_schema": None,
             "persona_id": getattr(task, "agent_id", None),
@@ -220,6 +255,120 @@ class TaskDispatcher:
         state["circuit_breaker"] = self._resolve_circuit_breaker().snapshot()
 
         return state
+
+    def _sandbox_task_slug(self, task: TaskSchema) -> str:
+        """Slug do task.id sanitizado para branch/pasta de worktree (+ sufixo uuid).
+
+        O sufixo uuid garante unicidade entre runs consecutivas do CLI (task.id
+        é fixo — "task-1") que, sem ele, colidiriam na MESMA worktree/branch.
+        """
+        import re
+
+        raw = str(getattr(task, "id", "") or "").lower()
+        slug = re.sub(r"[^a-z0-9-]+", "-", raw).strip("-")
+        if not slug:
+            slug = "task"
+        return f"{slug[:40]}-{uuid.uuid4().hex[:8]}"
+
+    def _setup_sandbox(self, initial_state: dict, task: TaskSchema) -> dict | None:
+        """Cria git worktree isolada (.slim/worktrees/) para a run, se habilitado.
+
+        Item 4.1: geração/testes rodam em worktree separada; o merge na main só
+        acontece após aprovação QA+AppSec (_finalize_sandbox). Degrada para None
+        (execução SEM isolamento) com log quando: sandbox desabilitada; repo
+        candidato não é git válido; repo é o próprio LoopForge (dogfooding); ou
+        a criação da worktree falha — nunca quebra o dispatch.
+        """
+        if not self.sandbox_enabled:
+            return None
+        from lf.runner.git.sandbox import GitSandbox
+
+        # Repo candidato: project_dir se for caminho real != "."; senão cwd.
+        project_dir = str(initial_state.get("project_dir") or ".")
+        if project_dir != "." and Path(project_dir).is_dir():
+            repo = Path(project_dir).resolve()
+        else:
+            repo = Path(os.getcwd()).resolve()
+
+        if not GitSandbox.is_git_repo(repo):
+            logger.debug("Sandbox: '%s' não é repo git válido — execução sem isolamento.", repo)
+            return None
+
+        # Dogfooding: nunca isolar o próprio repo LoopForge.
+        loopforge_root = Path(__file__).resolve().parents[3]
+        if repo == loopforge_root or (repo / ".loopforge.json").exists():
+            logger.warning("Sandbox: repo LoopForge detectado (%s) — sandbox ignorada.", repo)
+            return None
+
+        slug = self._sandbox_task_slug(task)
+        sandbox = GitSandbox(repo)
+        try:
+            worktree = sandbox.create_worktree(slug)
+        except Exception as exc:
+            logger.warning("Falha ao criar worktree sandbox em %s: %s", repo, exc)
+            return None
+        if worktree is None:
+            logger.warning("Sandbox: create_worktree(%s) falhou em %s — degradação silenciosa.", slug, repo)
+            return None
+
+        return {
+            "enabled": True,
+            "repo": str(repo),
+            "worktree_path": str(worktree),
+            "task_id": slug,
+            "branch": f"lf-worktree-{slug}",
+        }
+
+    def _finalize_sandbox(self, sandbox: dict | None, result: dict, approved: bool) -> None:
+        """Finaliza a sandbox: merge na main SÓ se aprovado E sem erros/falhas/vulns.
+
+        Aprovado: limpa artefatos regeneráveis (artifacts_only) → commit na
+        worktree → merge na main → remove worktree+branch. Não aprovado:
+        remove worktree+branch SEM merge (o código fica só na branch temporária,
+        descartada). Nunca propaga exceção — degradação com warning.
+        """
+        if not sandbox or not sandbox.get("enabled"):
+            return
+        from lf.runner.git.sandbox import GitSandbox
+
+        git = GitSandbox(sandbox["repo"])
+        task_id = sandbox["task_id"]
+        try:
+            tests_failed = result.get("test_report", {}).get("summary", {}).get("tests_failed")
+            vulns = result.get("security_report", {}).get("vulnerabilities_found")
+            ok = approved and not result.get("error") and not tests_failed and not vulns
+            if ok:
+                from lf.pipeline.nodes.developer import _cleanup_stale_project_dirs
+
+                _cleanup_stale_project_dirs(
+                    [sandbox["worktree_path"]],
+                    stack=str(result.get("stack", "")),
+                    artifacts_only=True,
+                )
+                if git.commit_worktree(task_id, f"feat: código gerado por {task_id}"):
+                    if git.merge_worktree(task_id):
+                        git.cleanup_worktree(task_id)
+                    else:
+                        logger.warning("Sandbox: merge da worktree %s falhou — worktree removida sem merge.", task_id)
+                        git.cleanup_worktree(task_id)
+                else:
+                    logger.warning("Sandbox: nada a commitar na worktree %s — worktree removida.", task_id)
+                    git.cleanup_worktree(task_id)
+            else:
+                logger.warning(
+                    "Sandbox: run NÃO aprovada para merge (approved=%s, error=%r, tests_failed=%r, vulns=%r) "
+                    "— worktree %s removida sem merge.",
+                    approved,
+                    bool(result.get("error")),
+                    tests_failed,
+                    vulns,
+                    task_id,
+                )
+                git.cleanup_worktree(task_id)
+        except Exception as exc:
+            logger.warning("Falha ao finalizar sandbox (%s): %s", task_id, exc)
+            with contextlib.suppress(Exception):
+                git.cleanup_worktree(task_id)
 
     def _broadcast_ws(
         self,
@@ -479,16 +628,22 @@ class TaskDispatcher:
         current_node: str | None = None,
         duration_seconds: float | None = None,
         thread_id: str | None = None,
+        degraded: bool = False,
     ) -> None:
         """Upsert idempotente em pipeline_runs (M-07/A2) — writer canônico.
 
         Runs CLI (`lf run --mock`) nunca passaram pelo ``create_all`` da API,
         então a tabela pode não existir: garante com o MESMO schema de
-        models.PipelineRun (incluindo thread_id/parent_run_id) no MESMO db_path
-        do ``_record_decision`` (``.loopforge/telemetry.sqlite``, resolvido em
-        call-time). ``INSERT ... ON CONFLICT(id) DO UPDATE`` preserva
-        ``created_at`` e não sobrescreve ``idea``/``stack`` já gravados pela
-        API quando não informados (cláusula CASE).
+        models.PipelineRun (incluindo thread_id/parent_run_id/degraded) no MESMO
+        db_path do ``_record_decision`` (``.loopforge/telemetry.sqlite``,
+        resolvido em call-time). ``INSERT ... ON CONFLICT(id) DO UPDATE``
+        preserva ``created_at`` e não sobrescreve ``idea``/``stack`` já gravados
+        pela API quando não informados (cláusula CASE).
+
+        ``degraded`` (coluna NOT NULL sem default DB-side quando a tabela foi
+        criada pelo create_all da API) SEMPRE recebe valor — 0/False por padrão,
+        o status real nos upserts finais — senão o INSERT quebra com
+        ``NOT NULL constraint failed`` e a run CLI nunca vira linha.
 
         Telemetria: NUNCA derruba a pipeline (try/except + logger.warning).
         """
@@ -509,10 +664,20 @@ class TaskDispatcher:
                         duration_seconds FLOAT DEFAULT 0.0,
                         thread_id VARCHAR(50),
                         parent_run_id VARCHAR(36),
+                        degraded BOOLEAN DEFAULT 0,
+                        degraded_reason TEXT,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                # DBs legados (criados antes das colunas degraded existirem) não
+                # são alterados por CREATE TABLE IF NOT EXISTS — migra aditivamente
+                # (mesmo padrão de app._ensure_pipeline_runs_degraded_columns).
+                existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(pipeline_runs)").fetchall()}
+                if "degraded" not in existing_cols:
+                    conn.execute("ALTER TABLE pipeline_runs ADD COLUMN degraded BOOLEAN DEFAULT 0")
+                if "degraded_reason" not in existing_cols:
+                    conn.execute("ALTER TABLE pipeline_runs ADD COLUMN degraded_reason TEXT")
                 # Formato de timestamp do SQLAlchemy no SQLite (space-separated,
                 # sem tz) para o ORM da API ler sem fricção (teste (c)).
                 now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -520,13 +685,14 @@ class TaskDispatcher:
                     """
                     INSERT INTO pipeline_runs
                         (id, idea, stack, status, current_node, duration_seconds,
-                         thread_id, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         thread_id, degraded, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         status = excluded.status,
                         current_node = excluded.current_node,
                         duration_seconds = excluded.duration_seconds,
                         thread_id = excluded.thread_id,
+                        degraded = excluded.degraded,
                         updated_at = excluded.updated_at,
                         idea = CASE WHEN excluded.idea IS NOT NULL
                                     THEN excluded.idea ELSE pipeline_runs.idea END,
@@ -544,6 +710,7 @@ class TaskDispatcher:
                         # DEFAULT DB-side) — NULL quebraria o upsert "running".
                         0.0 if duration_seconds is None else duration_seconds,
                         thread_id,
+                        degraded,
                         now,
                         now,
                     ),
@@ -615,6 +782,76 @@ class TaskDispatcher:
         worker.join()
         if errors:
             raise errors[0]
+
+    def _render_hitl_diff_preview(self, state: dict) -> None:
+        """Renderiza diff side-by-side (máx. 5 arquivos) entre output_dir e o workspace.
+
+        Item 4.4 do roadmap: no gate HITL antes do QA, mostra lado a lado o que o
+        Developer gerou (output_dir) contra o alvo (project_dir ou diretório atual).
+        É PURE display: não altera fluxo de escolha, polling, timeouts ou eventos WS.
+
+        Degrada SILENCIOSAMENTE para a linha "Nenhuma diferença" quando output_dir
+        não existe, o alvo é inválido ou ocorre qualquer erro — nunca lança exceção
+        que quebre o gate HITL.
+        """
+        console = Console()
+        try:
+            # Import local (evita carregar o grupo click no import top-level do
+            # dispatcher). Sem risco de cycle: diff.py só importa click e workdir.
+            from lf.cli.commands.diff import _render_side_by_side_files
+        except Exception:
+            _render_side_by_side_files = None  # type: ignore[assignment]
+
+        console.print("\n[bold cyan]📊 Diff Side-by-Side (arquivos gerados vs workspace):[/bold cyan]")
+        try:
+            proposed_dir = Path(state.get("output_dir") or "").resolve()
+            if not proposed_dir.is_dir():
+                console.print("[green]Nenhuma diferença entre arquivos gerados e o workspace.[/green]")
+                return
+
+            # Alvo do diff: project_dir se existir e for caminho válido; senão o
+            # diretório atual (mesmo comportamento do diff.py: target = ".").
+            target_path = Path(state.get("project_dir") or ".").resolve()
+            if not target_path.is_dir():
+                target_path = Path(".").resolve()
+
+            if proposed_dir == target_path:
+                console.print("[green]Nenhuma diferença entre arquivos gerados e o workspace.[/green]")
+                return
+
+            diffs: list[tuple[str, str, str]] = []
+            for p in proposed_dir.rglob("*"):
+                if not p.is_file():
+                    continue
+                rel: str = str(p.relative_to(proposed_dir))
+                target_file = target_path / rel
+                proposed_text = p.read_text(errors="ignore")
+                original_text = target_file.read_text(errors="ignore") if target_file.exists() else ""
+                if proposed_text != original_text:
+                    diffs.append((rel, original_text, proposed_text))
+
+            if not diffs:
+                console.print("[green]Nenhuma diferença entre arquivos gerados e o workspace.[/green]")
+                return
+
+            # Máx. 5 arquivos para não inundar o console; conteúdo truncado em
+            # 3000 chars por arquivo (o preview de código usa o mesmo critério).
+            for rel, original, proposed in diffs[:5]:
+                if _render_side_by_side_files is not None:
+                    _render_side_by_side_files(
+                        rel,
+                        original[:3000] + ("..." if len(original) > 3000 else ""),
+                        proposed[:3000] + ("..." if len(proposed) > 3000 else ""),
+                    )
+                else:
+                    console.print(f"[bold yellow]📄 {rel}:[/bold yellow]")
+
+            extra = len(diffs) - 5
+            if extra > 0:
+                console.print(f"[dim]... e {extra} arquivo(s) adicionais com diferenças[/dim]")
+        except Exception as exc:  # pragma: no cover - degradação defensiva
+            logger.debug("Diff side-by-side no gate HITL indisponível: %s", exc)
+            console.print("[green]Nenhuma diferença entre arquivos gerados e o workspace.[/green]")
 
     def _human_interrupt_handler(self, snapshot, config, app) -> bool:
         """Manipula interrupção humana (HITL) exibindo os artefatos do nó RECÉM-CONCLUÍDO e o gate do PRÓXIMO nó."""
@@ -690,6 +927,10 @@ class TaskDispatcher:
                     console.print(clean_code)
             else:
                 console.print("[dim]Nenhum código gerado.[/dim]")
+
+            # Item 4.4 do roadmap: diff side-by-side (arquivos gerados vs workspace)
+            # logo após o preview do código, antes da lista de ações. Só exibição.
+            self._render_hitl_diff_preview(state)
 
         # 2. Se estamos pausados antes do DEVELOPER, mostra a especificação do TECH LEAD
         elif next_node == "developer":
@@ -1059,6 +1300,19 @@ class TaskDispatcher:
                 if part
             )
 
+        # Item 4.1 roadmap: sandbox em git worktree — substitui o workdir da run
+        # pelo caminho da worktree isolada (gera/testa lá; merge na main apenas
+        # após aprovação QA+AppSec no finalize). project_dir TAMBÉM aponta para a
+        # worktree: os nós (developer, lessons, appsec/devops, harness) operam só
+        # dentro do isolamento — sem efeitos colaterais untracked no repo do
+        # usuário, que quebrariam o merge (untracked overwritten). Snapshot
+        # persistido no estado.
+        sandbox_snapshot = self._setup_sandbox(initial_state, task)
+        if sandbox_snapshot:
+            initial_state["output_dir"] = sandbox_snapshot["worktree_path"]
+            initial_state["project_dir"] = sandbox_snapshot["worktree_path"]
+            initial_state["sandbox"] = sandbox_snapshot
+
         if self.interactive:
             return self._dispatch_sync(initial_state, thread_id, task, project_id)
 
@@ -1083,6 +1337,10 @@ class TaskDispatcher:
         initial_state["run_id"] = pipeline_run_id
         initial_state["task_id"] = task_id
         start_time = time.monotonic()
+        # Item 4.1: snapshot da sandbox (se ativa) + flag de finalização para o
+        # finally degradar SEM merge se a run morrer no meio.
+        sandbox = initial_state.get("sandbox") or None
+        sandbox_done = False
 
         try:
             await checkpointer.setup()
@@ -1123,10 +1381,11 @@ class TaskDispatcher:
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
-            if self.review_mode:
-                approved = self._review_mode_approval_gate(result)
-                if not approved:
-                    result["error"] = "Review mode rejected by user"
+            # Item 4.1: aprovação vale para o merge da sandbox — review mode só
+            # aprova se o usuário confirmar; caso contrário o merge é negado.
+            approved = not self.review_mode or self._review_mode_approval_gate(result)
+            if not approved:
+                result["error"] = "Review mode rejected by user"
 
             degraded = bool(result.get("degraded"))
             final_status = "completed" if not result.get("error") else "failed"
@@ -1139,6 +1398,7 @@ class TaskDispatcher:
                 current_node=result.get("next_agent", "FINISH"),
                 duration_seconds=round(time.monotonic() - start_time, 2),
                 thread_id=thread_id,
+                degraded=degraded,
             )
             await self._publish_event_async(
                 final_event,
@@ -1167,7 +1427,20 @@ class TaskDispatcher:
                     "🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url
                 )
 
-            self._create_pr_with_labels(task, result, project_id)
+            if sandbox:
+                # Item 4.1: merge na main SÓ com aprovação QA+AppSec. Caminho
+                # async não tem HITL (interactive=False) — sem prompt.
+                if self.interactive:
+                    resp = self._get_input_with_timeout(
+                        "[yellow]Mergear worktree na main? [s/N][/yellow]: ",
+                        timeout=self.subprocess_timeout_seconds,
+                    )
+                    if resp.strip().lower() not in ("s", "sim", "y", "yes"):
+                        approved = False
+                self._finalize_sandbox(sandbox, result, approved)
+                sandbox_done = True
+            else:
+                self._create_pr_with_labels(task, result, project_id)
             return result
 
         except Exception as e:
@@ -1186,10 +1459,21 @@ class TaskDispatcher:
                 thread_id=thread_id,
                 run_id=pipeline_run_id,
             )
+            if sandbox and not sandbox_done:
+                self._finalize_sandbox(sandbox, {**initial_state, "error": str(e), "status": "failed"}, approved=False)
+                sandbox_done = True
             return {**initial_state, "error": str(e), "status": "failed"}
 
         finally:
             await checkpointer.conn.close()
+            if sandbox and not sandbox_done:
+                # Run morreu no meio (sem passar pelo except acima): degrada SEM
+                # merge — a worktree é removida e o código descartado.
+                self._finalize_sandbox(
+                    sandbox,
+                    {"error": "run interrompida — sandbox não finalizada"},
+                    approved=False,
+                )
 
     def _dispatch_sync(self, initial_state: dict, thread_id: str, task: TaskSchema, project_id: str) -> dict:
         """Dispatcher síncrono (caminho HITL): mantém _human_interrupt_handler e graph.stream.
@@ -1211,6 +1495,10 @@ class TaskDispatcher:
         initial_state["run_id"] = pipeline_run_id
         initial_state["task_id"] = task_id
         start_time = time.monotonic()
+        # Item 4.1: snapshot da sandbox (se ativa) + flag de finalização (mesmo
+        # padrão do _dispatch_async — o finally degrada SEM merge se a run morrer).
+        sandbox = initial_state.get("sandbox") or None
+        sandbox_done = False
 
         self._upsert_pipeline_run(
             pipeline_run_id,
@@ -1269,10 +1557,11 @@ class TaskDispatcher:
             state_snapshot = graph.get_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
-            if self.review_mode:
-                approved = self._review_mode_approval_gate(result)
-                if not approved:
-                    result["error"] = "Review mode rejected by user"
+            # Item 4.1: aprovação vale para o merge da sandbox — review mode só
+            # aprova se o usuário confirmar; caso contrário o merge é negado.
+            approved = not self.review_mode or self._review_mode_approval_gate(result)
+            if not approved:
+                result["error"] = "Review mode rejected by user"
 
             degraded = bool(result.get("degraded"))
             final_status = "completed" if not result.get("error") else "failed"
@@ -1285,6 +1574,7 @@ class TaskDispatcher:
                 current_node=result.get("next_agent", "FINISH"),
                 duration_seconds=round(time.monotonic() - start_time, 2),
                 thread_id=thread_id,
+                degraded=degraded,
             )
             self._broadcast_ws(
                 final_event,
@@ -1313,7 +1603,21 @@ class TaskDispatcher:
                     "🚀 Pipeline Finalizado", f"Task {task_id}: {status_label}", webhook_url=self.webhook_url
                 )
 
-            self._create_pr_with_labels(task, result, project_id)
+            if sandbox:
+                # Item 4.1: no caminho HITL o usuário decide o merge na main
+                # (default N — só "s/sim/y/yes" aprova). QA+AppSec já passaram;
+                # este prompt é a última palavra do humano.
+                if self.interactive:
+                    resp = self._get_input_with_timeout(
+                        "[yellow]Mergear worktree na main? [s/N][/yellow]: ",
+                        timeout=self.subprocess_timeout_seconds,
+                    )
+                    if resp.strip().lower() not in ("s", "sim", "y", "yes"):
+                        approved = False
+                self._finalize_sandbox(sandbox, result, approved)
+                sandbox_done = True
+            else:
+                self._create_pr_with_labels(task, result, project_id)
             return result
 
         except Exception as e:
@@ -1328,10 +1632,21 @@ class TaskDispatcher:
             self._broadcast_ws(
                 "pipeline_error", task_id, {"error": str(e)}, thread_id=thread_id, run_id=pipeline_run_id
             )
+            if sandbox and not sandbox_done:
+                self._finalize_sandbox(sandbox, {**initial_state, "error": str(e), "status": "failed"}, approved=False)
+                sandbox_done = True
             return {**initial_state, "error": str(e), "status": "failed"}
 
         finally:
             checkpointer.conn.close()
+            if sandbox and not sandbox_done:
+                # Run morreu no meio (sem passar pelo except acima): degrada SEM
+                # merge — a worktree é removida e o código descartado.
+                self._finalize_sandbox(
+                    sandbox,
+                    {"error": "run interrompida — sandbox não finalizada"},
+                    approved=False,
+                )
 
     def resume(self, project_id: str = "project", task_id: str = "task-1", thread_id: str | None = None) -> dict:
         """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via trajectories.db.
@@ -1371,6 +1686,35 @@ class TaskDispatcher:
                 raise RuntimeError(f"Nenhum checkpoint encontrado para o thread '{thread_id}'.")
 
             last_values = snapshot.values
+            # Item 4.1: resume de run em sandbox — se a worktree foi removida
+            # entre a pausa e o resume (ex.: limpeza manual), recria a partir do
+            # snapshot e aponta o output_dir para a worktree nova ANTES do astream.
+            sandbox_state = last_values.get("sandbox") or {}
+            if sandbox_state.get("enabled"):
+                from lf.runner.git.sandbox import GitSandbox
+
+                worktree_path = Path(sandbox_state["worktree_path"])
+                if not worktree_path.exists():
+                    sb = GitSandbox(sandbox_state["repo"])
+                    recreated = sb.create_worktree(sandbox_state["task_id"])
+                    if recreated is not None:
+                        new_sandbox = {**sandbox_state, "worktree_path": str(recreated)}
+                        await graph.aupdate_state(
+                            config,
+                            {
+                                "output_dir": str(recreated),
+                                "project_dir": str(recreated),
+                                "sandbox": new_sandbox,
+                            },
+                        )
+                        last_values["output_dir"] = str(recreated)
+                        last_values["project_dir"] = str(recreated)
+                        last_values["sandbox"] = new_sandbox
+                    else:
+                        logger.warning(
+                            "Resume: não foi possível recriar worktree sandbox %s — seguindo sem isolamento.",
+                            sandbox_state.get("task_id"),
+                        )
             resuming_node = snapshot.next[0] if snapshot.next else last_values.get("next_agent", "cpo")
 
             print(
@@ -1427,6 +1771,7 @@ class TaskDispatcher:
                 current_node=result.get("next_agent", "FINISH"),
                 duration_seconds=round(time.monotonic() - start_time, 2),
                 thread_id=thread_id,
+                degraded=degraded,
             )
             await self._publish_event_async(
                 final_event,

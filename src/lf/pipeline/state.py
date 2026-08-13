@@ -87,3 +87,24 @@ class GraphState(TypedDict):
     # o LangGraph descarta chaves fora do TypedDict, e sem ele o hard-stop
     # de budget do nó developer nunca via o estado (enforcement era morto).
     circuit_breaker: dict
+
+    # Sandbox (roadmap 4.1): snapshot serializável definido pelo TaskDispatcher
+    # em _setup_sandbox — git worktree isolada (.slim/worktrees/) para geração/
+    # testes, com merge na main após aprovação QA+AppSec. Canal NotRequired (só
+    # existe quando sandbox_enabled) e declarado para o LangGraph persistir no
+    # checkpoint (o resume recria a worktree a partir dele).
+    sandbox: NotRequired[dict]
+
+    # Entrega Incremental por User Story (milestone v7 item 5.1): com
+    # incremental_slices=True o pipeline gera/valida UM slice (user story) por
+    # vez — Developer → QA → (test_writer → Developer → QA)* → Parallel Audit.
+    # Todos os canais são NotRequired (flag off = estado idêntico ao atual);
+    # precisam ser declarados senão o LangGraph descarta as chaves (mesmo
+    # padrão de circuit_breaker/sandbox).
+    incremental_slices: NotRequired[bool]
+    slices: NotRequired[list[dict]]  # derivado de user_stories (slices.py)
+    slice_index: NotRequired[int]
+    slice_status: NotRequired[str]  # "pending" | "passed" | "failed"
+    slice_test_report: NotRequired[dict]  # QA scoped, com slice_failed/regression_failed
+    test_scope: NotRequired[str]  # "slice" | "full"
+    slice_max_retries: NotRequired[int]  # limite de retries por slice (AdePipeline)

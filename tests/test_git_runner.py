@@ -5,8 +5,11 @@ from lf.runner.git.pr import create_github_pr
 from lf.runner.git.sandbox import GitSandbox
 
 
-def test_git_checkpoint_manager(tmp_path):
+def test_git_checkpoint_manager(tmp_path, monkeypatch):
     manager = GitCheckpointManager(repo_path=tmp_path)
+    # O guard LF_API_TEST (conftest autouse) faz create_checkpoint no-op — remove
+    # para exercitar o caminho real de checkpoint (git add/commit/rev-parse).
+    monkeypatch.delenv("LF_API_TEST", raising=False)
     with patch("subprocess.run") as mock_run:
         # Mock rev-parse HEAD return
         mock_run.return_value = MagicMock(returncode=0, stdout="abc123commit\n", stderr="")

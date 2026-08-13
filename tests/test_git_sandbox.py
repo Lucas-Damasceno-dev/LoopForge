@@ -132,7 +132,11 @@ class TestMergeWorktree:
         _git(git_repo, "commit", "-m", "main change")
         sandbox = GitSandbox(git_repo)
         assert sandbox.merge_worktree("conf") is False
-        assert _git(git_repo, "merge", "--abort", check=False).returncode in (0, 1)
+        # merge_worktree aborta o merge em falha: o repo NÃO fica em estado
+        # MERGING e a branch original é restaurada (roadmap 4.1).
+        merge_head = _git(git_repo, "rev-parse", "-q", "--verify", "MERGE_HEAD", check=False)
+        assert merge_head.returncode != 0, "repo não deveria estar em estado MERGING"
+        assert _git(git_repo, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip() == "main"
 
     def test_missing_branch_returns_false(self, git_repo: Path) -> None:
         sandbox = GitSandbox(git_repo)

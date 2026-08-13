@@ -30,6 +30,15 @@ def qa(state: GraphState) -> dict:
 
     feedback_history = list(state.get("feedback_history", []))
 
+    # Entrega incremental (v7 5.1): slice corrente para classificação e gate de
+    # cobertura (flag off → variáveis vazias, comportamento byte-idêntico).
+    incremental = state.get("incremental_slices", False)
+    slices = list(state.get("slices", []) or [])
+    slice_index = int(state.get("slice_index", 0) or 0)
+    current_story = None
+    if incremental and slices and 0 <= slice_index < len(slices):
+        current_story = slices[slice_index].get("story") or {}
+
     if not code and not state.get("mock_llm"):
         print("--- AVISO: QA pulando testes — nenhum código foi gerado pelo Developer ---")
         fail_report = _build_report_from_harness(
@@ -45,17 +54,42 @@ def qa(state: GraphState) -> dict:
         print(
             f"--- AVISO: Testes falharam (tentativa {qa_attempt}/{state.get('max_retries', 3)}). Reportando ao Developer. ---"
         )
+        slice_payload: dict = {}
+        if incremental:
+            slice_payload = _slice_fail_payload(slices, slice_index, current_story, fail_report)
         return {
             **state,
             "test_report": fail_report,
             "qa_attempt_count": qa_attempt,
             "feedback_history": new_feedback,
             "next_agent": "developer",
+            **slice_payload,
         }
 
     if state.get("mock_llm"):
         print("--- INFO: QA modo MOCK ---")
         report = _mock_report(report_id, now_iso)
+        if incremental:
+            # Slice mock: aprovado por construção — mantém o E2E determinístico.
+            slice_id = (current_story or {}).get("id", "US000")
+            slice_test_report = {
+                **report,
+                "slice_id": slice_id,
+                "slice_failed": 0,
+                "regression_failed": 0,
+                "test_scope": "slice",
+            }
+            slices[slice_index]["status"] = "passed"
+            slices[slice_index]["test_report"] = slice_test_report
+            return {
+                **state,
+                "test_report": report,
+                "slice_test_report": slice_test_report,
+                "slice_status": "passed",
+                "slices": slices,
+                "test_scope": "slice",
+                "next_agent": "parallel_audit",
+            }
         return {**state, "test_report": report, "next_agent": "parallel_audit"}
 
     # Fase 1: Executar harness real no projeto
@@ -63,7 +97,11 @@ def qa(state: GraphState) -> dict:
 
     # Fase 2: Gerar relatório estruturado via OpenCode (com fallback resiliente para o harness)
     user_stories = state.get("user_stories", [])
-    user_story_id = user_stories[0].get("id", "US001") if user_stories else "US001"
+    # Modo incremental: user_story_id vem do slice corrente (não da story 0).
+    if current_story is not None:
+        user_story_id = current_story.get("id", "US001")
+    else:
+        user_story_id = user_stories[0].get("id", "US001") if user_stories else "US001"
 
     # 🩹 Self-Healing MVP de Dependências: se falhar por versão incompatível, tenta auto-fixar
     if (harness_result.get("passed", 0) == 0 or harness_result.get("errors")) and _attempt_dependency_self_healing(
@@ -113,11 +151,17 @@ def qa(state: GraphState) -> dict:
     report.setdefault("summary", {})["duration_seconds"] = harness_result.get("duration_ms", 0) / 1000.0
 
     # Gate determinístico de cobertura de critérios: cada acceptance criterion precisa de ao menos 1 teste passando.
-    total_criteria = sum(
-        len(us.get("acceptance_criteria") or [])
-        for us in user_stories
-        if isinstance(us.get("acceptance_criteria"), list)
-    )
+    # Modo incremental: soma SÓ os critérios do slice corrente (o gate whole-feature
+    # com todas as stories falharia slices que ainda não foram implementados).
+    if current_story is not None:
+        story_criteria = current_story.get("acceptance_criteria")
+        total_criteria = len(story_criteria) if isinstance(story_criteria, list) else 0
+    else:
+        total_criteria = sum(
+            len(us.get("acceptance_criteria") or [])
+            for us in user_stories
+            if isinstance(us.get("acceptance_criteria"), list)
+        )
     passed = report.get("summary", {}).get("tests_passed", 0)
     criteria_coverage_feedback = ""
     contract_tests_feedback = ""
@@ -215,13 +259,92 @@ def qa(state: GraphState) -> dict:
             msg = f"{msg}\n{contract_tests_feedback}"
         new_feedback = feedback_history + [{"from": "qa", "message": msg, "timestamp": now_iso}]
 
+    # Modo incremental: relatório scoped do slice (slice_failed/regression_failed)
+    # + status do slice para o should_retry decidir avanço/retry/auditoria.
+    slice_payload_out: dict = {}
+    if incremental:
+        slice_failed, regression_failed = _classify_slice_failures(harness_result, slice_index)
+        slice_id = (current_story or {}).get("id", "US000")
+        slice_test_report = {
+            **report,
+            "slice_id": slice_id,
+            "slice_failed": slice_failed,
+            "regression_failed": regression_failed,
+            "test_scope": "slice",
+        }
+        slice_status_out = "passed" if is_pass else "failed"
+        if slices and 0 <= slice_index < len(slices):
+            slices[slice_index]["status"] = slice_status_out
+            slices[slice_index]["test_report"] = slice_test_report
+        slice_payload_out = {
+            "slice_test_report": slice_test_report,
+            "slice_status": slice_status_out,
+            "slices": slices,
+            "test_scope": "slice",
+        }
+
     return {
         **state,
         "test_report": report,
         "qa_attempt_count": qa_attempt,
         "feedback_history": new_feedback,
         "next_agent": next_agent,
+        **slice_payload_out,
     }
+
+
+def _slice_fail_payload(slices: list, slice_index: int, current_story: dict | None, report: dict) -> dict:
+    """Payload de falha do slice para o caminho 'nenhum código gerado' (QA)."""
+    slice_id = (current_story or {}).get("id", "US000")
+    slice_test_report = {
+        **report,
+        "slice_id": slice_id,
+        "slice_failed": 1,
+        "regression_failed": 0,
+        "test_scope": "slice",
+    }
+    if slices and 0 <= slice_index < len(slices):
+        slices[slice_index]["status"] = "failed"
+        slices[slice_index]["test_report"] = slice_test_report
+    return {
+        "slice_test_report": slice_test_report,
+        "slice_status": "failed",
+        "slices": slices,
+        "test_scope": "slice",
+    }
+
+
+def _classify_slice_failures(harness_result: dict, slice_index: int) -> tuple[int, int]:
+    """(slice_failed, regression_failed) — separa falhas do slice corrente de regressão.
+
+    Uma falha pertence ao SLICE quando o caminho do teste começa com
+    ``tests/slices/slice_{NN}/`` (contrato do slice corrente, gravado pelo
+    Test Writer); qualquer outro caminho (tests/ da raiz, slices anteriores,
+    fontes) é REGRESSÃO. Erros livres sem caminho contam como falha do slice
+    (conservador: não provam regressão).
+    """
+    prefix = f"tests/slices/slice_{int(slice_index):02d}/"
+    slice_failed = 0
+    regression_failed = 0
+
+    suites = harness_result.get("results_by_suite") or []
+    for suite in suites:
+        if not isinstance(suite, dict):
+            continue
+        for detail in suite.get("failed_tests_details") or []:
+            if not isinstance(detail, dict):
+                continue
+            name = str(detail.get("test_name") or detail.get("name") or "")
+            if not name:
+                continue
+            if name.startswith(prefix):
+                slice_failed += 1
+            else:
+                regression_failed += 1
+
+    free_errors = [e for e in (harness_result.get("errors") or []) if isinstance(e, str) and e.strip()]
+    slice_failed += len(free_errors)
+    return slice_failed, regression_failed
 
 
 def _run_harness(project_dir: str, stack: str = "", output_dir: str = ".") -> dict:
@@ -281,8 +404,9 @@ def _find_contract_test_files(product_dir: str, stack: str) -> list[Path]:
             "**/*.spec.tsx",
         ]
     else:
-        # python ou stack desconhecida: comportamento original (tests/test_*.py)
-        patterns = ["tests/test_*.py", "tests/*_test.py"]
+        # python ou stack desconhecida: testes-contrato na raiz de tests/ E
+        # recursivos (tests/slices/slice_NN/ no modo incremental).
+        patterns = ["tests/test_*.py", "tests/*_test.py", "tests/**/test_*.py", "tests/**/*_test.py"]
 
     files: list[Path] = []
     for pattern in patterns:

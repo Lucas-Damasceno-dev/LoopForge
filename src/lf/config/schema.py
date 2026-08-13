@@ -57,6 +57,10 @@ class TaskSchema(BaseModel):
     routing_mode: Literal["full", "fast", "patch", "review-only", "explore"] = "full"
     task_type: Literal["feature", "bugfix", "patch", "review", "explore", "fast", "simple"] = "feature"
     complexity_level: Literal["mvp", "standard", "advanced"] = "standard"
+    incremental_slices: bool = Field(
+        default=False,
+        description="Entrega incremental por user story (v7 5.1): gera/valida um slice por vez",
+    )
 
     def __getitem__(self, item: str) -> Any:
         if item == "persona":
@@ -143,6 +147,10 @@ class AdeRunner(BaseModel):
     max_concurrent_runs: int = Field(
         default=2, ge=1, description="Runs executando em paralelo (E3); excedente fica enfileirado"
     )
+    sandbox_enabled: bool = Field(
+        default=False,
+        description="Geração/testes em git worktree isolada (.slim/worktrees/) com merge na main após QA+AppSec",
+    )
 
 
 class AdeApiKey(BaseModel):
@@ -168,12 +176,30 @@ class AdeMemory(BaseModel):
     cross_project: bool = Field(default=False, description="Busca de lições ignora o filtro de stack (todas as stacks)")
 
 
+class AdePipeline(BaseModel):
+    """Configuração da entrega incremental por user story (milestone v7 item 5.1).
+
+    ``incremental_slices`` liga o modo slice no pipeline inteiro (gates HITL,
+    should_retry e nós); ``max_slices`` limita quantos slices a derivação
+    considera (default 8); ``slice_max_retries`` limita retries por slice antes
+    de seguir para a auditoria final.
+    """
+
+    incremental_slices: bool = Field(
+        default=False,
+        description="Entrega incremental por user story: gera/valida um slice por vez",
+    )
+    max_slices: int = Field(default=8, ge=1, description="Limite de slices derivados de user stories")
+    slice_max_retries: int = Field(default=3, ge=1, description="Retries máximos por slice antes da auditoria final")
+
+
 class AdeConfig(BaseModel):
     budget: AdeBudget = Field(default_factory=lambda: AdeBudget())
     mcp_servers: list[AdeMcpServer] = Field(default_factory=list)
     providers: AdeProviders = Field(default_factory=lambda: AdeProviders())
     hitl: AdeHITL = Field(default_factory=lambda: AdeHITL())
     runner: AdeRunner = Field(default_factory=lambda: AdeRunner())
+    pipeline: AdePipeline = Field(default_factory=lambda: AdePipeline())
     genome_injection: bool = Field(
         default=False,
         description="Injeta seção 'GENOMA DE PROJETO' nos prompts de cpo/pm/tech_lead (env LF_GENOME_INJECTION)",

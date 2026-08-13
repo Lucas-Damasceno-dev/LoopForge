@@ -112,9 +112,22 @@ def test_writer(state: GraphState, config: Optional[RunnableConfig] = None) -> d
     print("---EXECUTANDO NÓ: Test Writer---")
 
     user_stories = state.get("user_stories", [])
+    incremental = state.get("incremental_slices", False)
+    slices = list(state.get("slices", []) or [])
+    slice_index = int(state.get("slice_index", 0) or 0)
+
+    # Entrega incremental (v7 5.1): o Test Writer gera o contrato SÓ da user
+    # story do slice corrente (os demais slices entram quando forem a vez deles).
+    current_story = None
+    if incremental and slices and 0 <= slice_index < len(slices):
+        current_story = slices[slice_index].get("story") or {}
+
     has_acceptance_criteria = any(
         isinstance((criteria := us.get("acceptance_criteria")), list) and len(criteria) > 0 for us in user_stories
     )
+    if current_story is not None:
+        criteria = current_story.get("acceptance_criteria")
+        has_acceptance_criteria = isinstance(criteria, list) and len(criteria) > 0
 
     if not user_stories or not has_acceptance_criteria:
         print("--- INFO: Test Writer: sem critérios de aceitação, pulando geração de testes-contrato ---")
@@ -124,8 +137,11 @@ def test_writer(state: GraphState, config: Optional[RunnableConfig] = None) -> d
     tech_spec = str(state.get("tech_spec", ""))
     output_dir = state.get("output_dir") or "."
 
+    # Stories que entram no prompt: só o slice corrente no modo incremental;
+    # todas no modo whole-feature (comportamento atual preservado).
+    stories_for_prompt = [current_story] if current_story is not None else user_stories
     stories_lines: list[str] = []
-    for us in user_stories:
+    for us in stories_for_prompt:
         criteria = us.get("acceptance_criteria")
         if isinstance(criteria, list) and criteria:
             stories_lines.append(f"- ID: {us.get('id', 'N/A')}")
@@ -170,6 +186,15 @@ def test_writer(state: GraphState, config: Optional[RunnableConfig] = None) -> d
     tests_root = Path(output_dir) / "tests"
     tests_root.mkdir(parents=True, exist_ok=True)
 
+    # Modo incremental: contrato do slice gravado em tests/slices/slice_{NN}/ —
+    # o QA usa esse prefixo para classificar falhas do slice vs. regressão.
+    slice_tests_root: Path | None = None
+    if current_story is not None:
+        from .slices import slice_dir_name
+
+        slice_tests_root = tests_root / "slices" / slice_dir_name(slice_index)
+        slice_tests_root.mkdir(parents=True, exist_ok=True)
+
     written_files: dict[str, str] = {}
     written = 0
     for rel_path, content in files_map.items():
@@ -180,7 +205,12 @@ def test_writer(state: GraphState, config: Optional[RunnableConfig] = None) -> d
         if "test" not in name_lower:
             continue
 
-        destination = Path(output_dir) / normalized
+        if slice_tests_root is not None:
+            # Preserva a estrutura após "tests/" dentro do diretório do slice.
+            rel_tail = normalized[len("tests/") :] if normalized.startswith("tests/") else Path(normalized).name
+            destination = slice_tests_root / rel_tail
+        else:
+            destination = Path(output_dir) / normalized
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(content, encoding="utf-8")
         written_files[normalized] = content
@@ -198,7 +228,15 @@ def test_writer(state: GraphState, config: Optional[RunnableConfig] = None) -> d
     if modules:
         contract_tests = raw + "\n\n### MODULES: " + ", ".join(modules)
 
-    return {**state, "next_agent": "developer", "contract_tests": contract_tests}
+    extra_slices: dict = {}
+    if current_story is not None:
+        # Registra o contrato do slice no estado para o Developer consumir
+        # exatamente os testes/modules do slice corrente.
+        slices[slice_index]["modules"] = modules
+        slices[slice_index]["contract_tests"] = contract_tests
+        extra_slices = {"slices": slices}
+
+    return {**state, "next_agent": "developer", "contract_tests": contract_tests, **extra_slices}
 
 
 # Marca a função como não-teste pro pytest (nome começa com `test_`); o mypy

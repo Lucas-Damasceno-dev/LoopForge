@@ -61,8 +61,41 @@ def router(state: GraphState) -> str:
     return END
 
 
-def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "__end__"]:
-    """Decide após QA se deve prosseguir para a auditoria simultânea (AppSec + DevOps) ou retentar."""
+def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "test_writer", "__end__"]:
+    """Decide após QA se deve prosseguir para a auditoria simultânea (AppSec + DevOps) ou retentar.
+
+    Modo whole-feature (incremental_slices off): retorna exatamente os valores
+    legados — pass → parallel_audit, falhou com retries → developer, esgotado →
+    parallel_audit (auditoria final).
+
+    Modo incremental (v7 5.1): o QA já classificou o slice corrente
+    (slice_status "passed"/"failed"). Passou → gera o contrato do PRÓXIMO slice
+    (test_writer) ou auditoria final se for o último; falhou com tentativas do
+    slice < slice_max_retries → developer (retry do MESMO slice); esgotado →
+    parallel_audit (auditoria final + lições).
+    """
+    if state.get("incremental_slices"):
+        slices = list(state.get("slices", []) or [])
+        slice_index = int(state.get("slice_index", 0) or 0)
+        slice_status = state.get("slice_status", "pending")
+        slice_attempts = (
+            int(slices[slice_index].get("attempts", 0) or 0) if slices and 0 <= slice_index < len(slices) else 0
+        )
+        slice_max_retries = int(state.get("slice_max_retries", 3) or 3)
+
+        if slice_status == "passed":
+            if slice_index + 1 >= len(slices):
+                return "parallel_audit"
+            return "test_writer"
+
+        if slice_attempts < slice_max_retries:
+            return "developer"
+
+        # NOTA: NÃO mutar o estado aqui — should_retry é função de aresta
+        # condicional (ver nota no bloco whole-feature abaixo).
+        print("--- AVISO: Retentativas do slice esgotadas. Executando auditoria final... ---")
+        return "parallel_audit"
+
     test_report = state.get("test_report", {})
     tests_failed = test_report.get("summary", {}).get("tests_failed", 1) if isinstance(test_report, dict) else 1
     qa_attempt = state.get("qa_attempt_count", 0)
@@ -159,6 +192,7 @@ def build_graph(
                 {
                     "parallel_audit": "parallel_audit",
                     "developer": "developer",
+                    "test_writer": "test_writer",
                     "__end__": END,
                 },
             )

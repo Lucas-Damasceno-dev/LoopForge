@@ -362,6 +362,26 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
     output_dir = state.get("output_dir", ".")
     project_dir = state.get("project_dir", output_dir)
 
+    # Entrega incremental (v7 5.1): o QA aprovou o slice anterior
+    # (slice_status == "passed") → avança para o próximo slice. Retry do MESMO
+    # slice mantém slice_status "failed" → NÃO avança (corrige o slice corrente).
+    incremental = state.get("incremental_slices", False)
+    slices = list(state.get("slices", []) or [])
+    slice_index = int(state.get("slice_index", 0) or 0)
+    slice_status = state.get("slice_status", "")
+    if incremental and slice_status == "passed":
+        slice_index += 1
+        slice_status = ""
+    current_story = None
+    if incremental and slices and 0 <= slice_index < len(slices):
+        current_story = slices[slice_index].get("story") or {}
+
+    def _slice_extra() -> dict:
+        """Propaga o estado do slice em TODOS os retornos (flag off → {})."""
+        if not incremental:
+            return {}
+        return {"slices": slices, "slice_index": slice_index, "slice_status": slice_status}
+
     default_main = _get_default_filename_by_stack(stack)
 
     # M-10 (hard-stop = PAUSA, não falha): checa o budget ANTES de qualquer
@@ -400,12 +420,16 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
                     f"--- INFO: Developer pulou {skipped_tests_count} arquivo(s) tests/ (contrato de testes ativo) ---"
                 )
         _write_project_files(mock_files, [output_dir, project_dir])
+        if incremental:
+            _bump_slice_attempt(slices, slice_index)
+            slice_status = "pending"  # aguarda veredito do QA
         return {
             **state,
             "code": mock_files.get(default_main, list(mock_files.values())[0]),
             "attempt_count": attempt_count,
             "next_agent": "qa",
             "error": None,
+            **_slice_extra(),
         }
 
     tech_spec = state.get("tech_spec", "")
@@ -414,7 +438,10 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
     model_name = os.environ.get("OPENROUTER_MODEL") or DEFAULT_OPENCODE_MODEL
 
     story_lines = []
-    for us in user_stories[:8]:
+    # Modo incremental: só a story do slice corrente entra no prompt (as demais
+    # slices entram quando forem a vez delas). Whole-feature: todas as stories.
+    stories_for_prompt = [current_story] if current_story is not None else user_stories
+    for us in stories_for_prompt:
         story_lines.append(f"- {us.get('id', '')}: {us.get('title', '')}")
         acceptance_criteria = us.get("acceptance_criteria")
         if isinstance(acceptance_criteria, list) and acceptance_criteria:
@@ -429,7 +456,13 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
         f"\nTech Spec:\n{_truncate_tech_spec(tech_spec)}",
         f"\nUser Stories:\n{chr(10).join(story_lines) if story_lines else 'N/A'}",
     ]
-    contract_tests = state.get("contract_tests", "")
+    # Contrato de testes do slice corrente (incremental) ou o último gravado
+    # pelo Test Writer (whole-feature). O bloco '### MODULES:' funciona com o
+    # string scoped — o inventário do slice vem junto no contrato.
+    if incremental and current_story is not None and slices:
+        contract_tests = str(slices[slice_index].get("contract_tests") or "")
+    else:
+        contract_tests = state.get("contract_tests", "")
     if contract_tests:
         contract_block = (
             f"\n\n=== CONTRATO DE TESTES (suíte definida pelo Test Writer independente) ===\n"
@@ -580,18 +613,26 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
             "feedback_history": new_feedback,
             "next_agent": "FINISH",
             "error": err_msg,
+            **_slice_extra(),
         }
 
     files_map = _parse_multi_file_response(raw, default_main)
-    contract_tests = state.get("contract_tests", "")
+    # Filtra paths tests/ do código gerado — o contrato (whole-feature ou do
+    # slice corrente) é quem manda nos testes; o Developer não sobrescreve.
+    if incremental and current_story is not None and slices:
+        contract_tests = str(slices[slice_index].get("contract_tests") or "")
+    else:
+        contract_tests = state.get("contract_tests", "")
     if contract_tests:
         files_map, skipped_tests_count = _filter_test_paths_from_file_map(files_map)
         if skipped_tests_count > 0:
             print(f"--- INFO: Developer pulou {skipped_tests_count} arquivo(s) tests/ (contrato de testes ativo) ---")
 
-    # Limpa subdiretórios antigos do projeto se for um retry para evitar acúmulo de arquiteturas conflitantes
+    # Limpa subdiretórios antigos do projeto se for um retry para evitar acúmulo de arquiteturas conflitantes.
+    # Incremental NÃO limpa: os slices anteriores são acumulados de propósito
+    # (regressão é detectada pelo QA comparando o slice novo contra os antigos).
     qa_attempts = state.get("qa_attempt_count", 0)
-    if qa_attempts > 0 and not state.get("read_only", False):
+    if qa_attempts > 0 and not state.get("read_only", False) and not incremental:
         _cleanup_stale_project_dirs([output_dir, project_dir], stack=stack)
 
     if not state.get("read_only", False):
@@ -640,9 +681,13 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
                 "feedback_history": feedback_history + [gate_feedback],
                 "next_agent": "developer",
                 "error": None,
+                **_slice_extra(),
             }
         feedback_history = feedback_history + [gate_feedback]
 
+    if incremental:
+        _bump_slice_attempt(slices, slice_index)
+        slice_status = "pending"  # aguarda veredito do QA
     return {
         **state,
         "code": primary_code,
@@ -650,7 +695,14 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
         "feedback_history": feedback_history,
         "next_agent": "qa",
         "error": None,
+        **_slice_extra(),
     }
+
+
+def _bump_slice_attempt(slices: list, slice_index: int) -> None:
+    """Incrementa o contador de tentativas do slice corrente (in-place)."""
+    if slices and 0 <= slice_index < len(slices):
+        slices[slice_index]["attempts"] = int(slices[slice_index].get("attempts", 0) or 0) + 1
 
 
 def _get_default_filename_by_stack(stack: str) -> str:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime
-from typing import Optional
+from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
@@ -62,7 +62,8 @@ def product_manager(state: GraphState, config: Optional[RunnableConfig] = None) 
     # Reutiliza user stories se já geradas em etapa anterior do plano
     if state.get("user_stories"):
         print("--- INFO: PM reutilizando User Stories existentes no estado ---")
-        return {**state, "next_agent": "tech_lead"}
+        extra_slices = _build_slices_extra(state)
+        return {**state, "next_agent": "tech_lead", **extra_slices}
 
     epic = state.get("epic")
     if not epic:
@@ -72,8 +73,9 @@ def product_manager(state: GraphState, config: Optional[RunnableConfig] = None) 
 
     if state.get("mock_llm"):
         print("--- INFO: PM modo MOCK ---")
-        stories = _mock_stories(epic)
-        return {**state, "user_stories": stories, "next_agent": "tech_lead"}
+        mock_stories = _mock_stories(epic)
+        extra_slices = _build_slices_extra(state, stories=mock_stories)
+        return {**state, "user_stories": mock_stories, "next_agent": "tech_lead", **extra_slices}
 
     print("--- INFO: PM usando OpenCode via subprocesso ---")
 
@@ -132,7 +134,30 @@ Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
                 json.dump(us, f, indent=2, ensure_ascii=False)
 
     extra = {"degraded": True, "degraded_reason": degraded_reason} if degraded else {}
-    return {**state, "user_stories": stories, "next_agent": "tech_lead", **extra}
+    extra_slices = _build_slices_extra(state, stories=stories)
+    return {**state, "user_stories": stories, "next_agent": "tech_lead", **extra, **extra_slices}
+
+
+def _build_slices_extra(state: Any, stories: list | None = None) -> dict:
+    """Deriva os slices incrementais das user stories, se a flag estiver ligada.
+
+    Retorna {} (byte-idêntico ao atual) quando ``incremental_slices`` está off;
+    com a flag ligada, devolve ``{"slices": [...]}`` capado por
+    ``AdePipeline.max_slices`` (lido em call-time). O nó developer/test_writer/
+    qa consome os slices via estado.
+    """
+    if not state.get("incremental_slices"):
+        return {}
+    try:
+        from ...config.loader import load_ade_config
+
+        max_slices = load_ade_config().pipeline.max_slices
+    except Exception:
+        max_slices = 8
+    from .slices import build_slices
+
+    user_stories = stories if stories is not None else state.get("user_stories", [])
+    return {"slices": build_slices(user_stories, max_slices=max_slices)}
 
 
 def _mock_stories(epic: dict) -> list[dict]:
