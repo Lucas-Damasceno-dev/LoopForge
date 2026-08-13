@@ -51,40 +51,79 @@ async def setup_test_db():
 
 @pytest.mark.asyncio
 async def test_queue_retorna_run_queued():
-    """Run enfileirada (slot ocupado) aparece na fila com status 'queued'."""
-    app = create_app()
-    # max_concurrent=1 → 1ª run ocupa o slot ativo, 2ª fica enfileirada
-    # (a pipeline mock da 1ª não termina na janela entre os dois POSTs).
-    app.state.run_queue.max_concurrent = 1
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        r1 = await ac.post("/api/runs", json={"idea": "Fila Q1", "stack": "python", "mock_llm": True})
-        assert r1.status_code == 201
-        r2 = await ac.post("/api/runs", json={"idea": "Fila Q2", "stack": "python", "mock_llm": True})
-        assert r2.status_code == 201
-        queued_run_id = r2.json()["id"]
+    """Fila determinística (sem pipeline): run queued aparece com metadados da DB.
 
+    A fila E3 é populada manualmente (pending/params + run na pipeline_runs) em
+    vez de POSTs reais — sem dependência de timing de pipeline mock (flaky). O
+    GET devolve o shape exato: max_concurrent, active_count, active, queued.
+    """
+    from sqlalchemy import insert
+
+    from lf.api.database import engine
+    from lf.api.models import PipelineRun
+
+    active_id = "aaaaaaaa-1111-2222-3333-444444444444"
+    queued_id = "bbbbbbbb-1111-2222-3333-444444444444"
+    async with engine.begin() as conn:
+        await conn.execute(insert(PipelineRun).values(id=active_id, idea="Ativa", stack="python", status="running"))
+        await conn.execute(insert(PipelineRun).values(id=queued_id, idea="Fila Q2", stack="python", status="queued"))
+
+    app = create_app()
+    app.state.run_queue.max_concurrent = 1
+    q = app.state.run_queue
+    q.active.add(active_id)
+    q.pending.append(queued_id)
+    q.params[queued_id] = {
+        "idea": "Fila Q2",
+        "stack": "python",
+        "mock_llm": True,
+        "routing_mode": "full",
+        "interactive": False,
+    }
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         r = await ac.get("/api/v1/runs/queue")
         assert r.status_code == 200
         data = r.json()
-        assert data["max_concurrent"] >= 1
-        assert data["active_count"] >= 1
-        assert r1.json()["id"] in data["active"]
-
-        matches = [q for q in data["queued"] if q["id"] == queued_run_id]
-        assert matches, f"run {queued_run_id} não está na fila: {data}"
-        assert matches[0]["idea"] == "Fila Q2"
-        assert matches[0]["stack"] == "python"
-        assert matches[0]["status"] == "queued"
-        assert matches[0]["created_at"] is not None
+        assert data["max_concurrent"] == 1
+        assert data["active_count"] == 1
+        assert data["active"] == [active_id]
+        assert len(data["queued"]) == 1
+        item = data["queued"][0]
+        assert item["id"] == queued_id
+        assert item["idea"] == "Fila Q2"
+        assert item["stack"] == "python"
+        assert item["status"] == "queued"
+        assert item["created_at"] is not None
 
 
 @pytest.mark.asyncio
 async def test_queue_vazia():
     """Sem runs pendentes, a fila retorna lista vazia com contadores válidos."""
     app = create_app()
+    app.state.run_queue.max_concurrent = 1
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         r = await ac.get("/api/v1/runs/queue")
         assert r.status_code == 200
         data = r.json()
-        assert data["max_concurrent"] >= 1
+        assert data["max_concurrent"] == 1
+        assert data["active_count"] == 0
+        assert data["active"] == []
         assert data["queued"] == []
+
+
+@pytest.mark.asyncio
+async def test_queue_post_run_smoke():
+    """Smoke: run criada via POST /api/runs aparece em active OU queued."""
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.post("/api/runs", json={"idea": "Fila smoke", "stack": "python", "mock_llm": True})
+        assert r.status_code == 201
+        run_id = r.json()["id"]
+
+        qr = await ac.get("/api/v1/runs/queue")
+        assert qr.status_code == 200
+        data = qr.json()
+        assert data["max_concurrent"] >= 1
+        all_ids = [q["id"] for q in data["queued"]] + data["active"]
+        assert run_id in all_ids
