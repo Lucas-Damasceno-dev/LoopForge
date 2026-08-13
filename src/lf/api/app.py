@@ -871,6 +871,11 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     app.include_router(coverage_router, dependencies=[Depends(verify_authentication)])
 
+    # ─── Docker & Devcontainer Generation (ADE) ───────────────────────
+    from lf.api.docker_gen import docker_router
+
+    app.include_router(docker_router, dependencies=[Depends(verify_authentication)])
+
     # ─── SPA React (M-16/B4) ─────────────────────────────────────────
     # Monta o dist da SPA em /app se disponível (env LF_SPA_DIST ou pacote
     # embutido lf.ade.static.dist na B5); sem dist, apenas loga warning.

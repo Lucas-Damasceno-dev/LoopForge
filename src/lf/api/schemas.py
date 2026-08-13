@@ -273,3 +273,31 @@ class CoverageReportResponse(BaseModel):
     source: str = "report"
 
 
+# ─── Docker & Devcontainer ─────────────────────────────────────────
+class DockerConfigResponse(BaseModel):
+    run_id: str
+    stack: str
+    base_image: str
+    dockerfile: str
+    docker_compose: str
+    devcontainer: str
+    dockerignore: str
+    suggested_ports: list[int] = Field(default_factory=list)
+    environment_vars: dict[str, str] = Field(default_factory=dict)
+
+
+class SaveDockerConfigRequest(BaseModel):
+    dockerfile: str | None = None
+    docker_compose: str | None = None
+    devcontainer: str | None = None
+    dockerignore: str | None = None
+
+
+class SaveDockerConfigResponse(BaseModel):
+    run_id: str
+    success: bool
+    saved_files: list[str] = Field(default_factory=list)
+    message: str
+
+
+
