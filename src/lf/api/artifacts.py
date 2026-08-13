@@ -127,10 +127,11 @@ async def get_run_artifacts(
     degraded_reason: str | None = None
     circuit_breaker: CircuitBreakerSnapshot | None = None
 
-    saver = create_async_checkpointer(_trajectories_db())
+    saver = None
     try:
+        saver = create_async_checkpointer(_trajectories_db())
         await saver.setup()
-        thread_id = f"run-{run_id}"
+        thread_id = run.thread_id or f"run-{run.id}"
         async with saver.conn.execute(
             "SELECT checkpoint_id FROM checkpoints WHERE thread_id = ? ORDER BY checkpoint_id DESC LIMIT 1",
             (thread_id,),
@@ -149,11 +150,21 @@ async def get_run_artifacts(
                         node_artifacts[node] = NodeArtifact(output=output)
                 degraded = bool(channels.get("degraded", False))
                 degraded_reason = channels.get("degraded_reason")
+                if not isinstance(degraded_reason, str):
+                    degraded_reason = None
                 cb = channels.get("circuit_breaker")
                 if isinstance(cb, dict):
                     circuit_breaker = CircuitBreakerSnapshot(**cb)
+    except Exception:
+        # Checkpoint corrompido/indisponível (ex.: fields None do CB) → resposta
+        # 200 com artifacts vazios em vez de 500 (padrão costs.py _node_cost_breakdown).
+        node_artifacts = {}
+        degraded = False
+        degraded_reason = None
+        circuit_breaker = None
     finally:
-        await saver.conn.close()
+        if saver is not None:
+            await saver.conn.close()
 
     return ArtifactsResponse(
         run_id=run_id,
