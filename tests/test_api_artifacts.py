@@ -49,14 +49,16 @@ async def setup_test_db():
     os.environ.pop("LF_API_REQUIRE_AUTH", None)
 
 
-async def _insert_run(run_id: str) -> None:
+async def _insert_run(run_id: str, thread_id: str | None = None) -> None:
     """Insere uma run direto na tabela pipeline_runs (sem pipeline)."""
     from lf.api.database import engine
     from lf.api.models import PipelineRun
 
     async with engine.begin() as conn:
         await conn.execute(
-            insert(PipelineRun).values(id=run_id, idea="teste artifacts", stack="python", status="completed")
+            insert(PipelineRun).values(
+                id=run_id, idea="teste artifacts", stack="python", status="completed", thread_id=thread_id
+            )
         )
 
 
@@ -87,6 +89,56 @@ async def test_artifacts_200_vazio_sem_checkpoint():
         assert data["degraded_reason"] is None
         assert data["circuit_breaker"] is None
         assert data["lessons"] == []
+
+
+@pytest.mark.asyncio
+async def test_artifacts_checkpoint_corrompido_graceful(tmp_path, monkeypatch):
+    """Checkpoint com circuit_breaker corrompido → 200 com artifacts vazios e degraded False."""
+    monkeypatch.setattr("lf.api.artifacts._trajectories_db", lambda: tmp_path / "trajectories.db")
+    monkeypatch.setattr("lf.api.artifacts._telemetry_db", lambda: tmp_path / "telemetry.sqlite")
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await _insert_run(RUN_ID)
+        await _seed_thread(
+            tmp_path / "trajectories.db",
+            f"run-{RUN_ID}",
+            "seed-corrupt",
+            {
+                "epic": {"title": "Login"},
+                "degraded": True,
+                "degraded_reason": "fallback",
+                # consecutive_failures=None viola o schema → ValidationError →
+                # cai no except graceful (200, artifacts vazios, degraded False).
+                "circuit_breaker": {"consecutive_failures": None},
+            },
+        )
+        r = await ac.get(f"/api/v1/runs/{RUN_ID}/artifacts")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["node_artifacts"] == {}
+        assert data["degraded"] is False
+        assert data["degraded_reason"] is None
+        assert data["circuit_breaker"] is None
+
+
+@pytest.mark.asyncio
+async def test_artifacts_thread_id_persistido(tmp_path, monkeypatch):
+    """Run com thread_id custom → artifacts vêm da thread persistida (ADR-0003)."""
+    monkeypatch.setattr("lf.api.artifacts._trajectories_db", lambda: tmp_path / "trajectories.db")
+    monkeypatch.setattr("lf.api.artifacts._telemetry_db", lambda: tmp_path / "telemetry.sqlite")
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await _insert_run(RUN_ID, thread_id="custom-thread")
+        await _seed_thread(
+            tmp_path / "trajectories.db",
+            "custom-thread",
+            "seed-thread",
+            {"epic": {"title": "Custom Thread"}},
+        )
+        r = await ac.get(f"/api/v1/runs/{RUN_ID}/artifacts")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["node_artifacts"]["cpo"]["output"]["epic"] == {"title": "Custom Thread"}
 
 
 async def _seed_thread(db_path: Path, thread_id: str, checkpoint_id: str, channels: dict) -> None:

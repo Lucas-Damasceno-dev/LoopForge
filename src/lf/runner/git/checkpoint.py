@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -8,6 +9,8 @@ class GitCheckpointManager:
 
     def create_checkpoint(self, message: str) -> str:
         """Creates git commit checkpoint."""
+        if os.getenv("LF_API_TEST"):
+            return ""
         subprocess.run(["git", "add", "."], cwd=self.repo_path, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", f"checkpoint: {message}"],

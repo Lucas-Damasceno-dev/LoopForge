@@ -58,6 +58,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Gerencia ciclo de vida da aplicação: init e close do DB."""
     settings = get_api_settings()
     await init_db(settings)
+    # Migração aditiva de pipeline_runs (degraded/degraded_reason): DBs legados
+    # não têm as colunas — ALTER TABLE idempotente (padrão C3/M-12).
+    _ensure_pipeline_runs_degraded_columns(_telemetry_db_path())
     yield
     await close_db()
 
@@ -119,6 +122,31 @@ def _ensure_human_decisions_state_patch_column(db_path: Path) -> None:
             conn.close()
     except Exception as exc:
         logger.warning("Falha ao garantir coluna state_patch em human_decisions: %s", exc)
+
+
+def _ensure_pipeline_runs_degraded_columns(db_path: Path) -> None:
+    """Garante as colunas aditivas ``degraded``/``degraded_reason`` em pipeline_runs.
+
+    DBs legados (criados antes do campo de degradação) não têm as colunas — o
+    ORM ``PipelineRun`` as declara, mas o create_all não altera tabelas
+    existentes. Adiciona via ALTER TABLE idempotente (detecção por PRAGMA
+    table_info), no mesmo espírito de ``_ensure_human_decisions_state_patch_column``.
+    Telemetria: nunca derruba o startup (try/except + warning).
+    """
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=10.0)
+        try:
+            conn.execute("PRAGMA busy_timeout=5000")
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(pipeline_runs)")}
+            if "degraded" not in cols:
+                conn.execute("ALTER TABLE pipeline_runs ADD COLUMN degraded BOOLEAN DEFAULT 0")
+            if "degraded_reason" not in cols:
+                conn.execute("ALTER TABLE pipeline_runs ADD COLUMN degraded_reason TEXT")
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.warning("Falha ao garantir colunas degraded em pipeline_runs: %s", exc)
 
 
 def create_app(ui_enabled: bool | None = None) -> FastAPI:
@@ -425,6 +453,42 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         """Alias legado de GET /api/v1/runs (M-18)."""
         _mark_legacy(response)
         return await _list_runs_impl(skip, limit, session)
+
+    @app.get(
+        "/api/v1/runs/queue",
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def get_run_queue(session: AsyncSession = Depends(get_session)):
+        """Estado da fila E3 (M-21): runs ativas + runs `queued` aguardando vaga.
+
+        DECLARADA ANTES de GET /api/v1/runs/{run_id}: "queue" é path fixo e
+        não pode ser capturada como run_id pelo roteador dinâmico.
+        """
+        q = app.state.run_queue
+        pending_ids = list(q.pending)
+        runs_by_id: dict[str, PipelineRun] = {}
+        if pending_ids:
+            result = await session.execute(select(PipelineRun).where(PipelineRun.id.in_(pending_ids)))
+            runs_by_id = {run.id: run for run in result.scalars().all()}
+        queued: list[dict] = []
+        for run_id in pending_ids:
+            run = runs_by_id.get(run_id)
+            queued.append(
+                {
+                    "id": run_id,
+                    "idea": run.idea if run else None,
+                    "stack": run.stack if run else None,
+                    "status": "queued",
+                    "created_at": run.created_at if run else None,
+                }
+            )
+        return {
+            "max_concurrent": q.max_concurrent,
+            "active_count": len(q.active),
+            "active": sorted(q.active),
+            "queued": queued,
+        }
 
     async def _get_run_impl(run_id: str, session: AsyncSession) -> PipelineRun:
         run = await session.get(PipelineRun, run_id)
@@ -971,12 +1035,21 @@ async def _run_pipeline(
                     f"Run pausada no nó {pending[0]} (budget excedido) — use POST /cost/override + /resume para retomar"
                 )
 
+        # Persistência do estado degradado (mock fallback, provider degradado)
+        # no PipelineRun — GET /runs devolve via from_attributes.
+        degraded = bool(final_state.get("degraded"))
+        degraded_reason = final_state.get("degraded_reason")
+        if not isinstance(degraded_reason, str):
+            degraded_reason = None
+
         await _set_run_status(
             run_id,
             final_status,
             current_node=current_node,
             duration_seconds=duration,
             logs=log_msg,
+            degraded=degraded,
+            degraded_reason=degraded_reason,
         )
 
         await event_bus.publish(
@@ -987,6 +1060,12 @@ async def _run_pipeline(
                 "duration_seconds": duration,
             },
         )
+
+        # Evento do snapshot do CircuitBreaker (10 campos) — consumido pela UI
+        # para renderizar o estado do gate de custo/falhas da run.
+        cb = final_state.get("circuit_breaker")
+        if isinstance(cb, dict):
+            await event_bus.publish(run_id, "circuit_breaker_changed", cb)
     except Exception as e:
         duration = round(time.time() - start_time, 2)
         await _set_run_status(

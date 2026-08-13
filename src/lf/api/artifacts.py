@@ -5,6 +5,7 @@ artefato do GraphState) + llm_costs/lessons (telemetry.sqlite). Padrão de
 paths call-time e PRAGMA busy_timeout herdado de costs.py/trajectories.py.
 """
 
+import logging
 import sqlite3
 from pathlib import Path
 
@@ -20,6 +21,8 @@ from lf.api.schemas import (
     CircuitBreakerSnapshot,
     NodeArtifact,
 )
+
+logger = logging.getLogger(__name__)
 
 artifacts_router = APIRouter(prefix="/api/v1", tags=["Artifacts"])
 
@@ -133,7 +136,8 @@ async def get_run_artifacts(
         await saver.setup()
         thread_id = run.thread_id or f"run-{run.id}"
         async with saver.conn.execute(
-            "SELECT checkpoint_id FROM checkpoints WHERE thread_id = ? ORDER BY checkpoint_id DESC LIMIT 1",
+            "SELECT checkpoint_id FROM checkpoints WHERE thread_id = ? AND checkpoint_ns = '' "
+            "ORDER BY checkpoint_id DESC LIMIT 1",
             (thread_id,),
         ) as cur:
             row = await cur.fetchone()
@@ -155,9 +159,10 @@ async def get_run_artifacts(
                 cb = channels.get("circuit_breaker")
                 if isinstance(cb, dict):
                     circuit_breaker = CircuitBreakerSnapshot(**cb)
-    except Exception:
+    except Exception as exc:
         # Checkpoint corrompido/indisponível (ex.: fields None do CB) → resposta
         # 200 com artifacts vazios em vez de 500 (padrão costs.py _node_cost_breakdown).
+        logger.warning("Falha ao ler checkpoint da run %s: %s", run_id, exc)
         node_artifacts = {}
         degraded = False
         degraded_reason = None
