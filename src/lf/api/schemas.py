@@ -129,3 +129,57 @@ class MCPToolCallRequest(BaseModel):
         default_factory=dict,
         description="Argumentos da tool MCP (JSON); ausente/vazio = {}",
     )
+
+
+# ─── Artifacts (InspectDrawer da SPA) ────────────────────────────────────
+class ArtifactTokens(BaseModel):
+    """Tokens + custo LLM agregados por nó (tabela llm_costs)."""
+
+    node: str
+    model: str | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cost_usd: float = 0.0
+    estimated: bool = False
+
+
+class NodeArtifact(BaseModel):
+    """Artifacts de um nó do DAG extraídos do último checkpoint."""
+
+    output: dict[str, Any] = Field(default_factory=dict)
+
+
+class CircuitBreakerSnapshot(BaseModel):
+    """Snapshot serializável do CircuitBreaker (canal circuit_breaker)."""
+
+    state: str | None = None
+    consecutive_failures: int = 0
+    total_iterations: int = 0
+    total_cost: float = 0.0
+    max_consecutive_failures: int | None = None
+    max_iterations: int | None = None
+    max_total_cost: float | None = None
+    cost_per_iteration: float | None = None
+    reset_timeout: float | None = None
+    last_failure_time: float | None = None
+
+
+class ArtifactLesson(BaseModel):
+    """Lição aprendida associada à run (tabela lessons)."""
+
+    id: int
+    run_id: str
+    lesson_text: str
+    created_at: float
+
+
+class ArtifactsResponse(BaseModel):
+    """GET /api/v1/runs/{id}/artifacts — artifacts + tokens + estado da run."""
+
+    run_id: str
+    node_artifacts: dict[str, NodeArtifact] = Field(default_factory=dict)
+    tokens: list[ArtifactTokens] = Field(default_factory=list)
+    degraded: bool = False
+    degraded_reason: str | None = None
+    circuit_breaker: CircuitBreakerSnapshot | None = None
+    lessons: list[ArtifactLesson] = Field(default_factory=list)
