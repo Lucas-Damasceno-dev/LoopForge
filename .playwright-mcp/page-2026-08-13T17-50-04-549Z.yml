@@ -1,0 +1,361 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - heading "LoopForge ADE" [level=1] [ref=e5]
+    - generic [ref=e883]: "#a1149e"
+    - generic [ref=e6]:
+      - 'generic "Connection status: Connected" [ref=e77]': Connected
+      - generic "Budget — no limit set" [ref=e1717]: $…
+      - navigation "Workspace views" [ref=e13]:
+        - button "Trajectories" [ref=e14]
+        - button "MCP playground" [ref=e20]
+        - button "Memory" [ref=e24]
+        - button "Evals" [ref=e30]
+        - button "Git" [ref=e33]
+        - button "Health" [ref=e37]
+        - button "Prompts" [ref=e41]
+        - button "Settings" [ref=e45]
+      - button "Focus" [ref=e48]
+  - generic [ref=e50]:
+    - tablist "Runs" [ref=e51]:
+      - tab "#70b10d completed" [ref=e78]:
+        - generic [ref=e79]: "#70b10d"
+        - generic [ref=e80]: completed
+      - 'button "Close #70b10d" [ref=e81]'
+      - tab "#283292 completed" [ref=e84]:
+        - generic [ref=e85]: "#283292"
+        - generic [ref=e86]: completed
+      - 'button "Close #283292" [ref=e87]'
+      - tab "#da83e4 completed" [ref=e90]:
+        - generic [ref=e91]: "#da83e4"
+        - generic [ref=e92]: completed
+      - 'button "Close #da83e4" [ref=e93]'
+      - tab "#2b04fe completed" [ref=e96]:
+        - generic [ref=e97]: "#2b04fe"
+        - generic [ref=e98]: completed
+      - 'button "Close #2b04fe" [ref=e99]'
+      - tab "#b64058 completed" [ref=e102]:
+        - generic [ref=e103]: "#b64058"
+        - generic [ref=e104]: completed
+      - 'button "Close #b64058" [ref=e105]'
+      - tab "#aff5a2 completed" [ref=e108]:
+        - generic [ref=e109]: "#aff5a2"
+        - generic [ref=e110]: completed
+      - 'button "Close #aff5a2" [ref=e111]'
+      - tab "#112515 completed" [ref=e114]:
+        - generic [ref=e115]: "#112515"
+        - generic [ref=e116]: completed
+      - 'button "Close #112515" [ref=e117]'
+      - tab "#4f4596 completed" [ref=e120]:
+        - generic [ref=e121]: "#4f4596"
+        - generic [ref=e122]: completed
+      - 'button "Close #4f4596" [ref=e123]'
+      - tab "#77aaa5 completed" [ref=e126]:
+        - generic [ref=e127]: "#77aaa5"
+        - generic [ref=e128]: completed
+      - 'button "Close #77aaa5" [ref=e129]'
+      - tab "#8731e9 completed" [ref=e132]:
+        - generic [ref=e133]: "#8731e9"
+        - generic [ref=e134]: completed
+      - 'button "Close #8731e9" [ref=e135]'
+      - tab "#873e3e completed" [ref=e138]:
+        - generic [ref=e139]: "#873e3e"
+        - generic [ref=e140]: completed
+      - 'button "Close #873e3e" [ref=e141]'
+      - tab "#ee8904 completed" [ref=e144]:
+        - generic [ref=e145]: "#ee8904"
+        - generic [ref=e146]: completed
+      - 'button "Close #ee8904" [ref=e147]'
+      - tab "#6170da completed" [ref=e150]:
+        - generic [ref=e151]: "#6170da"
+        - generic [ref=e152]: completed
+      - 'button "Close #6170da" [ref=e153]'
+      - tab "#6d4019 failed degraded" [ref=e156]:
+        - generic [ref=e157]: "#6d4019"
+        - generic [ref=e158]: failed
+        - generic [ref=e159]: degraded
+      - 'button "Close #6d4019" [ref=e160]'
+      - tab "#df4c6a completed" [ref=e163]:
+        - generic [ref=e164]: "#df4c6a"
+        - generic [ref=e165]: completed
+      - 'button "Close #df4c6a" [ref=e166]'
+      - tab "#d4b30b completed" [ref=e169]:
+        - generic [ref=e170]: "#d4b30b"
+        - generic [ref=e171]: completed
+      - 'button "Close #d4b30b" [ref=e172]'
+      - tab "#421cea completed" [ref=e175]:
+        - generic [ref=e176]: "#421cea"
+        - generic [ref=e177]: completed
+      - 'button "Close #421cea" [ref=e178]'
+      - tab "#5e010c completed" [ref=e181]:
+        - generic [ref=e182]: "#5e010c"
+        - generic [ref=e183]: completed
+      - 'button "Close #5e010c" [ref=e184]'
+      - tab "#ca79ce completed" [ref=e187]:
+        - generic [ref=e188]: "#ca79ce"
+        - generic [ref=e189]: completed
+      - 'button "Close #ca79ce" [ref=e190]'
+      - tab "#f4b5b7 completed" [ref=e193]:
+        - generic [ref=e194]: "#f4b5b7"
+        - generic [ref=e195]: completed
+      - 'button "Close #f4b5b7" [ref=e196]'
+      - tab "#381fd2 completed" [ref=e199]:
+        - generic [ref=e200]: "#381fd2"
+        - generic [ref=e201]: completed
+      - 'button "Close #381fd2" [ref=e202]'
+      - tab "#05a2f9 completed" [ref=e205]:
+        - generic [ref=e206]: "#05a2f9"
+        - generic [ref=e207]: completed
+      - 'button "Close #05a2f9" [ref=e208]'
+      - tab "#57654b completed" [ref=e211]:
+        - generic [ref=e212]: "#57654b"
+        - generic [ref=e213]: completed
+      - 'button "Close #57654b" [ref=e214]'
+      - tab "#3a4234 completed" [ref=e217]:
+        - generic [ref=e218]: "#3a4234"
+        - generic [ref=e219]: completed
+      - 'button "Close #3a4234" [ref=e220]'
+      - tab "#1245e4 failed" [ref=e223]:
+        - generic [ref=e224]: "#1245e4"
+        - generic [ref=e225]: failed
+      - 'button "Close #1245e4" [ref=e226]'
+      - tab "#0eebc2 completed" [ref=e229]:
+        - generic [ref=e230]: "#0eebc2"
+        - generic [ref=e231]: completed
+      - 'button "Close #0eebc2" [ref=e232]'
+      - tab "#38a7eb failed" [ref=e235]:
+        - generic [ref=e236]: "#38a7eb"
+        - generic [ref=e237]: failed
+      - 'button "Close #38a7eb" [ref=e238]'
+      - tab "#ce90b7 completed" [ref=e241]:
+        - generic [ref=e242]: "#ce90b7"
+        - generic [ref=e243]: completed
+      - 'button "Close #ce90b7" [ref=e244]'
+      - tab "#610f6b completed" [ref=e247]:
+        - generic [ref=e248]: "#610f6b"
+        - generic [ref=e249]: completed
+      - 'button "Close #610f6b" [ref=e250]'
+      - tab "#9fcf1f completed" [ref=e253]:
+        - generic [ref=e254]: "#9fcf1f"
+        - generic [ref=e255]: completed
+      - 'button "Close #9fcf1f" [ref=e256]'
+      - tab "#5cb8d2 completed" [ref=e259]:
+        - generic [ref=e260]: "#5cb8d2"
+        - generic [ref=e261]: completed
+      - 'button "Close #5cb8d2" [ref=e262]'
+      - tab "#542539 completed" [ref=e265]:
+        - generic [ref=e266]: "#542539"
+        - generic [ref=e267]: completed
+      - 'button "Close #542539" [ref=e268]'
+      - tab "#6f5e7c completed" [ref=e271]:
+        - generic [ref=e272]: "#6f5e7c"
+        - generic [ref=e273]: completed
+      - 'button "Close #6f5e7c" [ref=e274]'
+      - tab "#b29b05 completed" [ref=e277]:
+        - generic [ref=e278]: "#b29b05"
+        - generic [ref=e279]: completed
+      - 'button "Close #b29b05" [ref=e280]'
+      - tab "#945651 completed" [ref=e283]:
+        - generic [ref=e284]: "#945651"
+        - generic [ref=e285]: completed
+      - 'button "Close #945651" [ref=e286]'
+      - tab "#185599 completed" [ref=e289]:
+        - generic [ref=e290]: "#185599"
+        - generic [ref=e291]: completed
+      - 'button "Close #185599" [ref=e292]'
+      - tab "#0731ba completed" [ref=e295]:
+        - generic [ref=e296]: "#0731ba"
+        - generic [ref=e297]: completed
+      - 'button "Close #0731ba" [ref=e298]'
+      - tab "#f3fe6d completed" [ref=e301]:
+        - generic [ref=e302]: "#f3fe6d"
+        - generic [ref=e303]: completed
+      - 'button "Close #f3fe6d" [ref=e304]'
+      - tab "#bdda88 completed" [ref=e307]:
+        - generic [ref=e308]: "#bdda88"
+        - generic [ref=e309]: completed
+      - 'button "Close #bdda88" [ref=e310]'
+      - tab "#382483 failed degraded" [ref=e313]:
+        - generic [ref=e314]: "#382483"
+        - generic [ref=e315]: failed
+        - generic [ref=e316]: degraded
+      - 'button "Close #382483" [ref=e317]'
+      - tab "#3edbc2 completed" [ref=e320]:
+        - generic [ref=e321]: "#3edbc2"
+        - generic [ref=e322]: completed
+      - 'button "Close #3edbc2" [ref=e323]'
+      - tab "#7b4eea completed" [ref=e326]:
+        - generic [ref=e327]: "#7b4eea"
+        - generic [ref=e328]: completed
+      - 'button "Close #7b4eea" [ref=e329]'
+      - tab "#16fe33 completed" [ref=e332]:
+        - generic [ref=e333]: "#16fe33"
+        - generic [ref=e334]: completed
+      - 'button "Close #16fe33" [ref=e335]'
+      - tab "#7018b5 completed" [ref=e338]:
+        - generic [ref=e339]: "#7018b5"
+        - generic [ref=e340]: completed
+      - 'button "Close #7018b5" [ref=e341]'
+      - tab "#949b51 completed" [ref=e344]:
+        - generic [ref=e345]: "#949b51"
+        - generic [ref=e346]: completed
+      - 'button "Close #949b51" [ref=e347]'
+      - tab "#d79906 completed" [ref=e350]:
+        - generic [ref=e351]: "#d79906"
+        - generic [ref=e352]: completed
+      - 'button "Close #d79906" [ref=e353]'
+      - tab "#d3c6f4 completed" [ref=e356]:
+        - generic [ref=e357]: "#d3c6f4"
+        - generic [ref=e358]: completed
+      - 'button "Close #d3c6f4" [ref=e359]'
+      - tab "#01693a completed" [ref=e362]:
+        - generic [ref=e363]: "#01693a"
+        - generic [ref=e364]: completed
+      - 'button "Close #01693a" [ref=e365]'
+      - tab "#7834e4 completed" [ref=e368]:
+        - generic [ref=e369]: "#7834e4"
+        - generic [ref=e370]: completed
+      - 'button "Close #7834e4" [ref=e371]'
+      - tab "#aad908 completed" [ref=e374]:
+        - generic [ref=e375]: "#aad908"
+        - generic [ref=e376]: completed
+      - 'button "Close #aad908" [ref=e377]'
+      - tab "demo-5415 completed" [ref=e887]:
+        - generic [ref=e888]: demo-5415
+        - generic [ref=e889]: completed
+      - button "Close demo-5415" [ref=e890]
+      - tab "#a1149e running" [selected] [ref=e1720]:
+        - generic [ref=e1721]: "#a1149e"
+        - generic [ref=e1722]: running
+      - 'button "Close #a1149e" [ref=e1723]'
+    - generic [ref=e52]:
+      - generic [ref=e380]: "Queue: 1/2 · 0 waiting"
+      - button "Run demo" [ref=e53]
+      - generic [ref=e54]:
+        - combobox "Stack" [ref=e55]:
+          - option "python" [selected]
+          - option "java"
+          - option "rust"
+          - option "go"
+          - option "js"
+        - combobox "Routing mode" [ref=e56]:
+          - option "full" [selected]
+          - option "fast"
+          - option "patch"
+          - option "review-only"
+          - option "explore"
+        - generic [ref=e57]:
+          - textbox "Idea" [ref=e58]:
+            - /placeholder: Idea for the pipeline…
+          - button "Run" [disabled] [ref=e59]
+    - application [ref=e894]:
+      - generic [ref=e896]:
+        - generic:
+          - generic:
+            - img:
+              - group "Edge from entry to cpo" [ref=e897] [cursor=pointer]
+            - img:
+              - group "Edge from cpo to pm" [ref=e900] [cursor=pointer]
+            - img:
+              - group "Edge from pm to tech_lead" [ref=e903] [cursor=pointer]
+            - img:
+              - group "Edge from tech_lead to test_writer" [ref=e906] [cursor=pointer]
+            - img:
+              - group "Edge from test_writer to developer" [ref=e909] [cursor=pointer]
+            - img:
+              - group "Edge from developer to qa" [ref=e912] [cursor=pointer]
+            - img:
+              - group "Edge from qa to retry" [ref=e915] [cursor=pointer]
+            - img:
+              - group "Edge from retry to parallel_audit" [ref=e918] [cursor=pointer]
+          - generic:
+            - group [ref=e921] [cursor=pointer]:
+              - button "Entry (Pending)" [ref=e922]:
+                - generic [ref=e924]: Entry
+                - generic [ref=e926]: Pending
+            - group [ref=e929] [cursor=pointer]:
+              - button "CPO (Approved)" [ref=e930]:
+                - generic [ref=e932]: CPO
+                - generic [ref=e934]: Approved
+            - group [ref=e937] [cursor=pointer]:
+              - button "PM (Approved)" [ref=e938]:
+                - generic [ref=e940]: PM
+                - generic [ref=e942]: Approved
+            - group [ref=e945] [cursor=pointer]:
+              - button "Tech Lead (Approved)" [ref=e946]:
+                - generic [ref=e948]: Tech Lead
+                - generic [ref=e950]: Approved
+            - group [ref=e953] [cursor=pointer]:
+              - button "Test Writer (Approved)" [ref=e954]:
+                - generic [ref=e956]: Test Writer
+                - generic [ref=e958]: Approved
+            - group [ref=e961] [cursor=pointer]:
+              - button "Developer (Approved)" [ref=e962]:
+                - generic [ref=e964]: Developer
+                - generic [ref=e966]: Approved
+            - group [ref=e969] [cursor=pointer]:
+              - button "QA (Approved)" [ref=e970]:
+                - generic [ref=e972]: QA
+                - generic [ref=e974]: Approved
+            - group [ref=e977] [cursor=pointer]:
+              - button "Retry (Pending)" [ref=e978]:
+                - generic [ref=e980]: Retry
+                - generic [ref=e982]: Pending
+            - group [ref=e985] [cursor=pointer]:
+              - button "Parallel Audit (Approved)" [ref=e986]:
+                - generic [ref=e988]: Parallel Audit
+                - generic [ref=e990]: Approved
+      - generic "Control Panel" [ref=e993]:
+        - button "Zoom In" [ref=e994] [cursor=pointer]
+        - button "Zoom Out" [disabled]
+        - button "Fit View" [ref=e1000] [cursor=pointer]
+        - button "Toggle Interactivity" [ref=e1003] [cursor=pointer]
+      - img "Mini Map" [ref=e1007]
+      - link "React Flow attribution" [ref=e1018] [cursor=pointer]:
+        - /url: https://reactflow.dev/attribution
+        - text: React Flow
+  - generic [ref=e68]:
+    - generic [ref=e69]: Live — step 7/7
+    - slider "Inspection step" [ref=e70] [cursor=pointer]: "7"
+    - button "Back to live" [disabled] [ref=e71]
+  - generic [ref=e72]:
+    - generic [ref=e73]:
+      - heading "Console" [level=2] [ref=e74]
+      - combobox "Filter by node" [ref=e1020]:
+        - option "All nodes" [selected]
+        - option "Entry"
+        - option "CPO"
+        - option "PM"
+        - option "Tech Lead"
+        - option "Test Writer"
+        - option "Developer"
+        - option "QA"
+        - option "Parallel Audit"
+      - group "Filter by level" [ref=e1021]:
+        - button "All" [pressed] [ref=e1022]
+        - button "INFO" [ref=e1023]
+        - button "WARN" [ref=e1024]
+        - button "ERROR" [ref=e1025]
+      - searchbox "Search logs" [ref=e1026]
+      - button "Auto-scroll" [pressed] [ref=e1027]: Pause
+      - button "Clear logs" [ref=e1028]: Clear
+      - button "Collapse console" [expanded] [ref=e1029]: ▾
+    - list [ref=e1030]:
+      - listitem [ref=e1031]: "[2:47:15 PM] [system] [INFO] pipeline started"
+      - listitem [ref=e1032]: "[2:47:15 PM] [cpo] [INFO] node completed → pm"
+      - listitem [ref=e1033]: "[2:47:16 PM] [system] [INFO] pipeline started"
+      - listitem [ref=e1034]: "[2:47:16 PM] [pm] [INFO] node completed → tech_lead"
+      - listitem [ref=e1035]: "[2:47:16 PM] [system] [INFO] pipeline started"
+      - listitem [ref=e1036]: "[2:47:16 PM] [tech_lead] [INFO] node completed → test_writer"
+      - listitem [ref=e1037]: "[2:47:17 PM] [system] [INFO] pipeline started"
+      - listitem [ref=e1038]: "[2:47:17 PM] [test_writer] [INFO] node completed → developer"
+      - listitem [ref=e1039]: "[2:47:17 PM] [system] [INFO] pipeline started"
+      - listitem [ref=e1040]: "[2:47:17 PM] [developer] [INFO] node completed → qa"
+      - listitem [ref=e1041]: "[2:47:18 PM] [system] [INFO] pipeline started"
+      - listitem [ref=e1042]: "[2:47:18 PM] [qa] [INFO] node completed → parallel_audit"
+      - listitem [ref=e1043]: "[2:47:18 PM] [system] [INFO] pipeline started"
+      - listitem [ref=e1044]: "[2:47:18 PM] [parallel_audit] [INFO] node completed →"
+      - listitem [ref=e1045]: "[2:47:19 PM] [system] [INFO] pipeline finished"
+      - listitem [ref=e1726]: "[2:49:58 PM] [system] [INFO] run created: criar calculadora de IMC em python com testes"
+      - listitem [ref=e1727]: "[2:49:59 PM] [system] [INFO] run updated: queued"
+      - listitem [ref=e1728]: "[2:49:59 PM] [system] [INFO] run updated: running"
+      - listitem [ref=e1729]: "[2:50:02 PM] [system] [INFO] pipeline started"

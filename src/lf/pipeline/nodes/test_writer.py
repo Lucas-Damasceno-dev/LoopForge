@@ -10,10 +10,10 @@ from typing import Optional
 
 from langchain_core.runnables import RunnableConfig
 
+from ...pipeline.llm_factory import resolve_model
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
-from ...pipeline.llm_factory import resolve_model
 from .developer import _parse_multi_file_response
 
 DEFAULT_PROMPT = (

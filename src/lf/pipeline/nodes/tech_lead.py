@@ -13,10 +13,10 @@ from typing import Optional
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
+from ...pipeline.llm_factory import resolve_model
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
-from ...pipeline.llm_factory import resolve_model
 
 DEFAULT_PROMPT = """Você é um Tech Lead. Revise as user stories e recomende a melhor stack.
 

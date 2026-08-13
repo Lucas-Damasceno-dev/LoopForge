@@ -1,0 +1,53 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - heading "LoopForge ADE" [level=1] [ref=e5]
+    - generic [ref=e6]:
+      - 'generic "Connection status: Reconnecting…" [ref=e7]': Reconnecting…
+      - generic "Budget — sem dados de custo" [ref=e10]:
+        - generic [ref=e11]: Budget
+        - generic [ref=e12]: — no data
+      - navigation "Workspace views" [ref=e13]:
+        - button "Trajectories" [ref=e14]
+        - button "MCP playground" [ref=e20]
+        - button "Memory" [ref=e24]
+        - button "Evals" [ref=e30]
+        - button "Git" [ref=e33]
+        - button "Health" [ref=e37]
+        - button "Prompts" [ref=e41]
+        - button "Settings" [ref=e45]
+      - button "Focus" [ref=e48]
+  - generic [ref=e50]:
+    - tablist "Runs" [ref=e51]
+    - generic [ref=e52]:
+      - button "Run demo" [ref=e53]
+      - generic [ref=e54]:
+        - combobox "Stack" [ref=e55]:
+          - option "python" [selected]
+          - option "java"
+          - option "rust"
+          - option "go"
+          - option "js"
+        - combobox "Routing mode" [ref=e56]:
+          - option "full" [selected]
+          - option "fast"
+          - option "patch"
+          - option "review-only"
+          - option "explore"
+        - generic [ref=e57]:
+          - textbox "Idea" [ref=e58]:
+            - /placeholder: Idea for the pipeline…
+          - button "Run" [disabled] [ref=e59]
+    - generic [ref=e61]:
+      - heading "No active run" [level=2] [ref=e62]
+      - paragraph [ref=e63]: Start a run to see the pipeline in action
+      - generic [ref=e65]:
+        - button "Run example pipeline" [ref=e66]
+        - button "Create new run" [ref=e67]
+  - generic [ref=e68]:
+    - generic [ref=e69]: Live — step 0/0
+    - slider "Inspection step" [ref=e70] [cursor=pointer]: "0"
+    - button "Back to live" [disabled] [ref=e71]
+  - generic [ref=e73]:
+    - heading "Console" [level=2] [ref=e74]
+    - generic [ref=e75]: No logs
+    - button "Expand console" [ref=e76]: ▸

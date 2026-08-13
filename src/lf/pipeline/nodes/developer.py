@@ -21,8 +21,8 @@ from langgraph.types import interrupt
 
 from ...config.workdir import is_within
 from ...guardrails.circuit_breaker import CircuitBreaker
-from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.llm_factory import resolve_model
+from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
 

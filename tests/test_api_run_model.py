@@ -8,11 +8,11 @@ Verifica o caminho completo: payload RunCreate.model → fila E3 → TaskSchema.
 import asyncio
 import contextlib
 import os
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from unittest.mock import patch
 
 from lf.api.app import create_app
 from lf.api.database import close_db, init_db
