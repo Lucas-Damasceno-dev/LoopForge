@@ -127,6 +127,11 @@ def call_openrouter_api(
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
     effective_base_url = base_url or os.environ.get("OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL)
+    # O endpoint do OpenCode Go (zen/go/v1) aceita o modelo SEM prefixo de
+    # provider (ex.: "deepseek-v4-flash", não "opencode-go/deepseek-v4-flash").
+    # Normaliza quando o usuário passa o nome completo da assinatura.
+    if "opencode.ai/zen" in effective_base_url and "/" in target_model:
+        target_model = target_model.rsplit("/", 1)[-1]
     url = f"{effective_base_url.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {key}",
@@ -156,7 +161,8 @@ def call_openrouter_api(
             timeout_val = base_timeout * (1.0 + attempt * 0.5)
             if streaming:
                 assert on_token_delta is not None
-                chunks: list[str] = []
+                content_chunks: list[str] = []
+                reasoning_chunks: list[str] = []
                 usage = None
                 with (
                     httpx.Client(timeout=timeout_val) as client,
@@ -185,13 +191,21 @@ def call_openrouter_api(
                         choices = cdata.get("choices", [])
                         if choices:
                             delta = choices[0].get("delta", {})
-                            content = delta.get("content") or choices[0].get("message", {}).get("content")
+                            msg = choices[0].get("message", {})
+                            # Modelos de reasoning (ex.: deepseek-v4-flash no
+                            # OpenCode Go) emitem reasoning_content com content
+                            # vazio — acumula separado e usa como fallback
+                            # apenas se content nunca vier (sem misturar).
+                            content = delta.get("content") or msg.get("content")
+                            reasoning = delta.get("reasoning_content") or msg.get("reasoning_content")
                             if content:
-                                chunks.append(content)
+                                content_chunks.append(content)
                                 on_token_delta(content)
+                            elif reasoning:
+                                reasoning_chunks.append(reasoning)
                         if cdata.get("usage"):
                             usage = cdata["usage"]
-                text = "".join(chunks)
+                text = "".join(content_chunks) or "".join(reasoning_chunks)
                 if not text:
                     empty_content = True
                     raise RuntimeError("OpenRouter API retornou content vazio (streaming)")
@@ -211,7 +225,13 @@ def call_openrouter_api(
                                 choices = cdata.get("choices", [])
                                 if choices:
                                     delta = choices[0].get("delta", {})
-                                    content = delta.get("content") or choices[0].get("message", {}).get("content")
+                                    msg = choices[0].get("message", {})
+                                    content = (
+                                        delta.get("content")
+                                        or msg.get("content")
+                                        or delta.get("reasoning_content")
+                                        or msg.get("reasoning_content")
+                                    )
                                     if content:
                                         chunks.append(content)
                                 if cdata.get("usage"):
@@ -227,7 +247,12 @@ def call_openrouter_api(
                     data = resp.json()
                     choice = data["choices"][0]
                     msg = choice.get("message", {})
-                    text = msg.get("content") or choice.get("delta", {}).get("content", "")
+                    text = (
+                        msg.get("content")
+                        or choice.get("delta", {}).get("content", "")
+                        or msg.get("reasoning_content", "")
+                        or choice.get("delta", {}).get("reasoning_content", "")
+                    )
                     usage = data.get("usage")
                     if not text:
                         empty_content = True
