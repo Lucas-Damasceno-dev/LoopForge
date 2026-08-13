@@ -132,6 +132,11 @@ def _print_cost_report(session_id: str, watermark: int | None, retries_consumed:
     default=False,
     help="Imprimir relatório de custo real por nó, cache hit rate e retries consumidos",
 )
+@click.option(
+    "--sandbox/--no-sandbox",
+    default=None,
+    help="Executar em Git Worktree isolada (.slim/worktrees/) com merge seguro",
+)
 def run_cmd(
     idea: str | None,
     stack: str | None,
@@ -146,6 +151,7 @@ def run_cmd(
     advanced: bool,
     wizard: bool,
     report_cost: bool,
+    sandbox: bool | None,
 ):
     """Executa a pipeline de tarefas dos agentes autônomos do LoopForge."""
     session_id = str(uuid.uuid4())[:8]
@@ -156,7 +162,13 @@ def run_cmd(
     if resume_id:
         cfg = load_config()
         project_id = getattr(cfg, "project_id", None) or "project"
-        dispatcher = TaskDispatcher(mock_llm=mock, interactive=interactive, notify=notify, webhook_url=webhook_url)
+        dispatcher = TaskDispatcher(
+            mock_llm=mock,
+            interactive=interactive,
+            notify=notify,
+            webhook_url=webhook_url,
+            sandbox_enabled=sandbox,
+        )
         console.print(f"[bold cyan]⚡ Retomando pipeline do checkpoint '{resume_id}'...[/bold cyan]")
         dispatcher.resume(project_id=project_id, task_id=resume_id)
         return
@@ -184,6 +196,7 @@ def run_cmd(
         review_mode=review_mode,
         notify=notify,
         webhook_url=webhook_url,
+        sandbox_enabled=sandbox,
     )
 
     tasks_to_run = []

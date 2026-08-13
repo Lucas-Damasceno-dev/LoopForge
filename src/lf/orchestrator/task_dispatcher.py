@@ -98,6 +98,7 @@ class TaskDispatcher:
         hitl_timeout_seconds: int | None = None,
         hitl_on_timeout: str | None = None,
         subprocess_timeout_seconds: int | None = None,
+        sandbox_enabled: bool | None = None,
     ):
         self.mock_llm = mock_llm
         self.interactive = interactive
@@ -132,7 +133,7 @@ class TaskDispatcher:
         from lf.config.loader import load_ade_config
 
         ade_config = load_ade_config()
-        self.sandbox_enabled = ade_config.runner.sandbox_enabled
+        self.sandbox_enabled = sandbox_enabled if sandbox_enabled is not None else ade_config.runner.sandbox_enabled
         if self.sandbox_enabled and ade_config.runner.max_concurrent_runs > 1:
             logger.warning(
                 "Sandbox habilitada com runner.max_concurrent_runs > 1: runs paralelas no MESMO repo "
@@ -950,6 +951,7 @@ class TaskDispatcher:
         console.print("  [green]c[/green] — Continuar / Aprovar")
         console.print("  [yellow]r[/yellow] — Retentar nó anterior")
         console.print("  [blue]a[/blue] — Solicitar alterações / Ajustar Prompt (Request Changes)")
+        console.print("  [magenta]d[/magenta] — Ver Diff side-by-side das alterações")
         console.print("  [red]x[/red] — Abortar pipeline")
 
         timeout_mode = {"continue": "CONTINUAR", "abort": "ABORTAR", "pause": "AGUARDAR DECISÃO TARDIA"}.get(
@@ -959,18 +961,10 @@ class TaskDispatcher:
 
         # Lê tecla única (sem Enter) com poll remoto curto intercalado para
         # não congelar o gate: (a) chama _get_single_key_with_timeout a cada
-        # 0.5s; (b) se retornar tecla válida (c/r/a/x), processa; teclas
+        # 0.5s; (b) se retornar tecla válida (c/r/a/d/x), processa; teclas
         # inválidas (\r, \n, '') são ignoradas e a espera continua; (c) entre
         # leituras faz poll remoto curto; (d) sai no deadline global
         # (hitl_timeout_seconds) ou quando houver decisão (local ou remota).
-        #
-        # C4 (M-11) on_timeout no esgotamento do deadline:
-        #   continue = transição graciosa (legado, human_decision_expired);
-        #   abort    = run falha controladamente (pipeline_failed, sem LLM);
-        #   pause    = NÃO consome LLM, mantém o gate aberto re-aguardando a
-        #              decisão tardia. gate_started (timestamp do início do
-        #              gate) + flag timeout_elapsed distinguem 'expirado mas
-        #              aguardando' de 'nunca expirou'.
         choice: str | None = None
         remote_decision: dict | None = None
         gate_started = time.monotonic()
@@ -978,16 +972,10 @@ class TaskDispatcher:
         timeout_elapsed = False
         pause_announced = False
         poll_interval = 0.5
-        valid_choices = ("c", "r", "a", "x")
-        prompt_text = "➜ Escolha [c/r/a/x] (default: c): "
+        prompt_text = "➜ Escolha [c/r/a/d/x] (default: c): "
         while True:
             if time.monotonic() >= deadline:
                 if self.hitl_on_timeout == "pause":
-                    # Expirou MAS o gate permanece aberto (deadline vira
-                    # infinito — não expira de novo). O timestamp do início
-                    # do gate (gate_started) é a referência que distingue a
-                    # decisão tardia ('expirado mas aguardando') da que veio
-                    # dentro do prazo ('nunca expirou').
                     if not pause_announced:
                         pause_announced = True
                         console.print(
@@ -1000,7 +988,11 @@ class TaskDispatcher:
                     break
             raw_choice = self._get_single_key_with_timeout(prompt_text, poll_interval)
             prompt_text = ""
-            if raw_choice in valid_choices:
+            if raw_choice == "d":
+                self._render_hitl_diff(state)
+                prompt_text = "\n➜ Escolha [c/r/a/d/x] (default: c): "
+                continue
+            if raw_choice in ("c", "r", "a", "x"):
                 choice = raw_choice
                 break
             remote_decision = self._poll_remote_decision_once(telemetry_run_id)
