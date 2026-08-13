@@ -71,11 +71,20 @@ async def test_events_backfill_after_run():
         run_id, status = await _run_mock_pipeline(client, idea="Backfill e2e")
         assert status == "completed"
 
-        resp = await client.get(f"/api/v1/runs/{run_id}/events")
-        assert resp.status_code == 200
-        data = resp.json()
+        events = []
+        data = {}
+        deadline = asyncio.get_running_loop().time() + 5.0
+        while asyncio.get_running_loop().time() < deadline:
+            resp = await client.get(f"/api/v1/runs/{run_id}/events")
+            assert resp.status_code == 200
+            data = resp.json()
+            events = data.get("events", [])
+            updated_statuses = [e["payload"].get("status") for e in events if e["event"] == "run_updated"]
+            if "completed" in updated_statuses:
+                break
+            await asyncio.sleep(0.1)
+
         assert data["run_id"] == run_id
-        events = data["events"]
         assert events, "nenhum evento persistido para a run"
 
         # Envelope v1 + seq estritamente incremental

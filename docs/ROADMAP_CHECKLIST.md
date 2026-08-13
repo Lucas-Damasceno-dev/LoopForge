@@ -77,12 +77,12 @@
 
 ## 🛡️ ONDA 4: Isolação de Segurança & Experiência de Saída (UX/UI)
 
-- [~] **4.1 Worktree Sandbox Isolation & Proteção de Ambiente** *(parcial)*
+- [x] **4.1 Worktree Sandbox Isolation & Proteção de Ambiente**
   - Executar a geração e testes do projeto dentro de uma Git Worktree isolada (`.slim/worktrees/`).
   - Efetuar o merge na branch principal apenas após a aprovação combinada do QA e do AppSec.
-  - *Status*: ⚠️ **PARCIAL** (auditado 2026-08-12).
-  - *Evidência*: `WorktreeSandbox` **existe** em `src/lf/runner/git/sandbox.py` (`create_worktree`/`merge_worktree`/`cleanup_worktree`, worktrees em `.slim/worktrees/`), **mas não é referenciado** pelo `TaskDispatcher` nem pela CLI (grep por `WorktreeSandbox`/`git.sandbox` em `src/lf/` só encontra o próprio arquivo). Falta conectar no `TaskDispatcher.dispatch()`.
-  - *Arquivos*: `src/lf/runner/git/checkpoint.py`, `src/lf/orchestrator/task_dispatcher.py`
+  - *Status*: ✅ **IMPLEMENTADO** (auditado e conectado 2026-08-13).
+  - *Evidência*: `GitSandbox` em `src/lf/runner/git/sandbox.py` integrado ao `TaskDispatcher._setup_sandbox` e `_finalize_sandbox`; flag `--sandbox/--no-sandbox` na CLI `lf run`. Testes em `tests/orchestrator/test_dispatch_sandbox.py` e `tests/test_git_sandbox.py` (24/24 passed).
+  - *Arquivos*: `src/lf/runner/git/sandbox.py`, `src/lf/orchestrator/task_dispatcher.py`, `src/lf/cli/commands/run.py`
 
 - [x] **4.2 Resumo Executivo em Markdown com Diagrama Mermaid (`PROJECT_SUMMARY.md`)**
   - Gerar um arquivo `PROJECT_SUMMARY.md` ao final da execução contendo um Diagrama Mermaid da Arquitetura gerada, badges de qualidade/segurança e instrução de comandos CLI/endpoints.
@@ -96,16 +96,17 @@
   - *Nota*: implementado com **Click prompts** (interativos), **NÃO** com `InquirerPy`/`questionary`.
   - *Arquivos*: `src/lf/cli/commands/run.py`
 
-- [~] **4.4 Diff Side-by-Side Interativo no HITL (`lf run -i`)** *(parcial)*
-  - *Status*: ⚠️ **PARCIAL** (auditado 2026-08-12).
-  - *Evidência*: `lf diff` standalone **existe** (`diff.py:21` `diff_cmd`, `:33`/`:58` rendering side-by-side via `_render_side_by_side_diff`/`_render_side_by_side_files`), **mas não está integrado** ao fluxo HITL do `lf run -i`.
-  - *Arquivos*: `src/lf/cli/commands/studio.py`, `src/lf/orchestrator/task_dispatcher.py`
+- [x] **4.4 Diff Side-by-Side Interativo no HITL (`lf run -i`)**
+  - *Status*: ✅ **IMPLEMENTADO** (auditado e integrado 2026-08-13).
+  - *Evidência*: Atalho `d` integrado em `TaskDispatcher._human_interrupt_handler` disparando `_render_hitl_diff` com comparação lado a lado (`_render_side_by_side_files`) antes da confirmação humana.
+  - *Arquivos*: `src/lf/cli/commands/diff.py`, `src/lf/orchestrator/task_dispatcher.py`
 
 ---
 
-## 📌 Milestone v7 (Parqueado para o Próximo Ciclo)
+## 📌 Milestone v7
 
-- [ ] **5.1 Entrega Incremental por User Story (Incremental Feature Slices)**
+- [x] **5.1 Entrega Incremental por User Story (Incremental Feature Slices)**
   - Reestruturação da topologia do grafo para ciclo iterativo `Developer ↔ QA` por User Story individual antes da agregação final.
-  - *Status*: ⏳ **PENDENTE** (auditado 2026-08-12).
-  - *Justificativa*: nenhum trecho de slice incremental (user-story granular) encontrado no código (`grep` por `incremental`/slice por user story não retorna matches); topologia atual é whole-feature (`Developer` entrega o projeto inteiro de uma vez).
+  - *Status*: ✅ **IMPLEMENTADO** (auditado e verificado 2026-08-13).
+  - *Evidência*: Canais e slices em `GraphState`, `should_retry` com loop `passed` → `test_writer` / `failed` → `developer`, `pm.build_slices`, `developer` e `qa` com classificação de regressão vs slice. Testes em `tests/test_incremental_slices_*.py` (24/24 passed).
+  - *Arquivos*: `src/lf/pipeline/graph.py`, `src/lf/pipeline/nodes/pm.py`, `src/lf/pipeline/nodes/developer.py`, `src/lf/pipeline/nodes/qa.py`

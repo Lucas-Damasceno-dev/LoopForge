@@ -124,3 +124,24 @@ async def test_get_git_info_dir_without_git_returns_404():
         resp = await client.get("/api/v1/git/plain")
     assert resp.status_code == 404
     assert "não é um repositório git" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_publish_pr_endpoint_mock_and_404(monkeypatch):
+    """POST /publish-pr: 404 em run inexistente; 200 em run com repo."""
+    async with _client() as client:
+        resp_404 = await client.post("/api/v1/git/ghost/publish-pr", json={"title": "PR"})
+        assert resp_404.status_code == 404
+
+    _make_git_repo(Path("run_pr-target"))
+    monkeypatch.setattr("lf.runner.git.pr.create_github_pr", lambda **kwargs: True)
+
+    async with _client() as client:
+        resp = await client.post(
+            "/api/v1/git/pr-target/publish-pr",
+            json={"title": "feat: test pr", "body": "details", "labels": ["automated"]},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert "sucesso" in data["message"]

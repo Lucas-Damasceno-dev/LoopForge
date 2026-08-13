@@ -125,14 +125,18 @@ class JavaStackHandler(BaseStackHandler):
         return "maven"
 
     def detect_test_command(self, project_dir: str) -> str | None:
+        if os.path.exists(os.path.join(project_dir, "mvnw")):
+            return "./mvnw test"
         if os.path.exists(os.path.join(project_dir, "pom.xml")):
             return "mvn test"
-        if os.path.exists(os.path.join(project_dir, "build.gradle")):
+        if os.path.exists(os.path.join(project_dir, "gradlew")):
             return "./gradlew test"
+        if os.path.exists(os.path.join(project_dir, "build.gradle")):
+            return "gradle test"
         return None
 
     def get_fallback_test_command(self) -> str:
-        return "mvn test"
+        return "./mvnw test"
 
 
 class RustStackHandler(BaseStackHandler):

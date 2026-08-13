@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 from lf.cli.commands.audit import audit_cmd
 from lf.cli.commands.benchmark import benchmark_cmd
+from lf.cli.commands.clean import clean_cmd
 from lf.cli.commands.completion import completion_cmd
 from lf.cli.commands.diff import diff_cmd
 from lf.cli.commands.explore import explore_cmd
@@ -45,6 +46,7 @@ main.add_command(release_cmd)
 main.add_command(completion_cmd)
 main.add_command(generate_tests_cmd)
 main.add_command(audit_cmd)
+main.add_command(clean_cmd)
 
 
 if __name__ == "__main__":
