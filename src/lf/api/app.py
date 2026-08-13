@@ -856,6 +856,21 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     app.include_router(artifacts_router, dependencies=[Depends(verify_authentication)])
 
+    # ─── Terminal & Command Runner (ADE) ───────────────────────────────
+    from lf.api.terminal import terminal_router
+
+    app.include_router(terminal_router, dependencies=[Depends(verify_authentication)])
+
+    # ─── AST & Dependency Analysis (ADE) ──────────────────────────────
+    from lf.api.ast_analyzer import ast_router
+
+    app.include_router(ast_router, dependencies=[Depends(verify_authentication)])
+
+    # ─── Code Coverage & Metrics (ADE) ────────────────────────────────
+    from lf.api.coverage import coverage_router
+
+    app.include_router(coverage_router, dependencies=[Depends(verify_authentication)])
+
     # ─── SPA React (M-16/B4) ─────────────────────────────────────────
     # Monta o dist da SPA em /app se disponível (env LF_SPA_DIST ou pacote
     # embutido lf.ade.static.dist na B5); sem dist, apenas loga warning.

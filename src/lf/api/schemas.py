@@ -204,3 +204,72 @@ class RunFilesResponse(BaseModel):
     run_id: str
     files: list[RunFileItem] = Field(default_factory=list)
 
+
+# ─── Terminal & Command Runner ──────────────────────────────────────
+class ExecCommandRequest(BaseModel):
+    command: str = Field(..., description="Comando bash a executar no workspace da run")
+    timeout_seconds: int = Field(15, ge=1, le=60, description="Tempo limite em segundos")
+
+
+class ExecCommandResponse(BaseModel):
+    run_id: str
+    command: str
+    stdout: str
+    stderr: str
+    exit_code: int
+    duration_seconds: float
+
+
+class TerminalInfoResponse(BaseModel):
+    run_id: str
+    workspace_path: str | None
+    exists: bool
+
+
+# ─── AST & Dependency Analysis ─────────────────────────────────────
+class AstSymbolInfo(BaseModel):
+    name: str
+    kind: str
+    line_number: int
+    docstring: str | None = None
+
+
+class AstModuleInfo(BaseModel):
+    file_path: str
+    language: str
+    total_lines: int
+    symbols: list[AstSymbolInfo] = Field(default_factory=list)
+    imports: list[str] = Field(default_factory=list)
+
+
+class AstEdge(BaseModel):
+    source_file: str
+    target_module: str
+    import_type: str = "import"
+
+
+class AstAnalysisResponse(BaseModel):
+    run_id: str
+    modules: list[AstModuleInfo] = Field(default_factory=list)
+    external_packages: list[str] = Field(default_factory=list)
+    dependency_graph: list[AstEdge] = Field(default_factory=list)
+
+
+# ─── Code Coverage ─────────────────────────────────────────────────
+class FileCoverageItem(BaseModel):
+    file_path: str
+    total_lines: int
+    covered_lines: int
+    missed_lines: int
+    percentage: float
+
+
+class CoverageReportResponse(BaseModel):
+    run_id: str
+    total_lines: int
+    covered_lines: int
+    coverage_percentage: float
+    files: list[FileCoverageItem] = Field(default_factory=list)
+    source: str = "report"
+
+

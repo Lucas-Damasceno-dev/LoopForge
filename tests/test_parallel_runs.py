@@ -81,8 +81,13 @@ async def test_parallel_runs_default_max_two():
         assert final3 == "completed", f"r3 deveria completar, está {final3}"
 
         # Eventos run_updated da r3: queued -> running -> completed.
-        events = await event_bus.list_events(r3_id)
-        statuses = [e["payload"].get("status") for e in events if e["event"] == "run_updated"]
+        statuses: list[str] = []
+        for _ in range(15):
+            events = await event_bus.list_events(r3_id)
+            statuses = [e["payload"].get("status") for e in events if e["event"] == "run_updated"]
+            if statuses and statuses[-1] == "completed":
+                break
+            await asyncio.sleep(0.1)
         assert statuses[0] == "queued", f"primeiro run_updated deveria ser queued: {statuses}"
         assert "running" in statuses, f"esperava transição running: {statuses}"
         assert statuses[-1] == "completed", f"último run_updated deveria ser completed: {statuses}"
