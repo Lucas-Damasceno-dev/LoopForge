@@ -4,11 +4,11 @@ Trajectories assíncronas em `.loopforge/trajectories.db` com modo WAL explícit
 garantido na abertura (antes do `setup()`), para evitar travamentos de
 leitura/escrita concorrentes durante chamadas da API.
 """
+
+import sqlite3
 from pathlib import Path
 
 import aiosqlite
-import sqlite3
-
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 

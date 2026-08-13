@@ -45,7 +45,7 @@ async def test_async_checkpointer_roundtrip_put_get(tmp_path, monkeypatch):
         "channel_values": {"next_agent": "cpo"},
     }
     metadata = {"source": "loop", "step": 1}
-    saved = await saver.aput(config, checkpoint, metadata, {})
+    await saver.aput(config, checkpoint, metadata, {})
     listed = []
     async for item in saver.alist(config, limit=10):
         listed.append(item)

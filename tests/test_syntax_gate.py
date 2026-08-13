@@ -1,9 +1,9 @@
 """Testes do gate sintático (Onda 2, 2.3): validação AST/javac + retry hard no Developer."""
 
 import shutil
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from lf.pipeline.nodes.developer import _check_syntax_and_types, developer
 

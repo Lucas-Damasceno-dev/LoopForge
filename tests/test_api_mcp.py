@@ -13,7 +13,7 @@ from httpx import ASGITransport, AsyncClient
 from lf.api.app import create_app
 from lf.config.loader import load_ade_config, save_ade_config
 from lf.config.schema import AdeConfig, AdeMcpServer
-from lf.mcp.permissions import MCPPermissionDenied, MCPUnavailable
+from lf.mcp.permissions import MCPPermissionError, MCPUnavailableError
 
 FAKE = r"""
 import asyncio
@@ -126,7 +126,7 @@ async def test_mcp_call_tool_success_with_allowlist(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_mcp_call_tool_403_fora_da_allowlist(tmp_path, monkeypatch):
-    """Tool fora da allowlist → 403 com detail PT (MCPPermissionDenied)."""
+    """Tool fora da allowlist → 403 com detail PT (MCPPermissionError)."""
     monkeypatch.chdir(tmp_path)
     cfg = _write_ade(
         tmp_path,
@@ -134,7 +134,7 @@ async def test_mcp_call_tool_403_fora_da_allowlist(tmp_path, monkeypatch):
     )
     fake = _FakeRegistry(
         config=cfg,
-        errors={("t", "hack"): MCPPermissionDenied("Tool t:hack não permitida (allowlist do ade.yaml)")},
+        errors={("t", "hack"): MCPPermissionError("Tool t:hack não permitida (allowlist do ade.yaml)")},
     )
     monkeypatch.setattr("lf.api.mcp._registry", lambda: fake)
 
@@ -147,7 +147,7 @@ async def test_mcp_call_tool_403_fora_da_allowlist(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_mcp_call_tool_503_server_nao_conectado(tmp_path, monkeypatch):
-    """Servidor não conectado → 503 com detail PT (MCPUnavailable)."""
+    """Servidor não conectado → 503 com detail PT (MCPUnavailableError)."""
     monkeypatch.chdir(tmp_path)
     cfg = _write_ade(
         tmp_path,
@@ -155,7 +155,7 @@ async def test_mcp_call_tool_503_server_nao_conectado(tmp_path, monkeypatch):
     )
     fake = _FakeRegistry(
         config=cfg,
-        errors={("t", "ping"): MCPUnavailable("Servidor MCP t não conectado")},
+        errors={("t", "ping"): MCPUnavailableError("Servidor MCP t não conectado")},
     )
     monkeypatch.setattr("lf.api.mcp._registry", lambda: fake)
 

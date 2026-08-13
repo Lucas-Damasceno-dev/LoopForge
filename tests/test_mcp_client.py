@@ -2,9 +2,11 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+
 import pytest
+
 from lf.config.schema import AdeConfig, AdeMcpServer
-from lf.mcp.permissions import MCPPermissionDenied
+from lf.mcp.permissions import MCPPermissionError
 from lf.mcp.registry import MCPRegistry
 
 FAKE_SERVER_SRC = r"""
@@ -92,7 +94,7 @@ async def test_permission_denied_raises(fake_server_script, tmp_path, monkeypatc
     registry = MCPRegistry(cfg)
     await registry.start_all()
     try:
-        with pytest.raises(MCPPermissionDenied):
+        with pytest.raises(MCPPermissionError):
             await registry.call_tool("fake", "echo", {"text": "x"})
     finally:
         await registry.stop_all()

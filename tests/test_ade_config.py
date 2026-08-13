@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
+
 import pytest
+
 from lf.config.loader import load_ade_config, save_ade_config
 from lf.config.schema import AdeConfig, AdeMcpServer
 
@@ -16,7 +18,11 @@ def test_ade_config_defaults(tmp_path, monkeypatch):
 
 def test_ade_config_roundtrip_yaml(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    cfg = AdeConfig(mcp_servers=[AdeMcpServer(name="fs", command="npx", args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"])])
+    cfg = AdeConfig(
+        mcp_servers=[
+            AdeMcpServer(name="fs", command="npx", args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"])
+        ]
+    )
     path = save_ade_config(cfg, tmp_path / "ade.yaml")
     assert path.exists()
     loaded = load_ade_config(path)
