@@ -61,6 +61,10 @@ class TaskSchema(BaseModel):
         default=False,
         description="Entrega incremental por user story (v7 5.1): gera/valida um slice por vez",
     )
+    model: str | None = Field(
+        default=None,
+        description="Modelo LLM override da run (preenche llm_model_name no estado; vence env/config)",
+    )
 
     def __getitem__(self, item: str) -> Any:
         if item == "persona":

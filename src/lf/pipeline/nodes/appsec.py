@@ -14,6 +14,7 @@ from ...guardrails.security_scanner import SecurityScanner
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
+from ...pipeline.llm_factory import resolve_model
 
 DEFAULT_PROMPT = "Você é um engenheiro de AppSec sênior especializado em segurança de código."
 
@@ -94,6 +95,7 @@ def appsec(state: GraphState, config: Optional[RunnableConfig] = None) -> dict: 
                 llm_res = call_llm_via_opencode(
                     system_prompt=get_effective_prompt("appsec", DEFAULT_PROMPT),
                     user_prompt=prompt,
+                    model=resolve_model(state),
                     mock=state.get("mock_llm", False),
                     node="appsec",
                     run_id=resolve_run_id(state, config),

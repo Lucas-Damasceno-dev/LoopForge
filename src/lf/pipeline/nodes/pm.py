@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
+from ...pipeline.llm_factory import resolve_model
 
 DEFAULT_PROMPT = """Você é um Product Manager. Quebre o épico abaixo em user stories detalhadas.
 
@@ -105,6 +106,7 @@ Escopo OUT: {", ".join(epic.get("scope_out", []))}"""
         result = call_llm_via_opencode(
             system_prompt=system_prompt,
             user_prompt=epic_context,
+            model=resolve_model(state),
             schema_model=UserStoryList,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),

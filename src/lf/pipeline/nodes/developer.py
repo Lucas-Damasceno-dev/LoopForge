@@ -22,9 +22,9 @@ from langgraph.types import interrupt
 from ...config.workdir import is_within
 from ...guardrails.circuit_breaker import CircuitBreaker
 from ...pipeline.prompt_overrides import get_effective_prompt
+from ...pipeline.llm_factory import resolve_model
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
-from ...runner.opencode.runner import DEFAULT_OPENCODE_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -435,7 +435,9 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
     tech_spec = state.get("tech_spec", "")
     idea = state.get("idea", "")
     user_stories = state.get("user_stories", [])
-    model_name = os.environ.get("OPENROUTER_MODEL") or DEFAULT_OPENCODE_MODEL
+    # Modelo LLM da run: override explícito (llm_model_name do estado, ex.
+    # campo `model` do POST /api/v1/runs) VENCE env/config (resolve_model).
+    model_name = resolve_model(state)
 
     story_lines = []
     # Modo incremental: só a story do slice corrente entra no prompt (as demais

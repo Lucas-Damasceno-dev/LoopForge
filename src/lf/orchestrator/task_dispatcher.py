@@ -220,6 +220,11 @@ class TaskDispatcher:
             "error": None,
             "feedback_history": [],
             "mock_llm": self.mock_llm,
+            # Modelo LLM da run: override explícito (task.model, ex. campo
+            # `model` do POST /api/v1/runs) preenche o canal llm_model_name —
+            # os nós o leem via resolve_model() (vence env/config). Ausente →
+            # None: comportamento atual (resolve_default_model nos nós).
+            "llm_model_name": getattr(task, "model", None),
             # Fix 1: run_id/task_id preenchidos no dispatch (a thread canônica
             # `run-{uuid}` só é derivada depois do _build_initial_state); o nó
             # developer usa o run_id p/ dimensionar custos em llm_costs. O

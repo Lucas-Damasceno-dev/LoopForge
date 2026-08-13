@@ -14,6 +14,7 @@ class RunCreate(BaseModel):
     mock_llm: bool = Field(False, description="Usar modo LLM mock")
     routing_mode: RoutingMode = Field("full", description="Modo de roteamento: full ou fast")
     interactive: bool = Field(False, description="Pausar após nós para aprovação humana (HITL)")
+    model: str | None = Field(None, description="Modelo LLM override para a run (vence env/config)")
 
 
 class RunUpdate(BaseModel):

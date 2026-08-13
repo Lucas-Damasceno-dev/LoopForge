@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
+from ...pipeline.llm_factory import resolve_model
 
 DEFAULT_PROMPT = """Você é um Tech Lead. Revise as user stories e recomende a melhor stack.
 
@@ -154,6 +155,7 @@ def tech_lead(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
         validation = call_llm_via_opencode(
             system_prompt=get_effective_prompt("tech_lead", DEFAULT_PROMPT),
             user_prompt=f"Ideia do Projeto: {idea}\n\nUser Stories:\n{stories_str}",
+            model=resolve_model(state),
             schema_model=ValidationResult,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
@@ -223,6 +225,7 @@ Template (use como guia):
                 project_dir=str(state.get("project_dir") or state.get("output_dir") or "."),
             ),
             user_prompt=user_prompt_str,
+            model=resolve_model(state),
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
             node="tech_lead",

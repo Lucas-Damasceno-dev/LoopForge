@@ -19,6 +19,7 @@ __all__ = [
     "_semantic_normalize_prompt",
     "DEFAULT_LLM_MODEL",
     "resolve_default_model",
+    "resolve_model",
 ]
 
 # Fonte única do modelo LLM default (Fix 2): os 5 defaults divergentes
@@ -47,6 +48,21 @@ def resolve_default_model() -> str:
     except Exception:
         pass
     return DEFAULT_LLM_MODEL
+
+
+def resolve_model(state: Any = None) -> str:
+    """Resolve o modelo LLM da run com precedência única (v7 feature per-run model).
+
+    ``state["llm_model_name"]`` (override por run, via POST /api/v1/runs campo
+    ``model``) VENCE qualquer env/config; sem override, delega para
+    ``resolve_default_model()`` (OPENROUTER_MODEL → OPENCODE_MODEL → config
+    llm_model → DEFAULT_LLM_MODEL). Usado pelos nós ao chamar
+    ``call_llm_via_opencode(model=...)`` — com state sem override o resultado
+    é byte-idêntico ao comportamento atual.
+    """
+    if state and state.get("llm_model_name"):
+        return str(state["llm_model_name"])
+    return resolve_default_model()
 
 
 DEFAULT_OPENROUTER_MODEL = resolve_default_model()

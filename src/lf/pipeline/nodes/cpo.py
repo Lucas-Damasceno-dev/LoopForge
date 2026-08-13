@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
+from ...pipeline.llm_factory import resolve_model
 
 DEFAULT_PROMPT = """Você é um CPO (Chief Product Officer). Transforme a ideia abaixo em um épico de produto estruturado em JSON.
 
@@ -93,6 +94,7 @@ def cpo(state: GraphState, config: Optional[RunnableConfig] = None) -> dict:  # 
         epic = call_llm_via_opencode(
             system_prompt=system_prompt,
             user_prompt=f"Ideia do usuário: {state.get('idea', '')}",
+            model=resolve_model(state),
             schema_model=EpicSchema,
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),

@@ -281,6 +281,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             mock_llm=payload.mock_llm,
             routing_mode=payload.routing_mode,
             interactive=payload.interactive,
+            model=payload.model,
         )
         await session.refresh(run)
         return run
@@ -890,6 +891,7 @@ async def _promote_next(app: FastAPI) -> None:
         mock_llm = params.get("mock_llm", False)
         routing_mode = params.get("routing_mode", "full")
         interactive = params.get("interactive", False)
+        model = params.get("model")
 
         # M-02/ADR-0003: thread canônica `run-{id}` persistida junto da promoção.
         await _set_run_status(run_id, "running", thread_id=f"run-{run_id}", parent_run_id=run_id)
@@ -903,6 +905,7 @@ async def _promote_next(app: FastAPI) -> None:
                 mock_llm=mock_llm,
                 routing_mode=routing_mode,
                 interactive=interactive,
+                model=model,
             )
         )
 
@@ -915,6 +918,7 @@ async def _execute_pipeline_in_background(
     mock_llm: bool = False,
     routing_mode: str = "full",
     interactive: bool = False,
+    model: str | None = None,
 ) -> None:
     """Enfileira a run na fila E3 (FIFO) e dispara a promoção se houver vaga.
 
@@ -932,6 +936,7 @@ async def _execute_pipeline_in_background(
             "mock_llm": mock_llm,
             "routing_mode": routing_mode,
             "interactive": interactive,
+            "model": model,
         }
         q.pending.append(run_id)
     await _promote_next(app)
@@ -974,6 +979,7 @@ async def _run_pipeline(
     mock_llm: bool = False,
     routing_mode: str = "full",
     interactive: bool = False,
+    model: str | None = None,
 ) -> None:
     """Executa a pipeline de uma run JÁ promovida; no fim, promove a próxima da fila."""
     import os
@@ -992,6 +998,7 @@ async def _run_pipeline(
         # routing_mode chega como str dos params da fila (payload da API); o
         # próprio TaskSchema valida o Literal em runtime — cast só tipográfico.
         routing_mode=cast(Literal["full", "fast", "patch", "review-only", "explore"], routing_mode),
+        model=model,
     )
 
     project_dir = f"/tmp/loopforge/run_{run_id}"

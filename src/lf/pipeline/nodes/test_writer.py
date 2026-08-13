@@ -13,6 +13,7 @@ from langchain_core.runnables import RunnableConfig
 from ...pipeline.prompt_overrides import get_effective_prompt
 from ...pipeline.state import GraphState
 from ...runner.opencode.llm import call_llm_via_opencode, resolve_run_id
+from ...pipeline.llm_factory import resolve_model
 from .developer import _parse_multi_file_response
 
 DEFAULT_PROMPT = (
@@ -161,6 +162,7 @@ def test_writer(state: GraphState, config: Optional[RunnableConfig] = None) -> d
         raw = call_llm_via_opencode(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
+            model=resolve_model(state),
             mock=state.get("mock_llm", False),
             circuit_breaker=state.get("circuit_breaker"),
             project_root=output_dir,
