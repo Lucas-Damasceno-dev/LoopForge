@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, String, Text
+from sqlalchemy import JSON, DateTime, Float, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from lf.api.database import Base
@@ -57,3 +57,31 @@ class HumanDecisionModel(Base):
     feedback_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     user: Mapped[str] = mapped_column(String(50), default="human_operator")
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+
+
+class AgentTemplate(Base):
+    """Modelo ORM para a tabela 'agent_templates'.
+
+    Colunas espelhando os schemas pydantic de AgentBase (lf/api/agents.py).
+    env_vars/tools_allowlist/permissions usam JSON (precedente: events.payload,
+    eventos.py) — ok no SQLite; create_all cria a tabela nova sem migração.
+    `name` é unique (chave natural do agente).
+    """
+
+    __tablename__ = "agent_templates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_generate_uuid)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(String(100), default="default")
+    temperature: Mapped[float] = mapped_column(Float, default=0.7)
+    max_retries: Mapped[int] = mapped_column(default=2)
+    timeout_seconds: Mapped[int] = mapped_column(default=300)
+    env_vars: Mapped[dict] = mapped_column(JSON, default=dict)
+    tools_allowlist: Mapped[list] = mapped_column(JSON, default=list)
+    permissions: Mapped[list] = mapped_column(JSON, default=list)
+    stack: Mapped[str] = mapped_column(String(50), default="python")
+    budget_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc, onupdate=_now_utc)
