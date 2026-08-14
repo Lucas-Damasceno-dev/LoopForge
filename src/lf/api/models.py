@@ -85,3 +85,24 @@ class AgentTemplate(Base):
     budget_usd: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc, onupdate=_now_utc)
+
+
+class PipelineTemplate(Base):
+    """Modelo ORM para a tabela 'pipeline_templates'.
+
+    Colunas espelhando os schemas pydantic de PipelineBase (lf/api/pipelines.py).
+    nodes/edges usam JSON (precedente: events.payload e AgentTemplate) — ok no
+    SQLite; create_all cria a tabela nova sem migração. `name` é unique (chave
+    natural do pipeline). Validação semântica (ciclos etc.) é da camada
+    validate (task 3), não deste modelo.
+    """
+
+    __tablename__ = "pipeline_templates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_generate_uuid)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    nodes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    edges: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc, onupdate=_now_utc)
