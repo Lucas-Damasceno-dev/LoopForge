@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lf.api.database import get_session
-from lf.api.models import PipelineTemplate
+from lf.api.models import AgentTemplate, PipelineTemplate
 
 pipelines_router = APIRouter(prefix="/api/v1/pipelines", tags=["Pipelines"])
 
@@ -163,3 +163,29 @@ async def delete_pipeline(pipeline_id: str, session: AsyncSession = Depends(get_
     await session.delete(pipeline)
     await session.commit()
     return {"deleted": True}
+
+
+@pipelines_router.post("/{pipeline_id}/validate")
+async def validate_pipeline_endpoint(
+    pipeline_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Valida um pipeline salvo (referências, ciclos, tetos, agentes).
+
+    known_agents = ids de agent_templates + SPECIAL_AGENT_IDS (ids do pipeline
+    nativo). Sempre 200 com {"valid": bool, "errors": [...]}; 404 se o
+    pipeline não existe. Import local do validador evita ciclo de imports
+    (pipeline_validator importa os schemas deste módulo).
+    """
+    from lf.api.pipeline_validator import validate_pipeline
+
+    row = await session.get(PipelineTemplate, pipeline_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    agents = await session.execute(select(AgentTemplate.id))
+    known_agents = {row_id for (row_id,) in agents.all()}
+
+    pipeline = PipelineBase(name=row.name, description=row.description, nodes=row.nodes, edges=row.edges)
+    errors = validate_pipeline(pipeline, known_agents)
+    return {"valid": not errors, "errors": errors}
