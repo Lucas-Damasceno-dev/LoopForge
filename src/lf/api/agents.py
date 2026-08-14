@@ -1,4 +1,4 @@
-"""Schemas pydantic de agentes (S2 — CRUD de agentes).
+"""Schemas pydantic + endpoints CRUD de agentes (S2 — CRUD de agentes).
 
 Mesmo padrão do memory.py: schemas no próprio arquivo do router.
 AgentUpdate é PATCH-style (todos os campos opcionais) — no PUT, campos
@@ -7,7 +7,16 @@ omitidos mantêm o valor existente no ORM.
 
 from datetime import datetime
 
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from lf.api.database import get_session
+from lf.api.models import AgentTemplate
+
+agents_router = APIRouter(prefix="/api/v1/agents", tags=["Agents"])
 
 
 class AgentBase(BaseModel):
@@ -57,3 +66,86 @@ class AgentResponse(AgentBase):
     id: str = Field(..., description="Id do agente (uuid)")
     created_at: datetime = Field(..., description="Timestamp de criação")
     updated_at: datetime = Field(..., description="Timestamp da última atualização")
+
+
+# ─── Endpoints ───────────────────────────────────────────────────────────
+@agents_router.get("", response_model=list[AgentResponse])
+async def list_agents(session: AsyncSession = Depends(get_session)) -> list[AgentTemplate]:
+    """Lista agentes ordenados por name (vazio = [])."""
+    result = await session.execute(select(AgentTemplate).order_by(AgentTemplate.name))
+    return list(result.scalars().all())
+
+
+@agents_router.post("", response_model=AgentResponse, status_code=201)
+async def create_agent(
+    payload: AgentCreate,
+    session: AsyncSession = Depends(get_session),
+) -> AgentTemplate:
+    """Cria um agente (uuid gerado pelo ORM; name único → 422)."""
+    existing = await session.execute(select(AgentTemplate).where(AgentTemplate.name == payload.name))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=422, detail="name already exists")
+    agent = AgentTemplate(**payload.model_dump())
+    session.add(agent)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail="name already exists") from None
+    await session.refresh(agent)
+    return agent
+
+
+@agents_router.get("/{agent_id}", response_model=AgentResponse)
+async def get_agent(agent_id: str, session: AsyncSession = Depends(get_session)) -> AgentTemplate:
+    """Retorna um agente pelo id."""
+    agent = await session.get(AgentTemplate, agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+
+@agents_router.put("/{agent_id}", response_model=AgentResponse)
+async def update_agent(
+    agent_id: str,
+    payload: AgentUpdate,
+    session: AsyncSession = Depends(get_session),
+) -> AgentTemplate:
+    """Atualiza um agente (PATCH-style: campos None/omitidos mantêm o valor)."""
+    agent = await session.get(AgentTemplate, agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    if "name" in data:
+        dup = await session.execute(
+            select(AgentTemplate).where(
+                AgentTemplate.name == data["name"],
+                AgentTemplate.id != agent_id,
+            )
+        )
+        if dup.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=422, detail="name already exists")
+
+    for field, value in data.items():
+        if value is not None:
+            setattr(agent, field, value)
+
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail="name already exists") from None
+    await session.refresh(agent)
+    return agent
+
+
+@agents_router.delete("/{agent_id}")
+async def delete_agent(agent_id: str, session: AsyncSession = Depends(get_session)) -> dict:
+    """Remove um agente pelo id."""
+    agent = await session.get(AgentTemplate, agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    await session.delete(agent)
+    await session.commit()
+    return {"deleted": True}
