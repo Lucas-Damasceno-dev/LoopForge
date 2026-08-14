@@ -124,7 +124,17 @@ def test_sem_input_node():
         [node("a", "agent", agent_id="developer"), node("out", "output")],
         [edge("a", "out")],
     )
-    assert "pipeline requires at least one input node" in validate_pipeline(p, known_agents=set())
+    assert "pipeline must have exactly one input node" in validate_pipeline(p, known_agents=set())
+
+
+def test_dois_input_nodes():
+    """2 inputs → erro (build exige exatamente 1 input)."""
+    p = build(
+        [node("in1", "input"), node("in2", "input"), node("out", "output")],
+        [edge("in1", "out"), edge("in2", "out")],
+    )
+    errors = validate_pipeline(p, known_agents=set())
+    assert "pipeline must have exactly one input node" in errors
 
 
 def test_sem_output_node():
@@ -133,8 +143,18 @@ def test_sem_output_node():
         [edge("in", "a")],
     )
     errors = validate_pipeline(p, known_agents=set())
-    assert "pipeline requires at least one output node" in errors
+    assert "pipeline must have exactly one output node" in errors
     assert "node has no outgoing edges and is not output: a" in errors
+
+
+def test_dois_output_nodes():
+    """2 outputs → erro (build exige exatamente 1 output)."""
+    p = build(
+        [node("in", "input"), node("out1", "output"), node("out2", "output")],
+        [edge("in", "out1"), edge("in", "out2")],
+    )
+    errors = validate_pipeline(p, known_agents=set())
+    assert "pipeline must have exactly one output node" in errors
 
 
 def test_ciclo_nao_retry():

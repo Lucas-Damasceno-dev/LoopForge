@@ -123,13 +123,14 @@ def validate_pipeline(pipeline: PipelineBase, known_agents: set[str]) -> list[st
         elif n.agent_id not in known_agents and n.agent_id not in SPECIAL_AGENT_IDS:
             errors.append(f"agent node references unknown agent: {n.id}")
 
-    # 4. Input/output explícitos (v1 — exigimos declarados)
+    # 4. Input/output explícitos (v1 — exatamente 1 de cada; contrato do
+    # build_pipeline_graph, que lança ValueError se != 1)
     inputs = [n for n in nodes if n.type == "input"]
     outputs = [n for n in nodes if n.type == "output"]
-    if not inputs:
-        errors.append("pipeline requires at least one input node")
-    if not outputs:
-        errors.append("pipeline requires at least one output node")
+    if len(inputs) != 1:
+        errors.append("pipeline must have exactly one input node")
+    if len(outputs) != 1:
+        errors.append("pipeline must have exactly one output node")
 
     # 5. Ciclo não-retry
     if _cycle_detected(nodes, edges):
