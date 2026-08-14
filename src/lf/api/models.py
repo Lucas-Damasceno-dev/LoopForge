@@ -38,6 +38,12 @@ class PipelineRun(Base):
     # (NULL em runs raiz). Permite resume/fork/time-travel por chave real.
     thread_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     parent_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # S3 (editor de pipelines): run vinculada a um pipeline salvo. O snapshot
+    # (PipelineBase.model_dump()) é IMUTÁVEL por run — o template pode mudar ou
+    # ser deletado depois; a execução usa sempre o snapshot. Colunas aditivas
+    # via ALTER TABLE em database._apply_pipeline_runs_additive_migration.
+    pipeline_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    pipeline_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc, onupdate=_now_utc)
 

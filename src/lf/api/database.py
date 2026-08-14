@@ -116,6 +116,17 @@ async def _apply_pipeline_runs_additive_migration(conn) -> None:
     if "parent_run_id" not in columns:
         await conn.execute(text("ALTER TABLE pipeline_runs ADD COLUMN parent_run_id VARCHAR(36)"))
         migrated = True
+    # S3 (editor de pipelines): colunas de vínculo run↔pipeline. Aditivas e
+    # NULL-able — SEM backfill (runs legadas ficam com pipeline_id NULL =
+    # montagem automática). pipeline_snapshot é TEXT: SQLite não tem tipo JSON
+    # nativo em ALTER TABLE; o SQLAlchemy (JSON) serializa/deserializa ao
+    # ler/escrever a coluna TEXT — mesmo padrão das colunas JSON do repo.
+    if "pipeline_id" not in columns:
+        await conn.execute(text("ALTER TABLE pipeline_runs ADD COLUMN pipeline_id VARCHAR(36)"))
+        migrated = True
+    if "pipeline_snapshot" not in columns:
+        await conn.execute(text("ALTER TABLE pipeline_runs ADD COLUMN pipeline_snapshot TEXT"))
+        migrated = True
 
     if migrated:
         await conn.execute(

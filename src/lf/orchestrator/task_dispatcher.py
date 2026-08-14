@@ -99,6 +99,12 @@ class TaskDispatcher:
         hitl_on_timeout: str | None = None,
         subprocess_timeout_seconds: int | None = None,
         sandbox_enabled: bool | None = None,
+        # S3 (editor de pipelines): pipeline custom (PipelineBase) + templates
+        # da biblioteca (dict id -> AgentBase). Ausentes = fluxo atual
+        # (build_graph default). O snapshot do pipeline é IMUTÁVEL por run —
+        # quem chama o dispatcher passa o snapshot reconstruído como pydantic.
+        pipeline: Any | None = None,
+        agent_templates: dict | None = None,
     ):
         self.mock_llm = mock_llm
         self.interactive = interactive
@@ -106,6 +112,8 @@ class TaskDispatcher:
         self.review_mode = review_mode
         self.notify = notify
         self.webhook_url = webhook_url
+        self.pipeline = pipeline
+        self.agent_templates = agent_templates or {}
         if hitl_timeout_seconds is None:
             from lf.config.loader import load_ade_config
 
@@ -163,7 +171,21 @@ class TaskDispatcher:
         return load_ade_config().pipeline
 
     def _get_graph(self, checkpointer=None):
-        """Retorna grafo compilado (cache por sessão)."""
+        """Retorna grafo compilado (cache por sessão).
+
+        S3 (editor de pipelines): se a run foi criada com pipeline_id, monta o
+        grafo a partir do SNAPSHOT via build_pipeline_graph (agent_templates da
+        biblioteca resolvidos na execução; agente deletado → ValueError claro).
+        Senão, fluxo atual (build_graph default, HITL gates habilitados).
+        """
+        if self.pipeline is not None:
+            from lf.pipeline.pipeline_graph import build_pipeline_graph
+
+            return build_pipeline_graph(
+                self.pipeline,
+                self.agent_templates,
+                checkpointer=checkpointer,
+            )
         return build_graph(
             checkpointer=checkpointer,
             human_gate_enabled=self.interactive,

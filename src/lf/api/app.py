@@ -36,7 +36,9 @@ from lf.api.config import get_api_settings
 from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
 from lf.api.events import event_bus
-from lf.api.models import HumanDecisionModel, PipelineRun
+from lf.api.models import AgentTemplate, HumanDecisionModel, PipelineRun, PipelineTemplate
+from lf.api.pipeline_validator import SPECIAL_AGENT_IDS, validate_pipeline
+from lf.api.pipelines import PipelineBase
 from lf.api.rate_limit import RateLimitMiddleware
 from lf.api.schemas import (
     HealthResponse,
@@ -254,12 +256,41 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     # ─── CRUD & Execução de Runs ──────────────────────────────────
     async def _create_run_impl(payload: RunCreate, session: AsyncSession) -> PipelineRun:
-        """Cria a run como `queued` e a enfileira na fila E3 (M-21)."""
+        """Cria a run como `queued` e a enfileira na fila E3 (M-21).
+
+        S3 (editor de pipelines): se payload.pipeline_id, carrega o template,
+        revalida (defensivo — o template salvo pode ter sido editado para um
+        estado inválido) e grava um SNAPSHOT IMUTÁVEL do pipeline no run. A
+        execução usa sempre o snapshot — o template pode mudar/deletar depois.
+        """
         run = PipelineRun(
             idea=payload.idea,
             stack=payload.stack,
             status="queued",
         )
+
+        pipeline_snapshot: dict | None = None
+        if payload.pipeline_id:
+            template = await session.get(PipelineTemplate, payload.pipeline_id)
+            if template is None:
+                raise HTTPException(status_code=404, detail="Pipeline not found")
+
+            pipeline = PipelineBase(
+                name=template.name,
+                description=template.description,
+                nodes=template.nodes,
+                edges=template.edges,
+            )
+            agents_result = await session.execute(select(AgentTemplate.id))
+            known_agents = {row[0] for row in agents_result.all()} | SPECIAL_AGENT_IDS
+            errors = validate_pipeline(pipeline, known_agents)
+            if errors:
+                raise HTTPException(status_code=422, detail=f"pipeline invalid: {', '.join(errors)}")
+
+            run.pipeline_id = payload.pipeline_id
+            pipeline_snapshot = pipeline.model_dump()
+
+        run.pipeline_snapshot = pipeline_snapshot
         session.add(run)
         await session.commit()
         await session.refresh(run)
@@ -282,8 +313,10 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             routing_mode=payload.routing_mode,
             interactive=payload.interactive,
             model=payload.model,
+            pipeline_snapshot=pipeline_snapshot,
         )
         await session.refresh(run)
+        await _attach_pipeline_names([run], session)
         return run
 
     @app.post(
@@ -411,6 +444,20 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         _mark_legacy(response)
         return await _resume_run_impl(run_id, session)
 
+    async def _attach_pipeline_names(runs: list[PipelineRun], session: AsyncSession) -> list[PipelineRun]:
+        """Popula `pipeline_name` nas runs (join com PipelineTemplate no read).
+
+        Template deletado → pipeline_name None (snapshot preserva a execução).
+        """
+        ids = {r.pipeline_id for r in runs if r.pipeline_id}
+        if not ids:
+            return runs
+        result = await session.execute(select(PipelineTemplate).where(PipelineTemplate.id.in_(ids)))
+        names = {t.id: t.name for t in result.scalars().all()}
+        for run in runs:
+            run.pipeline_name = names.get(run.pipeline_id)  # type: ignore[attr-defined]
+        return runs
+
     async def _list_runs_impl(skip: int, limit: int, session: AsyncSession) -> RunListResponse:
         """Lista execuções de pipeline com paginação (expoe status queued)."""
         total_query = select(func.count(PipelineRun.id))
@@ -419,7 +466,9 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
         query = select(PipelineRun).order_by(PipelineRun.created_at.desc()).offset(skip).limit(limit)
         result = await session.execute(query)
-        runs = result.scalars().all()
+        runs = list(result.scalars().all())
+
+        await _attach_pipeline_names(runs, session)
 
         # Converte ORM -> RunResponse (from_attributes) explicitamente; o
         # response_model do FastAPI faria o mesmo em runtime.
@@ -495,6 +544,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         run = await session.get(PipelineRun, run_id)
         if not run:
             raise HTTPException(status_code=404, detail="Run not found")
+        await _attach_pipeline_names([run], session)
         return run
 
     @app.get(
@@ -933,6 +983,7 @@ async def _promote_next(app: FastAPI) -> None:
         routing_mode = params.get("routing_mode", "full")
         interactive = params.get("interactive", False)
         model = params.get("model")
+        pipeline_snapshot = params.get("pipeline_snapshot")
 
         # M-02/ADR-0003: thread canônica `run-{id}` persistida junto da promoção.
         await _set_run_status(run_id, "running", thread_id=f"run-{run_id}", parent_run_id=run_id)
@@ -947,6 +998,7 @@ async def _promote_next(app: FastAPI) -> None:
                 routing_mode=routing_mode,
                 interactive=interactive,
                 model=model,
+                pipeline_snapshot=pipeline_snapshot,
             )
         )
 
@@ -960,6 +1012,7 @@ async def _execute_pipeline_in_background(
     routing_mode: str = "full",
     interactive: bool = False,
     model: str | None = None,
+    pipeline_snapshot: dict | None = None,
 ) -> None:
     """Enfileira a run na fila E3 (FIFO) e dispara a promoção se houver vaga.
 
@@ -978,6 +1031,7 @@ async def _execute_pipeline_in_background(
             "routing_mode": routing_mode,
             "interactive": interactive,
             "model": model,
+            "pipeline_snapshot": pipeline_snapshot,
         }
         q.pending.append(run_id)
     await _promote_next(app)
@@ -1021,11 +1075,13 @@ async def _run_pipeline(
     routing_mode: str = "full",
     interactive: bool = False,
     model: str | None = None,
+    pipeline_snapshot: dict | None = None,
 ) -> None:
     """Executa a pipeline de uma run JÁ promovida; no fim, promove a próxima da fila."""
     import os
     import time
 
+    from lf.api.agents import AgentBase
     from lf.config.schema import TaskSchema
     from lf.orchestrator.task_dispatcher import TaskDispatcher
 
@@ -1048,10 +1104,43 @@ async def _run_pipeline(
     if os.getenv("LF_API_TEST"):
         mock_llm = True
 
+    # S3 (editor de pipelines): se a run tem pipeline_snapshot (imutável do
+    # start), monta o grafo custom via build_pipeline_graph; senão segue o
+    # fluxo atual (build_graph default). Agent templates da biblioteca são
+    # resolvidos na EXECUÇÃO: se o agente foi deletado depois do snapshot, o
+    # build lança ValueError('unknown agent node') → cai no except abaixo →
+    # run failed com erro claro no log (nunca crash silencioso).
+    pipeline = None
+    agent_templates: dict[str, AgentBase] = {}
+    if pipeline_snapshot:
+        from lf.api.database import session_factory
+
+        pipeline = PipelineBase(**pipeline_snapshot)
+        if session_factory:
+            async with session_factory() as bg_session:
+                agents = await bg_session.execute(select(AgentTemplate))
+                for row in agents.scalars().all():
+                    agent_templates[row.id] = AgentBase(
+                        name=row.name,
+                        description=row.description,
+                        prompt=row.prompt,
+                        model=row.model,
+                        temperature=row.temperature,
+                        max_retries=row.max_retries,
+                        timeout_seconds=row.timeout_seconds,
+                        env_vars=row.env_vars,
+                        tools_allowlist=row.tools_allowlist,
+                        permissions=row.permissions,
+                        stack=row.stack,
+                        budget_usd=row.budget_usd,
+                    )
+
     dispatcher = TaskDispatcher(
         mock_llm=mock_llm,
         interactive=interactive,
         notify=False,
+        pipeline=pipeline,
+        agent_templates=agent_templates,
     )
 
     def _sync_dispatch():

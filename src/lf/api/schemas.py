@@ -15,6 +15,7 @@ class RunCreate(BaseModel):
     routing_mode: RoutingMode = Field("full", description="Modo de roteamento: full ou fast")
     interactive: bool = Field(False, description="Pausar após nós para aprovação humana (HITL)")
     model: str | None = Field(None, description="Modelo LLM override para a run (vence env/config)")
+    pipeline_id: str | None = Field(None, description="Pipeline a executar; ausente = montagem automática atual")
 
 
 class RunUpdate(BaseModel):
@@ -35,6 +36,11 @@ class RunResponse(BaseModel):
     # Degradação da run (mock fallback, provider degradado etc.) — ADITIVO.
     degraded: bool = False
     degraded_reason: str | None = None
+    # S3 (editor de pipelines): run vinculada a um pipeline salvo. O snapshot
+    # imutável fica no PipelineRun (pipeline_snapshot); o nome vem do template
+    # via join no read (None se o template foi deletado).
+    pipeline_id: str | None = None
+    pipeline_name: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -298,6 +304,3 @@ class SaveDockerConfigResponse(BaseModel):
     success: bool
     saved_files: list[str] = Field(default_factory=list)
     message: str
-
-
-
