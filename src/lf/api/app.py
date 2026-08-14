@@ -881,6 +881,11 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
 
     app.include_router(agents_router, dependencies=[Depends(verify_authentication)])
 
+    # ─── Pipelines (S3 — editor de pipelines) ──────────────────────────
+    from lf.api.pipelines import pipelines_router
+
+    app.include_router(pipelines_router, dependencies=[Depends(verify_authentication)])
+
     # ─── SPA React (M-16/B4) ─────────────────────────────────────────
     # Monta o dist da SPA em /app se disponível (env LF_SPA_DIST ou pacote
     # embutido lf.ade.static.dist na B5); sem dist, apenas loga warning.

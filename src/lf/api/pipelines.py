@@ -1,16 +1,24 @@
-"""Schemas pydantic de pipelines (S3 — editor de pipelines).
+"""Schemas pydantic + endpoints CRUD de pipelines (S3 — editor de pipelines).
 
-Mesmo padrão de agents.py: schemas no próprio arquivo do router (aqui ainda
-sem router — endpoints CRUD entram na task 2). Validação apenas de shape
-pydantic: ciclos/semântica de grafo ficam para a task 3 (validate).
+Mesmo padrão de agents.py: schemas no próprio arquivo do router.
 PipelineUpdate é PATCH-style (todos os campos opcionais) — no PUT, campos
-omitidos mantêm o valor existente no ORM.
+omitidos mantêm o valor existente no ORM. Validação de shape pydantic aqui;
+ciclos/semântica de grafo ficam para a task 3 (validate).
 """
 
 from datetime import datetime
 from typing import Any, Literal
 
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from lf.api.database import get_session
+from lf.api.models import PipelineTemplate
+
+pipelines_router = APIRouter(prefix="/api/v1/pipelines", tags=["Pipelines"])
 
 NODE_TYPES = Literal["agent", "split", "merge", "input", "output", "gate"]
 EDGE_TYPES = Literal["sequential", "parallel", "conditional", "retry"]
@@ -72,3 +80,86 @@ class PipelineResponse(PipelineBase):
     id: str = Field(..., description="UUID do pipeline")
     created_at: datetime = Field(..., description="Data de criação")
     updated_at: datetime = Field(..., description="Data da última atualização")
+
+
+# ─── Endpoints ───────────────────────────────────────────────────────────
+@pipelines_router.get("", response_model=list[PipelineResponse])
+async def list_pipelines(session: AsyncSession = Depends(get_session)) -> list[PipelineTemplate]:
+    """Lista pipelines ordenados por name (vazio = [])."""
+    result = await session.execute(select(PipelineTemplate).order_by(PipelineTemplate.name))
+    return list(result.scalars().all())
+
+
+@pipelines_router.post("", response_model=PipelineResponse, status_code=201)
+async def create_pipeline(
+    payload: PipelineCreate,
+    session: AsyncSession = Depends(get_session),
+) -> PipelineTemplate:
+    """Cria um pipeline (uuid gerado pelo ORM; name único → 422)."""
+    existing = await session.execute(select(PipelineTemplate).where(PipelineTemplate.name == payload.name))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=422, detail="name already exists")
+    pipeline = PipelineTemplate(**payload.model_dump())
+    session.add(pipeline)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail="name already exists") from None
+    await session.refresh(pipeline)
+    return pipeline
+
+
+@pipelines_router.get("/{pipeline_id}", response_model=PipelineResponse)
+async def get_pipeline(pipeline_id: str, session: AsyncSession = Depends(get_session)) -> PipelineTemplate:
+    """Retorna um pipeline pelo id."""
+    pipeline = await session.get(PipelineTemplate, pipeline_id)
+    if pipeline is None:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    return pipeline
+
+
+@pipelines_router.put("/{pipeline_id}", response_model=PipelineResponse)
+async def update_pipeline(
+    pipeline_id: str,
+    payload: PipelineUpdate,
+    session: AsyncSession = Depends(get_session),
+) -> PipelineTemplate:
+    """Atualiza um pipeline (PATCH-style: campos None/omitidos mantêm o valor)."""
+    pipeline = await session.get(PipelineTemplate, pipeline_id)
+    if pipeline is None:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    if "name" in data:
+        dup = await session.execute(
+            select(PipelineTemplate).where(
+                PipelineTemplate.name == data["name"],
+                PipelineTemplate.id != pipeline_id,
+            )
+        )
+        if dup.scalar_one_or_none() is not None:
+            raise HTTPException(status_code=422, detail="name already exists")
+
+    for field, value in data.items():
+        if value is not None:
+            setattr(pipeline, field, value)
+
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail="name already exists") from None
+    await session.refresh(pipeline)
+    return pipeline
+
+
+@pipelines_router.delete("/{pipeline_id}")
+async def delete_pipeline(pipeline_id: str, session: AsyncSession = Depends(get_session)) -> dict:
+    """Remove um pipeline pelo id."""
+    pipeline = await session.get(PipelineTemplate, pipeline_id)
+    if pipeline is None:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    await session.delete(pipeline)
+    await session.commit()
+    return {"deleted": True}
