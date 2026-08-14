@@ -5,45 +5,39 @@ LoopForge communicates with OpenCode via subprocess. This document defines the c
 ## Invocation Format
 
 ```
-opencode run "PROMPT_TEXT" -m MODEL --pure
+opencode run "PROMPT_TEXT" -m MODEL --dir {root} --pure
 ```
 
 - `PROMPT_TEXT`: The full prompt (system + user), passed as a single positional argument
 - `-m MODEL`: Required model override (no default)
+- `--dir {root}`: Forces opencode's chdir to the run output dir
 - `--pure`: Enables pure mode (no tool-use overhead)
 - Working directory: project root
-- Timeout: **600s** (configurable via `OpenCodeRunner(timeout_seconds=N)`)
+- Timeout: **300s** default (configurable via `ade.yaml` `runner.subprocess_timeout_seconds`; `0` = no timeout; env `OPENCODE_TIMEOUT`)
 - Wrapped with `script -q -c <cmd> /dev/null` to provide a PTY (required by opencode)
+- On timeout, the **whole process tree** is killed (killpg + descendants via `/proc`), not just `script`
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENCODE_MODEL` | `openrouter/inclusionai/ling-3.0-flash:free` | Model to use |
-| `OPENROUTER_BASE_URL` | — | Custom base URL for OmniRoute (e.g., OpenRouter endpoints) |
+| `OPENCODE_MODEL` | `oc/deepseek-v4-flash-free` | Model to use (2nd in resolution chain; e.g. `opencode/deepseek-v4-flash-free`) |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Custom base URL (e.g. local OmniRoute) |
+| `OPENROUTER_TIMEOUT` | `300` | LLM HTTP timeout in seconds (`600` for reasoning models) |
+| `OPENCODE_TIMEOUT` | — | Subprocess timeout override (seconds) |
 | `OPENCODE_MOCK` | `0` | Set to `1` to return mock responses (no subprocess) |
-| `GEMINI_API_KEY` | — | API key for Google GenAI models (fallback in `llm_factory.py`) |
-| `OPENROUTER_API_KEY` | — | Primary provider API key (checked first by `TaskDispatcher._build_initial_state`) |
+| `OPENROUTER_API_KEY` | — | Primary provider API key (OpenRouter) |
 
 ## LLM Provider Resolution
 
-The effective model is resolved in this priority (see `runner.py:9` and `task_dispatcher.py:110`):
+The effective model is resolved by `resolve_default_model()` (`llm_factory.py:31`), in this priority:
 
-1. `OPENROUTER_MODEL` env var → OpenRouter
-2. `OPENCODE_MODEL` env var → OpenCode subprocess model
-3. Default: `inclusionai/ling-3.0-flash:free` (OpenRouter) or `gemini-2.0-flash` (Google fallback)
+1. `OPENROUTER_MODEL` env var
+2. `OPENCODE_MODEL` env var
+3. `llm_model` in `.loopforge.json` config
+4. Default: `oc/deepseek-v4-flash-free` (`DEFAULT_LLM_MODEL`)
 
-Provider auto-detection:
-- If `OPENROUTER_API_KEY` is set → `llm_provider = "openrouter"`
-- Otherwise → `llm_provider = "google"` (uses `GEMINI_API_KEY`)
-
-## Fallback to Google GenAI
-
-When `OPENROUTER_API_KEY` is not defined, the system falls back to Google GenAI:
-
-- `llm_model_name` defaults to `gemini-2.0-flash`
-- Requires `GEMINI_API_KEY` environment variable
-- Handled in `llm_factory.py` via conditional provider dispatch
+Primary provider is **OpenRouter** (HTTP direct). There is **no Google GenAI fallback**. When the HTTP call fails, execution falls back to the `opencode` subprocess; when `OPENCODE_MOCK=1` or the `opencode` binary is missing, mock responses are returned (no subprocess).
 
 ## Mock Mode
 

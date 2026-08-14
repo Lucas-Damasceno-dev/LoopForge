@@ -41,7 +41,7 @@ lf serve --host 127.0.0.1 --port 8000
 lf benchmark
 
 # 9. Retomar pipeline interrompido a partir de checkpoint
-lf resume --resume <session_id>
+lf resume --task-id <task_id>
 ```
 
 ---
@@ -52,14 +52,14 @@ lf resume --resume <session_id>
 # Inicializar projeto LoopForge
 lf init
 
-# Gerenciar planos de tarefas
-lf plan --list
+# Gerenciar planos de tarefas (Spec Review Gate)
+lf plan --vision "API REST de tarefas em Java"
 
 # Status da execução atual
 lf status
 
 # Geração automática de testes
-lf generate-tests --dir ./meu-projeto
+lf generate-tests ./meu-projeto
 
 # Auditoria completa do pipeline
 lf audit
@@ -68,10 +68,10 @@ lf audit
 lf export --dir ./meu-projeto
 
 # Interface web studio
-lf studio --port 3000
+lf studio --duration 30
 
-# Gerar changelog e release
-lf release --version 1.0.0
+# Gerar changelog e release (versão posicional; --dry-run para prévia)
+lf release 1.0.0
 
 # Gerar shell completion (bash/zsh/fish)
 lf completion bash > /etc/bash_completion.d/loopforge
@@ -83,7 +83,7 @@ lf completion bash > /etc/bash_completion.d/loopforge
 
 Para rodar o pipeline com chamadas LLM reais (em vez de `--mock`), siga os passos abaixo. Runs reais são lentos e dependem de integração externa.
 
-1. **Pré-requisito: `opencode` no PATH.** Sem o binário, o runner entra em **mock silencioso** (`src/lf/runner/opencode/runner.py:39` verifica `shutil.which("opencode")`) — o run "funciona" mas nenhum LLM é chamado.
+1. **Pré-requisito: `opencode` no PATH.** Sem o binário, o runner entra em **mock silencioso** (`src/lf/runner/opencode/runner.py:83` verifica `shutil.which("opencode")`) — o run "funciona" mas nenhum LLM é chamado.
 
 2. **Configure o ambiente** (OmniRoute local ou OpenRouter):
 
@@ -104,7 +104,7 @@ Para rodar o pipeline com chamadas LLM reais (em vez de `--mock`), siga os passo
 
 4. **Use `-i` no primeiro run real** para ativar o HITL (human-in-the-loop) e acompanhar as decisões entre os nós.
 
-5. **Atenção à latência**: runs full `--advanced` com modelos de reasoning podem levar **minutos por nó**. Não mate o processo. Se houver timeouts de LLM, aumente `OPENROUTER_TIMEOUT` (default `120s`) — ver `src/lf/pipeline/llm_factory.py:59`.
+5. **Atenção à latência**: runs full `--advanced` com modelos de reasoning podem levar **minutos por nó**. Não mate o processo. Se houver timeouts de LLM, aumente `OPENROUTER_TIMEOUT` (default `300s`; `600s` para modelos de reasoning) — backoff em `src/lf/pipeline/llm_factory.py:161`.
 
 ---
 

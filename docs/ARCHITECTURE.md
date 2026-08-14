@@ -2,7 +2,7 @@
 
 ## Overview
 
-LoopForge é um orquestrador autônomo de governança de agentes de IA construído em Python 3.12+ utilizando **LangGraph** para orquestração de workflow com estado (`GraphState`), **Pydantic v2** para validação estrita de dados, **FastAPI** para API REST e WebSockets, e o harness **OpenCode** para execução e LLM routing.
+LoopForge é um orquestrador autônomo de governança de agentes de IA construído em Python 3.11+ utilizando **LangGraph** para orquestração de workflow com estado (`GraphState`), **Pydantic v2** para validação estrita de dados, **FastAPI** para API REST e WebSockets, e o harness **OpenCode** para execução e LLM routing.
 
 ---
 
@@ -11,14 +11,14 @@ LoopForge é um orquestrador autônomo de governança de agentes de IA construí
 ```text
 src/lf/
 ├── api/              # Servidor FastAPI REST, WebSockets e templates HTML
-│   ├── app.py        # Endpoints /api/runs, /ws/streaming, background workers
+│   ├── app.py        # Endpoints /api/v1/runs, /ws/streaming, background workers
 │   ├── auth.py       # Autenticação via HTTP Basic e X-API-Key
 │   ├── websocket_manager.py # Gerenciador de conexões WebSocket (broadcast)
 │   └── schemas.py    # Schemas Pydantic de request/response
-├── cli/              # Interface CLI Click (16 commandos)
+├── cli/              # Interface CLI Click (17 commandos)
 │   ├── commands/     # run, serve, benchmark, resume, diff, explore, pr,
 │   │                 # init, plan, status, release, completion, generate-tests,
-│   │                 # audit, export, studio
+│   │                 # audit, export, studio, clean
 │   └── main.py       # Registro centralizado de comandos core
 ├── config/           # Pydantic v2 schemas (LoopForgeConfig, TaskSchema, TechStack)
 │   ├── schema.py     # Modelos Pydantic v2 com validação
@@ -26,7 +26,7 @@ src/lf/
 │   └── loader.py     # load_config() JSON/YAML
 ├── pipeline/         # LangGraph StateGraph, nodes, state
 │   ├── graph.py      # build_graph(), entry_router(), should_retry(), NodeRegistry
-│   ├── state.py      # GraphState TypedDict (32 campos)
+│   ├── state.py      # GraphState TypedDict (48 campos: 32 obrigatórios + 16 NotRequired)
 │   ├── llm_factory.py# SQLiteLLMCache, compressão de prompt, call_openrouter_api
 │   └── nodes/        # 9 nós dos agentes
 │       ├── cpo.py            # → PM
@@ -98,12 +98,14 @@ Nota: o gerador de lições (`generate_lessons_md`) **não é um nó** — é um
 
 ### Retry Logic (`should_retry`)
 
-Após o nó QA (`graph.py:64-81`):
+Após o nó QA (`should_retry`, `graph.py:64`):
 
 - **PASS** (0 testes falhos) → prossegue para `parallel_audit`
 - **FAIL** com retries restantes (`qa_attempt_count < max_retries`) → retorna ao `developer`
 - **FAIL** esgotado → `parallel_audit` mesmo assim, com o erro registrado **dentro do nó** (arestas condicionais não propagam mutação de estado)
-- **AppSec com severidade CRÍTICA/ALTA** → `developer` novamente via aresta `parallel_audit: {developer, __end__}` (`graph.py:119`)
+- **AppSec com severidade CRÍTICA/ALTA** → `developer` novamente via aresta `parallel_audit: {developer, __end__}` (`graph.py:152`)
+
+Modo **incremental** (`incremental_slices=true`, v7 5.1): slice `passed` → `test_writer` (contrato do próximo slice; `parallel_audit` se for o último); slice `failed` com tentativas < `slice_max_retries` → `developer` (retry do mesmo slice); esgotado → `parallel_audit` (auditoria final + lições).
 
 ---
 
@@ -123,7 +125,7 @@ Além do core `src/lf/`, o LoopForge inclui três pacotes independentes em `pack
 
 - **Decisão Dinâmica de Stack**: O Tech Lead analisa os requisitos e grava a melhor stack em `state["stack"]`. Se o usuário fornecer `--stack`, esta é usada como override.
 - **Roteamento Centralizado no Grafo**: Arcos e transições definidos estritamente em `graph.py`.
-- **Detecção Automática do QA**: Reconhecimento agnóstico de manifestos e executores (`pom.xml`, `Cargo.toml`, `go.mod`, `package.json`, `build.gradle`, `pyproject.toml`, `*.csproj`).
+- **Detecção Automática do QA**: Reconhecimento agnóstico de manifestos e executores (`pom.xml`/`mvnw`, `Cargo.toml`, `go.mod`, `package.json`/`vitest.config`, `build.gradle`/`gradlew`, `pyproject.toml` com `[tool.pytest.ini_options]`/`pytest.ini`).
 - **Auditoria Simultânea Paralela**: Nó `parallel_audit` executa `AppSec` e `DevOps` simultaneamente via `ThreadPoolExecutor` para otimização de tempo.
 - **Isolamento de Sessão de Banco de Dados**: Trabalhadores assíncronos no FastAPI utilizam `session_factory()` próprio em corrotina background para evitar conflitos de concorrencia.
 - **Cache Semântico e Compressão LLM**: Redução de custo via deduplicação de prompts e armazenamento local SQLite.
@@ -132,7 +134,7 @@ Além do core `src/lf/`, o LoopForge inclui três pacotes independentes em `pack
 
 ## Routing Modes Adaptativos
 
-O `entry_router` em `graph.py:23` avalia `routing_mode` e `task_type` para decidir o ponto de entrada:
+O `entry_router` em `graph.py:25` avalia `routing_mode` e `task_type` para decidir o ponto de entrada:
 
 | Modo | Entrada | Gatilho |
 |---|---|---|
@@ -151,9 +153,11 @@ Ações disponíveis via `POST /api/runs/{id}/decide`:
 - `approve` — prossegue com o resultado atual
 - `retry` — reexecuta o nó
 - `adjust_prompt` — ajusta o prompt e reexecuta (com `feedback_category` e `feedback_message`)
+- `adjust_state` — aplica `state_patch` (dict) ao checkpoint da run
+- `continue` / `pause` — segue / suspende a execução
 - `abort` — encerra a pipeline
 
-Timeout padrão: **300s**, configurável via `ade.yaml` (`hitl.timeout_seconds`). Comportamento em timeout configurável via `ade.yaml` (`hitl.on_timeout`: `continue` | `abort` (default) | `pause`) — `task_dispatcher.py:107-118`.
+Timeout padrão: **300s**, configurável via `ade.yaml` (`hitl.timeout_seconds`). Comportamento em timeout configurável via `ade.yaml` (`hitl.on_timeout`: `continue` (default) | `abort` | `pause`) — `task_dispatcher.py:109-120`.
 
 Decisões registradas em `.loopforge/telemetry.sqlite` (tabela `human_decisions`).
 
@@ -165,7 +169,7 @@ Três guardas no `CircuitBreaker` (`guardrails/circuit_breaker.py`):
 
 1. **Falhas Consecutivas**: Máximo de 5 falhas seguidas antes de abrir o circuito
 2. **Iterações Máximas**: Limite de 20 chamadas totais
-3. **Custo Máximo USD**: Gate por `max_total_cost` (default: $50.00, herdado de `budget_limit_usd` no `.loopforge.json`)
+3. **Custo Máximo USD**: Gate por `max_total_cost` (default efetivo: $10.00, fonte única `budget.max_usd` em `.loopforge/ade.yaml` via `load_budget_usd` — o `budget_limit_usd` do `.loopforge.json` é legado)
 
 Estados: `closed` (ok) → `open` (bloqueado) → `half-open` (tentativa de recuperação após 300s).
 

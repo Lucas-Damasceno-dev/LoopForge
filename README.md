@@ -27,14 +27,14 @@ Abaixo está a galeria de projetos reais **100% gerados autonomamente** pela pip
 
 | Módulo | Descrição | Status |
 |---|---|---|
-| **LangGraph Multi-Agent DAG** | 8 nós autônomos: **CPO**, **PM**, **Tech Lead**, **Test Writer**, **Developer**, **QA**, **AppSec**, **DevOps** + **Parallel Audit** (auditoria simultânea) e artefato final `lessons.md` | ✅ |
+| **LangGraph Multi-Agent DAG** | 9 nós autônomos: **CPO**, **PM**, **Tech Lead**, **Test Writer**, **Developer**, **QA**, **AppSec**, **DevOps** + **Parallel Audit** (auditoria simultânea) e artefato final `lessons.md` | ✅ |
 | **Stack Decidida pelo Tech Lead** | O Tech Lead avalia a ideia e define a melhor stack (`rust`, `java`, `python`, `go`, `js`) sem engessar a CLI | ✅ |
 | **Auditoria Simultânea Paralela** | Execução concorrente de **AppSec** (Security Review) e **DevOps** (CI/CD) via ThreadPoolExecutor | ✅ |
 | **Benchmark ELO System** | Suíte de 10 problemas curados para medição quantitativa da qualidade e rating ELO (`lf benchmark`) | ✅ |
 | **FastAPI REST & WebSockets UI** | Painel Web interativo ao vivo em tempo real com recepção de logs e HITL | ✅ |
 | **GitHub Action & `lf pr`** | Integração contínua para CI/CD (`action.yml`) e criação autônoma de Pull Requests (`lf pr`) | ✅ |
 | **Otimização de Custos LLM** | Cache semântico SQLite e compressão inteligente de prompts no `llm_factory` | ✅ |
-| **Human-in-the-Loop (HITL)** | Gates interativos nos nós developer, QA e parallel_audit com ações approve/retry/adjust/adjust_state/continue/pause/abort | ✅ |
+| **Human-in-the-Loop (HITL)** | Gates interativos nos nós developer, QA e parallel_audit com ações approve/retry/adjust_prompt/adjust_state/continue/pause/abort | ✅ |
 | **Review Mode** | Pausa antes de salvar artefatos em disco para revisão manual | ✅ |
 | **Notificações Desktop & Webhook** | Alertas via notify-send + webhooks Slack/Discord | ✅ |
 | **Circuit Breaker** | 3 guardas: 5 falhas consecutivas, 20 iterações máximas, custo máximo USD | ✅ |
@@ -89,7 +89,7 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 
 | Comando | Descrição |
 |---|---|
-| `lf run` | Executa o pipeline autônomo dos agentes (`--idea`, `--stack`, `--pr`, `--mock`, `-i`, `--review-mode`, `--notify`, `--wizard`, `--webhook-url`, `--resume`, `--mvp`, `--advanced`, `--report-cost`) |
+| `lf run` | Executa o pipeline autônomo dos agentes (`--idea`, `--stack`, `--pr`, `--mock`, `-i`, `--review-mode`, `--notify`, `--wizard`, `--webhook-url`, `--resume`, `--mvp`, `--advanced`, `--report-cost`, `--sandbox`) |
 | `lf serve` | Inicia o servidor REST API e a Web Dashboard UI ao vivo com WebSockets |
 | `lf benchmark` | Executa a suíte de benchmarks curados e reporta a pontuação ELO do pipeline |
 | `lf resume` | Retoma execuções de pipeline pausadas a partir de checkpoints no LangGraph |
@@ -97,7 +97,7 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 | `lf explore` | Explorador interativo de artefatos, especificações e relatórios de teste |
 | `lf pr` | Inicializa repositório Git, commita alterações e abre Pull Request no GitHub |
 | `lf init` | Inicializa um novo projeto LoopForge |
-| `lf plan` | Gerencia planos de tarefas do pipeline |
+| `lf plan` | Gera plano de execução com Spec Review Gate (`--vision`, `--mode full\|fast`, `--interactive`) |
 | `lf status` | Exibe o status da execução atual |
 | `lf release` | Gera changelog e release notes a partir do git log (última tag → HEAD; versão explícita ou patch bump; `--dry-run`) |
 | `lf completion` | Gera script de shell completion (bash/zsh/fish) |
@@ -105,6 +105,7 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 | `lf audit` | Auditoria completa do pipeline |
 | `lf export` | Exporta artefatos gerados |
 | `lf studio` | Visualizador TUI de telemetria em tempo real (lê `.loopforge/telemetry.sqlite`; teclas `R`/`Q`; `--db-path`) |
+| `lf clean` | Limpa workspaces temporários (`/tmp/loopforge`) e worktrees órfãs de sandbox (`--all`, `--older-than-hours`, `--worktrees`, `--dry-run`) |
 
 ---
 
@@ -115,7 +116,7 @@ lf pr --dir ./meu-projeto --idea "Feature de Autenticação"
 pytest tests/
 ```
 
-- **107 arquivos de teste** em `tests/` (suite ativa)
+- **120 arquivos de teste** em `tests/` (suite ativa)
 - Cobertura de Decisão Autônoma de Stack, Auditoria Paralela AppSec+DevOps, WebSockets Live, ELO Rating e Lessons Generator
 - CI pipeline: `ruff check --select E,F,W,I,N,UP,SIM src/lf tests` → `mypy src/lf` → `pytest --cov=src/lf --cov-fail-under=75 tests/`
 

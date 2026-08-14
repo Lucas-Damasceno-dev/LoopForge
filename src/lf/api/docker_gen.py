@@ -10,10 +10,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from lf.api.database import session_factory
+from lf.api.database import get_session
 from lf.api.models import PipelineRun
 from lf.api.schemas import DockerConfigResponse, SaveDockerConfigRequest, SaveDockerConfigResponse
 
@@ -26,11 +26,13 @@ def _get_run_workspace(run_id: str) -> Path:
     return _RUNS_ROOT / f"run_{run_id}"
 
 
-def _detect_database_need(workspace: Path) -> bool:
+def _detect_database_need(workspace: Path, idea: str = "") -> bool:
     """Verifica se o projeto usa banco de dados relacional (Postgres, SQLAlchemy, psycopg, etc)."""
+    keywords = ["sqlalchemy", "psycopg", "postgres", "database_url", "alembic", "prisma", "hibernate"]
+    if idea and any(kw in idea.lower() for kw in keywords):
+        return True
     if not workspace.exists():
         return False
-    keywords = ["sqlalchemy", "psycopg", "postgres", "database_url", "alembic", "prisma", "hibernate"]
     for path in workspace.rglob("*"):
         if path.is_file() and path.suffix in [".py", ".ts", ".js", ".java", ".env", ".toml"]:
             try:
@@ -252,17 +254,14 @@ services:
 
 
 @docker_router.get("/{run_id}", response_model=DockerConfigResponse)
-async def get_docker_config(run_id: str) -> DockerConfigResponse:
+async def get_docker_config(run_id: str, session: AsyncSession = Depends(get_session)) -> DockerConfigResponse:
     """Gera arquivos Dockerfile, docker-compose.yml e devcontainer.json para a run."""
-    async with session_factory() as session:
-        stmt = select(PipelineRun).where(PipelineRun.id == run_id)
-        result = await session.execute(stmt)
-        run = result.scalar_one_or_none()
-        if run is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Run '{run_id}' não encontrada")
+    run = await session.get(PipelineRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Run '{run_id}' não encontrada")
 
     workspace = _get_run_workspace(run_id)
-    uses_db = _detect_database_need(workspace)
+    uses_db = _detect_database_need(workspace, run.idea or "")
     stack = (run.stack or "python").lower()
 
     if "python" in stack or "fastapi" in stack:
@@ -284,14 +283,15 @@ async def get_docker_config(run_id: str) -> DockerConfigResponse:
 
 
 @docker_router.post("/{run_id}/save", response_model=SaveDockerConfigResponse)
-async def save_docker_config(run_id: str, payload: SaveDockerConfigRequest) -> SaveDockerConfigResponse:
+async def save_docker_config(
+    run_id: str,
+    payload: SaveDockerConfigRequest,
+    session: AsyncSession = Depends(get_session),
+) -> SaveDockerConfigResponse:
     """Salva os arquivos Docker gerados/customizados diretamente no workspace da run."""
-    async with session_factory() as session:
-        stmt = select(PipelineRun).where(PipelineRun.id == run_id)
-        result = await session.execute(stmt)
-        run = result.scalar_one_or_none()
-        if run is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Run '{run_id}' não encontrada")
+    run = await session.get(PipelineRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Run '{run_id}' não encontrada")
 
     workspace = _get_run_workspace(run_id)
     workspace.mkdir(parents=True, exist_ok=True)
