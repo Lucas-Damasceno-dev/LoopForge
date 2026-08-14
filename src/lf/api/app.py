@@ -383,10 +383,16 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         # a coluna (mesmo valor gravado por _promote_next/_execute_pipeline_in_background).
         thread_id = run.thread_id or f"run-{target_id}"
 
+        # S3 T5 (round 1): resume usa o SNAPSHOT persistido da run (imutável),
+        # nunca o template atual — se a run era de pipeline custom, o grafo
+        # retomado é o mesmo do start (build_pipeline_graph); sem snapshot,
+        # comportamento legado (build_graph default).
+        pipeline, agent_templates = await _pipeline_context_from_snapshot(run.pipeline_snapshot)
+
         def _sync_resume():
             from lf.orchestrator.task_dispatcher import TaskDispatcher
 
-            dispatcher = TaskDispatcher()
+            dispatcher = TaskDispatcher(pipeline=pipeline, agent_templates=agent_templates)
             return dispatcher.resume(thread_id=thread_id)
 
         async def _resume_in_bg():
@@ -1066,6 +1072,46 @@ async def _checkpoint_next_nodes(thread_id: str) -> list[str]:
         await saver.conn.close()
 
 
+async def _pipeline_context_from_snapshot(
+    snapshot: dict | None,
+) -> tuple[PipelineBase | None, dict]:
+    """Monta (pipeline, agent_templates) a partir do snapshot persistido da run.
+
+    S3 T5 (round 1): fonte ÚNICA do pipeline para create E resume — o snapshot
+    é imutável por run; o template atual NUNCA é usado em execução. Templates da
+    biblioteca são resolvidos na execução; se o agente foi deletado depois do
+    snapshot, o build levanta ValueError('unknown agent node') → o try/except
+    do executor converte em run failed com log claro.
+    """
+    from lf.api.agents import AgentBase
+    from lf.api.database import session_factory
+
+    if not snapshot:
+        return None, {}
+
+    pipeline = PipelineBase(**snapshot)
+    agent_templates: dict[str, AgentBase] = {}
+    if session_factory:
+        async with session_factory() as bg_session:
+            agents = await bg_session.execute(select(AgentTemplate))
+            for row in agents.scalars().all():
+                agent_templates[row.id] = AgentBase(
+                    name=row.name,
+                    description=row.description,
+                    prompt=row.prompt,
+                    model=row.model,
+                    temperature=row.temperature,
+                    max_retries=row.max_retries,
+                    timeout_seconds=row.timeout_seconds,
+                    env_vars=row.env_vars,
+                    tools_allowlist=row.tools_allowlist,
+                    permissions=row.permissions,
+                    stack=row.stack,
+                    budget_usd=row.budget_usd,
+                )
+    return pipeline, agent_templates
+
+
 async def _run_pipeline(
     app: FastAPI,
     run_id: str,
@@ -1081,7 +1127,6 @@ async def _run_pipeline(
     import os
     import time
 
-    from lf.api.agents import AgentBase
     from lf.config.schema import TaskSchema
     from lf.orchestrator.task_dispatcher import TaskDispatcher
 
@@ -1110,30 +1155,7 @@ async def _run_pipeline(
     # resolvidos na EXECUÇÃO: se o agente foi deletado depois do snapshot, o
     # build lança ValueError('unknown agent node') → cai no except abaixo →
     # run failed com erro claro no log (nunca crash silencioso).
-    pipeline = None
-    agent_templates: dict[str, AgentBase] = {}
-    if pipeline_snapshot:
-        from lf.api.database import session_factory
-
-        pipeline = PipelineBase(**pipeline_snapshot)
-        if session_factory:
-            async with session_factory() as bg_session:
-                agents = await bg_session.execute(select(AgentTemplate))
-                for row in agents.scalars().all():
-                    agent_templates[row.id] = AgentBase(
-                        name=row.name,
-                        description=row.description,
-                        prompt=row.prompt,
-                        model=row.model,
-                        temperature=row.temperature,
-                        max_retries=row.max_retries,
-                        timeout_seconds=row.timeout_seconds,
-                        env_vars=row.env_vars,
-                        tools_allowlist=row.tools_allowlist,
-                        permissions=row.permissions,
-                        stack=row.stack,
-                        budget_usd=row.budget_usd,
-                    )
+    pipeline, agent_templates = await _pipeline_context_from_snapshot(pipeline_snapshot)
 
     dispatcher = TaskDispatcher(
         mock_llm=mock_llm,

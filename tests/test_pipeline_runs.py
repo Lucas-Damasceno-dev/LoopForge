@@ -297,3 +297,96 @@ async def test_migracao_aditiva_pipeline_snapshot(tmp_path):
         await _apply_pipeline_runs_additive_migration(conn)
 
     await eng.dispose()
+
+
+def _install_graph_spies(monkeypatch) -> list[str]:
+    """Instala spys em build_pipeline_graph/build_graph; retorna lista de chamadas.
+
+    Rótulos: 'pg' (build_pipeline_graph — grafo custom), 'bg-exec'
+    (build_graph via TaskDispatcher._get_graph — executor default), 'bg-aux'
+    (build_graph via _checkpoint_next_nodes/costs — consulta M-10 de checkpoint,
+    ruído esperado que NÃO indica qual grafo a run executou).
+    """
+    from lf.pipeline.pipeline_graph import build_pipeline_graph as real_build_pg
+    from lf.pipeline.graph import build_graph as real_build_graph
+
+    calls: list[str] = []
+
+    def spy_pg(pipeline, agent_templates, checkpointer=None):
+        calls.append("pg")
+        return real_build_pg(pipeline, agent_templates, checkpointer=checkpointer)
+
+    def spy_bg_exec(*args, **kwargs):
+        calls.append("bg-exec")
+        return real_build_graph(*args, **kwargs)
+
+    def spy_bg_aux(*args, **kwargs):
+        calls.append("bg-aux")
+        return real_build_graph(*args, **kwargs)
+
+    monkeypatch.setattr("lf.pipeline.pipeline_graph.build_pipeline_graph", spy_pg)
+    # task_dispatcher importa build_graph no topo (binding direto) — spy lá
+    # captura EXATAMENTE o executor default (_get_graph); o spy em
+    # lf.pipeline.graph.build_graph captura os acessórios (helper M-10).
+    monkeypatch.setattr("lf.orchestrator.task_dispatcher.build_graph", spy_bg_exec)
+    monkeypatch.setattr("lf.pipeline.graph.build_graph", spy_bg_aux)
+    return calls
+
+
+async def _wait_calls(calls: list[str], predicate, timeout: float = 60.0) -> None:
+    """Aguarda o spy registrar chamadas que satisfazem `predicate`."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate(calls):
+            return
+        await asyncio.sleep(0.3)
+    raise AssertionError(f"spy não registrou chamadas esperadas: {calls}")
+
+
+@pytest.mark.asyncio
+async def test_resume_pipeline_usa_snapshot(client: AsyncClient, monkeypatch):
+    """Resume de run com pipeline usa build_pipeline_graph (snapshot), NUNCA build_graph.
+
+    Fix round 1 (T5): antes, _resume_run_impl montava TaskDispatcher() sem
+    pipeline → resume de run de pipeline executava o grafo default errado.
+    """
+    calls = _install_graph_spies(monkeypatch)
+
+    pipeline_id = await _create_pipeline(client, _pipeline_payload(name="resume-flow", agent_id="developer"))
+    resp = await client.post("/api/v1/runs", json={"idea": "pausa", "pipeline_id": pipeline_id})
+    assert resp.status_code == 201, resp.text
+    run_id = resp.json()["id"]
+
+    final = await _wait_terminal(client, run_id)
+    assert final["status"] in ("completed", "failed"), final
+    assert calls.count("pg") >= 1, "create não usou build_pipeline_graph"
+    assert "bg-exec" not in calls, "create com pipeline usou build_graph no executor"
+
+    calls.clear()
+
+    resp = await client.post(f"/api/v1/runs/{run_id}/resume")
+    assert resp.status_code == 200, resp.text
+    await _wait_calls(calls, lambda c: c.count("pg") >= 1)
+    assert "bg-exec" not in calls, "resume usou build_graph default em vez do snapshot"
+
+
+@pytest.mark.asyncio
+async def test_resume_sem_snapshot_usa_build_graph(client: AsyncClient, monkeypatch):
+    """Run legada sem snapshot: resume mantém comportamento atual (build_graph)."""
+    calls = _install_graph_spies(monkeypatch)
+
+    resp = await client.post("/api/v1/runs", json={"idea": "legada"})
+    assert resp.status_code == 201, resp.text
+    run_id = resp.json()["id"]
+
+    final = await _wait_terminal(client, run_id)
+    assert final["status"] in ("completed", "failed"), final
+    assert "bg-exec" in calls, "create default não usou build_graph no executor"
+    assert "pg" not in calls
+
+    calls.clear()
+
+    resp = await client.post(f"/api/v1/runs/{run_id}/resume")
+    assert resp.status_code == 200, resp.text
+    await _wait_calls(calls, lambda c: c.count("bg-exec") >= 1)
+    assert "pg" not in calls, "resume legado usou build_pipeline_graph"
