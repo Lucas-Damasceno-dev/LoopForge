@@ -75,13 +75,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await _recover_interrupted_runs(app)
     # Multi-worker (E3 redis): worker loop global — escuta lf:notify e promove
     # runs da fila compartilhada; também reaproveita slots/leases expirados.
+    # Event bus publica no canal lf:events e um forwarder repassa eventos de
+    # outros workers aos WebSockets LOCAIS (cross-worker WS).
     if settings.queue_backend == "redis":
         app.state.queue_worker = asyncio.create_task(_queue_worker_loop(app))
+        event_bus.configure_redis(app.state.run_queue.redis)
+        app.state.events_worker = asyncio.create_task(_events_forwarder(app))
     yield
-    if getattr(app.state, "queue_worker", None) is not None:
-        app.state.queue_worker.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await app.state.queue_worker
+    for name in ("events_worker", "queue_worker"):
+        worker = getattr(app.state, name, None)
+        if worker is not None:
+            worker.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
     await close_db()
 
 
@@ -238,7 +244,14 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     # O middleware é HTTP-only: WebSockets não passam por ele, e /health e
     # preflights OPTIONS (CORS) são ignorados.
     if settings.rate_limit_per_min > 0:
-        app.add_middleware(RateLimitMiddleware, limit_per_min=settings.rate_limit_per_min)
+        if settings.queue_backend == "redis":
+            app.add_middleware(
+                RateLimitMiddleware,
+                limit_per_min=settings.rate_limit_per_min,
+                redis=app.state.run_queue.redis,
+            )
+        else:
+            app.add_middleware(RateLimitMiddleware, limit_per_min=settings.rate_limit_per_min)
 
     # ─── Dashboard Web UI ───────────────────────────────────────────
     if ui_enabled:
@@ -1234,6 +1247,34 @@ async def _queue_worker_loop(app: FastAPI) -> None:
                 await _promote_next(app)
     finally:
         await pubsub.unsubscribe("lf:notify")
+
+
+async def _events_forwarder(app: FastAPI) -> None:
+    """Forwarder de eventos cross-worker: lf:events → WebSockets LOCAIS.
+
+    Cada worker publica o envelope no canal ``lf:events`` (event_bus) e
+    subscreve o canal: eventos de OUTROS workers são repassados aos sockets
+    locais (send_to_run + broadcast) — o WS de cada worker serve só os seus
+    clientes conectados.
+    """
+    q = app.state.run_queue
+    pubsub = q.redis.pubsub()
+    await pubsub.subscribe("lf:events")
+    try:
+        while True:
+            msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if msg is None:
+                continue
+            try:
+                data = json.loads(msg["data"])
+            except Exception:
+                continue
+            run_id = data.get("run_id")
+            if run_id:
+                await ws_manager.send_to_run(run_id, data)
+            await ws_manager.broadcast(data)
+    finally:
+        await pubsub.unsubscribe("lf:events")
 
 
 async def _checkpoint_next_nodes(thread_id: str) -> list[str]:

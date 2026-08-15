@@ -1,9 +1,11 @@
-"""Rate limiting leve in-memory (sliding window) para a API do LoopForge.
+"""Rate limiting (sliding window) para a API do LoopForge.
 
-Sem dependência externa: janela deslizante por chave — IP do cliente ou header
-``X-API-Key`` quando presente. O estado é por-processo (aceitável para a API
-local/single-worker). WebSockets e ``/health`` não são limitados; requisições
-OPTIONS (preflight CORS) também passam ilesas.
+Sem dependência externa no caminho default: janela deslizante por chave — IP do
+cliente ou header ``X-API-Key`` quando presente. O estado é por-processo
+(aceitável para a API local/single-worker). Com ``redis`` configurado
+(multi-worker, backend=redis), a janela é GLOBAL via ZSET ``lf:rl:{key}``.
+WebSockets e ``/health`` não são limitados; requisições OPTIONS (preflight
+CORS) também passam ilesas.
 """
 
 import time
@@ -19,10 +21,11 @@ class RateLimitMiddleware:
     ``websocket`` é ignorado).
     """
 
-    def __init__(self, app, limit_per_min: int = 300, window_seconds: int = 60) -> None:
+    def __init__(self, app, limit_per_min: int = 300, window_seconds: int = 60, redis=None) -> None:
         self.app = app
         self.limit = limit_per_min
         self.window = window_seconds
+        self.redis = redis  # Redis | None — None = in-memory (BC)
         # key -> timestamps (time.monotonic) das requests dentro da janela
         self._hits: dict[str, list[float]] = {}
         self._prune_threshold = 10_000
@@ -36,12 +39,25 @@ class RateLimitMiddleware:
         client = scope.get("client") or ("unknown", 0)
         return f"ip:{client[0]}"
 
-    def _check_window(self, key: str, now: float) -> tuple[bool, int]:
+    async def _check_window(self, key: str, now: float) -> tuple[bool, int]:
         """Janela deslizante: remove entradas expiradas e conta as restantes.
 
         Retorna (permitido, retry_after_seconds) — retry_after > 0 apenas
         quando a janela estourou (tempo até a request mais antiga expirar).
+        Com redis: ZSET ``lf:rl:{key}`` (score = timestamp), operações em
+        pipeline único (prune + count + insert + TTL).
         """
+        if self.redis is not None:
+            rkey = f"lf:rl:{key}"
+            pipe = self.redis.pipeline()
+            pipe.zremrangebyscore(rkey, "-inf", now - self.window)
+            pipe.zcard(rkey)
+            pipe.zadd(rkey, {str(now): now})
+            pipe.expire(rkey, self.window * 2)
+            _, count, _, _ = await pipe.execute()
+            if int(count) >= self.limit:
+                return False, 1
+            return True, 0
         cutoff = now - self.window
         window = self._hits.setdefault(key, [])
         while window and window[0] <= cutoff:
@@ -72,7 +88,7 @@ class RateLimitMiddleware:
 
         now = time.monotonic()
         key = self._client_key(scope)
-        allowed, retry_after = self._check_window(key, now)
+        allowed, retry_after = await self._check_window(key, now)
         if not allowed:
             response = JSONResponse(
                 {"detail": "Rate limit excedido. Tente novamente em instantes."},

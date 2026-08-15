@@ -14,6 +14,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from redis.asyncio import Redis
 from sqlalchemy import JSON, DateTime, Integer, String, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -121,6 +122,11 @@ class EventBus:
     def __init__(self) -> None:
         self._mem_seq: dict[str, int] = {}
         self._mem_lock = threading.Lock()
+        self._redis: Redis | None = None  # publicador de lf:events (multi-worker)
+
+    def configure_redis(self, redis: Redis) -> None:
+        """Ativa publicador redis (canal lf:events) — multi-worker WS."""
+        self._redis = redis
 
     async def _next_seq(self, session: AsyncSession, run_id: str) -> int:
         """Próximo seq da run, alocado atomicamente via UPDATE...RETURNING.
@@ -203,6 +209,11 @@ class EventBus:
                 "payload": payload,
             }
         self._broadcast(envelope)
+        if self._redis is not None:
+            try:
+                await self._redis.publish("lf:events", json.dumps(envelope))
+            except Exception:
+                logger.warning("Falha ao publicar evento no redis", exc_info=True)
         return envelope
 
     async def list_events(self, run_id: str, after_seq: int = 0, limit: int = 200) -> list[dict]:
