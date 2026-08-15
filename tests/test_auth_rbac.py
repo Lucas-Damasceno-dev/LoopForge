@@ -221,3 +221,19 @@ def test_matriz_roles():
     assert _required_role("GET", "/api/v1/trajectories/abc/export") == "viewer"
     # Escrita não mapeada → runner (default seguro)
     assert _required_role("POST", "/api/v1/rota-futura") == "runner"
+    # S3 RBAC: pipelines CRUD é admin-only (GET continua viewer)
+    assert _required_role("POST", "/api/v1/pipelines") == "admin"
+    assert _required_role("PUT", "/api/v1/pipelines/abc") == "admin"
+    assert _required_role("DELETE", "/api/v1/pipelines/abc") == "admin"
+    assert _required_role("GET", "/api/v1/pipelines") == "viewer"
+
+
+@pytest.mark.asyncio
+async def test_runner_403_pipelines_admin_201(tmp_path):
+    """Runner não cria pipeline (403); admin cria (201)."""
+    _write_ade(tmp_path, _ade_keys())
+    app = create_app()
+    body = {"name": "p-rbac", "description": "", "nodes": [], "edges": []}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        assert (await ac.post("/api/v1/pipelines", json=body, headers={"X-API-Key": RUNNER_KEY})).status_code == 403
+        assert (await ac.post("/api/v1/pipelines", json=body, headers={"X-API-Key": ENV_KEY})).status_code == 201

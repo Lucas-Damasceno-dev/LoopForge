@@ -79,6 +79,8 @@ def _required_role(method: str, path: str) -> str:
         return "admin"
     if p.startswith("/api/v1/prompts") and m in ("PATCH", "DELETE"):
         return "admin"
+    if p.startswith("/api/v1/pipelines") and m in ("POST", "PUT", "DELETE"):
+        return "admin"
 
     # RUNNER
     if p.startswith("/api/v1/memory") and m in ("POST", "PATCH"):
