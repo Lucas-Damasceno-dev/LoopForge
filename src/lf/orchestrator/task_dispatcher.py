@@ -496,13 +496,19 @@ class TaskDispatcher:
         if state == self._published_cb_state:
             return None
         self._published_cb_state = state
-        return self._broadcast_ws(
+        scheduled = self._broadcast_ws(
             "circuit_breaker_changed",
             task_id,
             cb_snapshot,
             thread_id=thread_id,
             run_id=pipeline_run_id,
         )
+        # Só devolve Task/Future REAL (para await em contexto async): em contexto
+        # sync _broadcast_ws já executou/disparou; se um teste stubou o método
+        # com MagicMock, não há o que aguardar (await em MagicMock → TypeError).
+        if isinstance(scheduled, (asyncio.Task, asyncio.Future)):
+            return scheduled
+        return None
 
     def _get_input_with_timeout(self, prompt_text: str, timeout: float = 300) -> str:
         """Lê input com suporte a timeout no Unix/Linux."""
