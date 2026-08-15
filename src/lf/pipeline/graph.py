@@ -172,6 +172,13 @@ def build_graph(
     workflow = StateGraph(GraphState)
 
     for node_name, node_func in NodeRegistry.get_all().items():
+        # Guarda contra poluição do NodeRegistry global: register_agent_node
+        # (pipelines custom) registra chaves `agent:<slug>` — ':' é caractere
+        # RESERVADO do LangGraph para nomes de nó; adicioná-los aqui quebra o
+        # compile do grafo DEFAULT (bug reproduzido: run default falha depois
+        # de uma pipeline de biblioteca rodar no mesmo processo).
+        if ":" in node_name or "|" in node_name:
+            continue
         workflow.add_node(node_name, node_func)
 
     workflow.set_conditional_entry_point(

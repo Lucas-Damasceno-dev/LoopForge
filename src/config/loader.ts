@@ -31,7 +31,11 @@ export async function loadConfig(configPath?: string, cwd: string = "."): Promis
     throw new Error(`Arquivo de configuração não encontrado em: ${possiblePaths[0]}. Execute 'loopforge init' para criar um.`);
   }
 
+<<<<<<< Updated upstream
 try {
+=======
+  try {
+>>>>>>> Stashed changes
     let jsonParsed: Record<string, unknown>;
     if (resolvedPath.endsWith(".yml") || resolvedPath.endsWith(".yaml")) {
       jsonParsed = yamlLoad(rawData) as Record<string, unknown>;
