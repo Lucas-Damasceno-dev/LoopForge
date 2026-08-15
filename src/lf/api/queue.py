@@ -3,31 +3,47 @@
 Contrato comum (RunQueue) consumido por app.py — TODOS os métodos são
 async (implementação uniforme; MemoryQueue usa corpos sync):
   enqueue → pendencia FIFO; try_promote → até max_concurrent (atômico no
-  redis via transação otimista WATCH/MULTI); release → libera slot;
-  remove_pending → cancel de fila; params → dicionário de execução retido
-  até a promoção.
+  redis via Lua); release → libera slot; remove_pending → cancel de fila;
+  params → dicionário de execução retido até a promoção.
 
 Redis: pending LIST (RPUSH/LPOP), active ZSET (score = lease epoch),
-params HASH com TTL. try_promote expira leases vencidos (score < now -
-lease), devolve-os ao fim da pending e promove enquanto couber — tudo numa
-transação WATCH/MULTI com retry em WatchError (equivalente ao script Lua
-planejado; fakeredis não executa EVAL, então a lógica é implementada em
-Python com atomicidade otimista).
+params HASH com TTL. Promoção atômica em Lua: expira leases vencidos
+(score < now - lease), conta ativos e promove enquanto couber.
 """
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import Protocol
 
 from redis.asyncio import Redis
-from redis.exceptions import WatchError
 
 # Chaves redis
 _PENDING = "lf:q:pending"
 _ACTIVE = "lf:q:active"
 _PARAMS = "lf:q:params:{run_id}"
+
+_PROMOTE_SCRIPT = """
+local pending = KEYS[1]
+local active = KEYS[2]
+local max = tonumber(ARGV[1])
+local now = tonumber(ARGV[2])
+local lease = tonumber(ARGV[3])
+-- expira leases vencidos (worker morto) → devolve a pending
+local expired = redis.call('ZRANGEBYSCORE', active, '-inf', now - lease)
+for _, rid in ipairs(expired) do
+  redis.call('ZREM', active, rid)
+  redis.call('RPUSH', pending, rid)
+end
+local promoted = {}
+while redis.call('ZCARD', active) < max do
+  local rid = redis.call('LPOP', pending)
+  if not rid then break end
+  redis.call('ZADD', active, now, rid)
+  table.insert(promoted, rid)
+end
+return promoted
+"""
 
 
 def _decode(value: str | bytes) -> str:
@@ -125,42 +141,20 @@ class RedisQueue:
         await pipe.execute()
 
     async def try_promote(self, max_concurrent: int) -> list[tuple[str, dict]]:
-        """Expira leases vencidos e promove até max_concurrent (atômico).
-
-        Transação otimista WATCH/MULTI: lê active/pending, computa em
-        Python, executa mutações no MULTI; WatchError → retry (outro
-        worker mexeu nas chaves).
-        """
+        """Expira leases vencidos e promove até max_concurrent (atômico via Lua)."""
+        script = self.redis.register_script(_PROMOTE_SCRIPT)
         now = time.time()
-        lease_exp = now - self.lease_seconds
-        promoted_ids: list[str] = []
-        while True:
-            try:
-                async with self.redis.pipeline(transaction=True) as pipe:
-                    await pipe.watch(_ACTIVE, _PENDING)
-                    expired = [_decode(r) for r in await pipe.zrangebyscore(_ACTIVE, "-inf", lease_exp)]
-                    active_count = await pipe.zcard(_ACTIVE)
-                    pending = [_decode(r) for r in await pipe.lrange(_PENDING, 0, -1)]
-                    slots = max_concurrent - (active_count - len(expired))
-                    queue = list(pending) + expired
-                    promoted_ids = queue[: max(slots, 0)]
-                    pipe.multi()
-                    for rid in expired:
-                        pipe.zrem(_ACTIVE, rid)
-                        pipe.rpush(_PENDING, rid)
-                    for rid in promoted_ids:
-                        pipe.lrem(_PENDING, 1, rid)
-                        pipe.zadd(_ACTIVE, {rid: now})
-                    await pipe.execute()
-                    break
-            except WatchError:
-                await asyncio.sleep(0.01)
+        rids = await script(
+            keys=[_PENDING, _ACTIVE],
+            args=[max_concurrent, now, self.lease_seconds],
+        )
         out: list[tuple[str, dict]] = []
-        for rid in promoted_ids:
-            params = await self.redis.hgetall(_PARAMS.format(run_id=rid))
+        for rid in rids:
+            run_id = _decode(rid)
+            params = await self.redis.hgetall(_PARAMS.format(run_id=run_id))
             out.append(
                 (
-                    rid,
+                    run_id,
                     {_decode(k): v.decode() if isinstance(v, bytes) else v for k, v in params.items()},
                 )
             )

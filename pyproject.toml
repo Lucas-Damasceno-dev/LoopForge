@@ -40,6 +40,7 @@ dev = [
     "mypy>=1.5.0",
     "ruff>=0.1.0",
     "fakeredis>=2.37.0",
+    "lupa>=2.1",
 ]
 
 [project.scripts]
