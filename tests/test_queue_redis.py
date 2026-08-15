@@ -30,7 +30,7 @@ async def test_enqueue_promove_fifo_ate_max_concurrent(rq):
     await rq.release("r1")
     promoted = await rq.try_promote(2)
     assert {rid for rid, _ in promoted} == {"r3"}
-    assert await rq.params("r3") == {"idea": "c"}
+    assert await rq.get_params("r3") == {"idea": "c"}
 
 
 @pytest.mark.asyncio

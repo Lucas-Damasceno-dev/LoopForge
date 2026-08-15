@@ -10,7 +10,6 @@ import logging
 import os
 import sqlite3
 import time
-from collections import deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -74,7 +73,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # com motivo claro (resume recupera do checkpoint). Runs `paused` são
     # PRESERVADAS (checkpoint persiste — intenção M-10).
     await _recover_interrupted_runs(app)
+    # Multi-worker (E3 redis): worker loop global — escuta lf:notify e promove
+    # runs da fila compartilhada; também reaproveita slots/leases expirados.
+    if settings.queue_backend == "redis":
+        app.state.queue_worker = asyncio.create_task(_queue_worker_loop(app))
     yield
+    if getattr(app.state, "queue_worker", None) is not None:
+        app.state.queue_worker.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await app.state.queue_worker
     await close_db()
 
 
@@ -100,24 +107,6 @@ async def _recover_interrupted_runs(app: FastAPI) -> None:
                 "run_updated",
                 {"status": "failed", "reason": "servidor reiniciou; use resume"},
             )
-
-
-class RunQueueState:
-    """Estado da fila de execução E3 (M-21): N runs ativas + FIFO de runs `queued`.
-
-    ``pending`` guarda os run_ids na ordem de chegada; ``active`` é o conjunto
-    das runs em execução (até ``max_concurrent``); ``params`` guarda os
-    parâmetros de execução (idea, stack, mock_llm, routing_mode, interactive) —
-    o PipelineRun não persiste esses campos, então são retidos em memória até a
-    promoção.
-    """
-
-    def __init__(self, max_concurrent: int = 1) -> None:
-        self.max_concurrent = max_concurrent
-        self.pending: deque[str] = deque()
-        self.active: set[str] = set()
-        self.lock = asyncio.Lock()
-        self.params: dict[str, dict] = {}
 
 
 def _mark_legacy(response: Response) -> None:
@@ -205,15 +194,23 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Estado da fila E3 (M-21) — N runs ativas + fila FIFO (por instância da app).
+    # Estado da fila E3 (M-21) — N runs ativas + fila FIFO. Backend por env:
+    # memory (BC, single-process) ou redis (multi-worker global).
     # max_concurrent_runs vem de ade.yaml (AdeRunner.max_concurrent_runs, default 2);
     # runs além do limite nascem `queued` e promovem quando um slot liberar.
+    from lf.api.queue import create_queue
     from lf.config.loader import load_ade_config
 
-    app.state.run_queue = RunQueueState(max_concurrent=load_ade_config().runner.max_concurrent_runs)
+    max_concurrent = load_ade_config().runner.max_concurrent_runs
+    app.state.run_queue = create_queue(
+        backend=settings.queue_backend,
+        redis_url=settings.redis_url,
+        max_concurrent=max_concurrent,
+    )
     # C8: registry run_id → asyncio.Task em execução (para POST /cancel).
-    # A fila em memória morre no restart — o crash recovery (C9) cobre isso.
+    # Local do processo: cada worker promove e executa localmente (redis).
     app.state.run_tasks = {}  # dict[str, asyncio.Task]
+    app.state.queue_worker = None  # task do worker loop (redis)
 
     # ─── Middleware: CORS (M-04) ───────────────────────────────────
     # Origens de LF_CORS_ORIGINS (vírgula) ou default ["*"]. Wildcard não
@@ -583,7 +580,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         não pode ser capturada como run_id pelo roteador dinâmico.
         """
         q = app.state.run_queue
-        pending_ids = list(q.pending)
+        pending_ids = await q.pending_ids()
         runs_by_id: dict[str, PipelineRun] = {}
         if pending_ids:
             result = await session.execute(select(PipelineRun).where(PipelineRun.id.in_(pending_ids)))
@@ -602,8 +599,8 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             )
         return {
             "max_concurrent": q.max_concurrent,
-            "active_count": len(q.active),
-            "active": sorted(q.active),
+            "active_count": len(await q.active_ids()),
+            "active": sorted(await q.active_ids()),
             "queued": queued,
         }
 
@@ -885,12 +882,10 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             raise HTTPException(status_code=409, detail="run not cancellable")
 
         q = app.state.run_queue
-        async with q.lock:
-            if run_id in q.pending:
-                # Remove da fila FIFO preservando a ordem das demais.
-                q.pending = deque(rid for rid in q.pending if rid != run_id)
-                q.params.pop(run_id, None)
-            q.active.discard(run_id)
+        # C8: remove da fila FIFO preservando a ordem das demais (pending) e
+        # descarta do conjunto de ativos (active) — contrato async da RunQueue.
+        await q.remove_pending(run_id)
+        await q.release(run_id)
 
         # C8: cancela a task asyncio correspondente (se em execução). O finally
         # de _run_pipeline libera a vaga e promove a próxima da fila.
@@ -1112,22 +1107,28 @@ async def _set_run_status(run_id: str, status: str, **extra) -> None:
     await event_bus.publish(run_id, "run_updated", payload)
 
 
+async def _lease_heartbeat(q, run_id: str) -> None:
+    """Renova o lease da run ativa a cada ~1/3 do lease (worker vivo)."""
+    try:
+        interval = max(5.0, getattr(q, "lease_seconds", 60) / 3)
+        while True:
+            await asyncio.sleep(interval)
+            await q.lease_refresh(run_id)
+    except asyncio.CancelledError:
+        pass
+
+
 async def _promote_next(app: FastAPI) -> None:
     """Promove runs enfileiradas (FIFO) para `running` enquanto houver vaga.
 
-    M-21 (E3): até ``max_concurrent`` runs ativas em paralelo — promove de uma
-    vez todas as que couberem no limite. A execução roda em background e, no
-    término (finally em `_run_pipeline`), chama `_promote_next` de novo para
-    liberar o próximo slot.
+    memory: promoção direta + execução local (BC).
+    redis: promoção global atômica; runs promovidas executam NESTE worker
+    (asyncio.create_task local) — o registro run_tasks é por processo.
     """
-    q = app.state.run_queue
-    promoted: list[tuple[str, dict]] = []
-    async with q.lock:
-        while len(q.active) < q.max_concurrent and q.pending:
-            run_id = q.pending.popleft()
-            q.active.add(run_id)
-            promoted.append((run_id, q.params.pop(run_id, {})))
+    from lf.api.queue import MemoryQueue
 
+    q = app.state.run_queue
+    promoted = await q.try_promote(q.max_concurrent)
     for run_id, params in promoted:
         idea = params.get("idea", "")
         stack = params.get("stack", "python")
@@ -1158,9 +1159,20 @@ async def _promote_next(app: FastAPI) -> None:
             )
         )
         # C8: registry run_id → asyncio.Task para o POST /cancel cancelar a
-        # execução correspondente (a fila em memória morre no restart, ok).
+        # execução correspondente (local do processo — cada worker promove e
+        # executa localmente).
         app.state.run_tasks[run_id] = task
         task.add_done_callback(lambda t, rid=run_id: app.state.run_tasks.pop(rid, None))
+        # Heartbeat do lease (redis): renova enquanto a run executa — sem isso
+        # uma run longa (> lease) perderia o lease e outro worker re-promoveria
+        # (execução duplicada). Cancela junto com o fim da task.
+        if not isinstance(q, MemoryQueue):
+            keeper = asyncio.create_task(_lease_heartbeat(q, run_id))
+
+            def _stop_lease_keeper(_t: asyncio.Task, k: asyncio.Task = keeper) -> None:
+                k.cancel()
+
+            task.add_done_callback(_stop_lease_keeper)
 
 
 async def _execute_pipeline_in_background(
@@ -1179,15 +1191,16 @@ async def _execute_pipeline_in_background(
 
     M-21 (E3): runs novas nascem `queued` e só executam quando houver slot
     livre (até ``max_concurrent`` simultâneas).
-    Idempotente: uma run já ativa/enfileirada não é enfileirada de novo.
+    Idempotente: uma run já ativa/enfileirada não é enfileirada de novo — a
+    checagem vive dentro de cada backend (MemoryQueue: active/pending;
+    RedisQueue: ZSCORE/LPOS).
     B6: resume usa o MESMO caminho (``resume=True`` → o executor chama
     dispatcher.resume em vez de dispatch).
     """
     q = app.state.run_queue
-    async with q.lock:
-        if run_id in q.active or run_id in q.pending:
-            return
-        q.params[run_id] = {
+    await q.enqueue(
+        run_id,
+        {
             "idea": idea,
             "stack": stack,
             "mock_llm": mock_llm,
@@ -1196,9 +1209,31 @@ async def _execute_pipeline_in_background(
             "model": model,
             "pipeline_snapshot": pipeline_snapshot,
             "resume": resume,
-        }
-        q.pending.append(run_id)
+        },
+    )
     await _promote_next(app)
+    # redis: acordar worker loop (outros workers também tentam promoção)
+    if getattr(app.state, "queue_notify", None):
+        await app.state.run_queue.redis.publish("lf:notify", run_id)
+
+
+async def _queue_worker_loop(app: FastAPI) -> None:
+    """Loop de worker (redis): escuta lf:notify e promove runs globais."""
+    q = app.state.run_queue
+    pubsub = q.redis.pubsub()
+    await pubsub.subscribe("lf:notify")
+    app.state.queue_notify = pubsub
+    try:
+        while True:
+            # aguarda notificação ou timeout p/ tentar promoção (crash leave)
+            msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if msg is not None:
+                await _promote_next(app)
+            elif await q.active_ids() or await q.pending_ids():
+                # tenta reaproveitar slots/leases expirados periodicamente
+                await _promote_next(app)
+    finally:
+        await pubsub.unsubscribe("lf:notify")
 
 
 async def _checkpoint_next_nodes(thread_id: str) -> list[str]:
@@ -1503,6 +1538,8 @@ async def _run_pipeline(
         # via ficar no-op se a run ainda estivesse em q.active quando o GET
         # observasse o status final (corrida resume × finally).
         q = app.state.run_queue
-        async with q.lock:
-            q.active.discard(run_id)
+        await q.release(run_id)
         await _promote_next(app)
+        # redis: acordar worker loop (outros workers também tentam promoção)
+        if getattr(app.state, "queue_notify", None):
+            await app.state.run_queue.redis.publish("lf:notify", run_id)

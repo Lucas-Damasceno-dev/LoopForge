@@ -13,6 +13,7 @@ params HASH com TTL. Promoção atômica em Lua: expira leases vencidos
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Protocol
 
@@ -59,7 +60,7 @@ class RunQueue(Protocol):
     async def remove_pending(self, run_id: str) -> bool: ...
     async def active_ids(self) -> set[str]: ...
     async def pending_ids(self) -> list[str]: ...
-    async def params(self, run_id: str) -> dict | None: ...
+    async def get_params(self, run_id: str) -> dict | None: ...
     async def close(self) -> None: ...
     async def lease_refresh(self, run_id: str) -> None: ...
 
@@ -72,6 +73,23 @@ class MemoryQueue:
         self._pending: list[str] = []
         self._active: set[str] = set()
         self._params: dict[str, dict] = {}
+
+    # ── Compatibilidade BC (Task 4): testes e código legado acessam as
+    # coleções pelo nome público do antigo RunQueueState (pending/active/
+    # params). As properties expõem as coleções internas — leitura E mutação
+    # direta continuam funcionando como no backend in-process histórico.
+
+    @property
+    def pending(self) -> list[str]:
+        return self._pending
+
+    @property
+    def active(self) -> set[str]:
+        return self._active
+
+    @property
+    def params(self) -> dict[str, dict]:
+        return self._params
 
     async def enqueue(self, run_id: str, params: dict) -> None:
         if run_id in self._active or run_id in self._pending:
@@ -103,7 +121,7 @@ class MemoryQueue:
     async def pending_ids(self) -> list[str]:
         return list(self._pending)
 
-    async def params(self, run_id: str) -> dict | None:
+    async def get_params(self, run_id: str) -> dict | None:
         return self._params.get(run_id)
 
     async def close(self) -> None:
@@ -134,11 +152,27 @@ class RedisQueue:
             return
         if await self.redis.lpos(_PENDING, run_id) is not None:
             return
+        # Params serializados em JSON: o dict de execução contém bools/None
+        # (mock_llm, interactive, model...) que o redis-py não serializa.
         pipe = self.redis.pipeline()
-        pipe.hset(_PARAMS.format(run_id=run_id), mapping=params)
+        pipe.hset(_PARAMS.format(run_id=run_id), mapping={"data": json.dumps(params)})
         pipe.expire(_PARAMS.format(run_id=run_id), 86400)  # TTL 24h
         pipe.rpush(_PENDING, run_id)
         await pipe.execute()
+
+    async def _params_for(self, run_id: str) -> dict | None:
+        raw = await self.redis.hgetall(_PARAMS.format(run_id=run_id))
+        if not raw:
+            return None
+        data = raw.get(b"data", raw.get("data"))
+        if data is None:
+            return None
+        value = data.decode() if isinstance(data, bytes) else data
+        try:
+            parsed = json.loads(value)
+        except (ValueError, TypeError):
+            return None
+        return parsed if isinstance(parsed, dict) else None
 
     async def try_promote(self, max_concurrent: int) -> list[tuple[str, dict]]:
         """Expira leases vencidos e promove até max_concurrent (atômico via Lua)."""
@@ -150,14 +184,9 @@ class RedisQueue:
         )
         out: list[tuple[str, dict]] = []
         for rid in rids:
-            run_id = _decode(rid)
-            params = await self.redis.hgetall(_PARAMS.format(run_id=run_id))
-            out.append(
-                (
-                    run_id,
-                    {_decode(k): v.decode() if isinstance(v, bytes) else v for k, v in params.items()},
-                )
-            )
+            run_id = rid.decode() if isinstance(rid, bytes) else str(rid)
+            params = await self._params_for(run_id)
+            out.append((run_id, params if params is not None else {}))
         return out
 
     async def release(self, run_id: str) -> None:
@@ -171,16 +200,13 @@ class RedisQueue:
         return False
 
     async def active_ids(self) -> set[str]:
-        return {_decode(r) for r in await self.redis.zrange(_ACTIVE, 0, -1)}
+        return {r.decode() if isinstance(r, bytes) else str(r) for r in await self.redis.zrange(_ACTIVE, 0, -1)}
 
     async def pending_ids(self) -> list[str]:
-        return [_decode(r) for r in await self.redis.lrange(_PENDING, 0, -1)]
+        return [r.decode() if isinstance(r, bytes) else str(r) for r in await self.redis.lrange(_PENDING, 0, -1)]
 
-    async def params(self, run_id: str) -> dict | None:
-        raw = await self.redis.hgetall(_PARAMS.format(run_id=run_id))
-        if not raw:
-            return None
-        return {_decode(k): v.decode() if isinstance(v, bytes) else v for k, v in raw.items()}
+    async def get_params(self, run_id: str) -> dict | None:
+        return await self._params_for(run_id)
 
     async def close(self) -> None:
         await self.redis.aclose()
