@@ -106,8 +106,11 @@ async def test_record_human_decision_dispara_broadcast(monkeypatch, client: Asyn
 
     Run criada mock SEM interactive → termina sem gate; o POST /decide não
     registra decisão nem emite human_decision_submitted (antes aceitava
-    qualquer coisa com 201 — bug do audit).
+    qualquer coisa com 201 — bug do audit). A execução em background é
+    stubbed (padrão de test_execute_and_resume_existing_run) para os
+    run_updated do lifecycle não poluírem o assert de broadcast.
     """
+    monkeypatch.setattr("lf.api.app._execute_pipeline_in_background", AsyncMock())
     run_resp = await client.post("/api/runs", json={"idea": "decisao"})
     run_id = run_resp.json()["id"]
     broadcast = AsyncMock()
@@ -120,7 +123,7 @@ async def test_record_human_decision_dispara_broadcast(monkeypatch, client: Asyn
         "user": "tester",
     }
     resp = await client.post(f"/api/runs/{run_id}/decide", json=payload)
-    # 409: run sem gate pendente (completed/inexistente) não aceita decisão.
+    # 409: run sem gate pendente (queued/completed) não aceita decisão.
     assert resp.status_code == 409
     detail = str(resp.json()["detail"])
     assert "não aceita decisões" in detail or "no pending decision" in detail
