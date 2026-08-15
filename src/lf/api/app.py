@@ -768,10 +768,12 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             )
 
         # B1(c): gate_node precisa casar com um gate PENDENTE de verdade — o
-        # checkpoint da thread parado em interrupt com o nó no `next`.
+        # checkpoint da thread parado em interrupt com o nó no `next`, e a run
+        # INTERATIVA (is_interactive no checkpoint). Run não-interativa em voo
+        # tem next transitório mas não aguarda decisão humana (flake A1).
         thread_id = run.thread_id or f"run-{run.id}"
-        pending = await _checkpoint_next_nodes(thread_id)
-        if payload.gate_node not in pending:
+        pending, is_interactive = await _checkpoint_gate_state(thread_id)
+        if not is_interactive or payload.gate_node not in pending:
             raise HTTPException(
                 status_code=409,
                 detail=f"no pending decision for gate_node {payload.gate_node} on run {run_id}",
@@ -1229,6 +1231,37 @@ async def _checkpoint_state(thread_id: str) -> dict:
         return dict(snap.values) if snap and snap.values else {}
     except Exception:
         return {}
+    finally:
+        await saver.conn.close()
+
+
+async def _checkpoint_gate_state(thread_id: str) -> tuple[list[str], bool]:
+    """(next, is_interactive) do checkpoint da thread (B1 refinado).
+
+    Gate REALMENTE pendente exige run INTERATIVA parada em interrupt — uma run
+    não-interativa em voo tem `next != []` transitório (ex.: next=[qa] entre
+    developer e qa) mas NÃO está aguardando decisão humana; aceitar decisão aí
+    era o flake do contrato A1 (201 em vez de 409).
+    """
+    from pathlib import Path
+
+    from lf.pipeline.checkpointer import create_async_checkpointer
+    from lf.pipeline.graph import build_graph
+
+    db_path = Path(".loopforge/trajectories.db").resolve()
+    if not db_path.exists():
+        return [], False
+    saver = create_async_checkpointer(db_path)
+    try:
+        await saver.setup()
+        graph = build_graph(checkpointer=saver)
+        snap = await graph.aget_state({"configurable": {"thread_id": thread_id}})
+        if not snap:
+            return [], False
+        values = dict(snap.values or {})
+        return list(snap.next), bool(values.get("is_interactive", False))
+    except Exception:
+        return [], False
     finally:
         await saver.conn.close()
 
