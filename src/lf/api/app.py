@@ -1411,20 +1411,24 @@ async def _run_pipeline(
         if isinstance(cb, dict):
             await event_bus.publish(run_id, "circuit_breaker_changed", cb)
     except Exception as e:
+        error = str(e)
         duration = round(time.time() - start_time, 2)
         await _set_run_status(
             run_id,
             "failed",
             duration_seconds=duration,
-            logs=f"Erro na execução da pipeline: {e}",
+            logs=f"Erro na execução da pipeline: {error}",
         )
         await event_bus.publish(
             run_id,
             "pipeline_error",
-            {"error": str(e)},
+            {"error": error},
         )
     finally:
-        # M-21: libera a vaga e promove as próximas da fila (FIFO).
+        # B6 (corrida fechada): libera a vaga e promove a próxima da fila (FIFO)
+        # ANTES de o status terminal ficar visível no GET — o resume via fila
+        # via ficar no-op se a run ainda estivesse em q.active quando o GET
+        # observasse o status final (corrida resume × finally).
         q = app.state.run_queue
         async with q.lock:
             q.active.discard(run_id)
