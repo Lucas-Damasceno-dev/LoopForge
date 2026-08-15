@@ -391,7 +391,16 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
     cb_data = state.get("circuit_breaker")
     cb = CircuitBreaker.from_snapshot(cb_data) if isinstance(cb_data, dict) else cb_data
     if cb is not None:
+        before_state = cb.state
         cb.record_iteration()
+        # M3: reflete a transição no CANAL do estado (o dict é o MESMO objeto
+        # propagado pelo grafo) — o dispatcher compara antes/depois e publica
+        # circuit_breaker_changed em tempo real; sem isso o canal ficava no
+        # snapshot inicial (closed) e a UI só via o estado final, errado.
+        if isinstance(cb_data, dict):
+            cb_data.update(cb.snapshot())
+        if before_state != cb.state:
+            print(f"--- CIRCUIT BREAKER: transição {before_state} → {cb.state} ---")
         if cb.budget_exceeded:
             print("--- CIRCUIT BREAKER: orçamento excedido — run PAUSADA (hard-stop M-10) ---")
             # Interrompe o grafo no próprio nó developer: o checkpoint fica
@@ -406,6 +415,11 @@ def developer(state: GraphState, config: Optional[RunnableConfig] = None) -> dic
                     "node": "developer",
                     "max_usd": cb.max_total_cost,
                     "spent_usd": cb.total_cost,
+                    # M3: o interrupt ABORTA o retorno do nó — o canal do estado
+                    # não carrega o CB atualizado (LangGraph passa cópia). O
+                    # snapshot aqui é a fonte do evento circuit_breaker_changed
+                    # na transição closed→open (o dispatcher lê no checkpoint).
+                    "circuit_breaker": cb.snapshot(),
                 }
             )
 

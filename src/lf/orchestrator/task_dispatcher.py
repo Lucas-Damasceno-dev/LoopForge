@@ -109,6 +109,8 @@ class TaskDispatcher:
         self.mock_llm = mock_llm
         self.interactive = interactive
         self.circuit_breaker = circuit_breaker
+        # M3: último estado de circuit_breaker PUBLICADO (dedup por transição).
+        self._published_cb_state: str | None = None
         self.review_mode = review_mode
         self.notify = notify
         self.webhook_url = webhook_url
@@ -461,6 +463,46 @@ class TaskDispatcher:
                 await scheduled
             except Exception as exc:
                 logger.warning("Falha ao publicar evento via EventBus: %s", exc)
+
+    def _cb_from_snapshot(self, state_snapshot, fallback: dict | None = None) -> dict | None:
+        """Snapshot do CircuitBreaker a publicar (M3).
+
+        Prefere o payload do interrupt de budget (hard-stop M-10): o interrupt
+        ABORTA o retorno do nó developer, então o canal do estado não carrega o
+        CB atualizado (LangGraph passa CÓPIA do estado ao nó) — o payload leva o
+        snapshot no instante da transição closed→open.
+        """
+        for it in getattr(state_snapshot, "interrupts", None) or ():
+            iv = getattr(it, "value", None)
+            if isinstance(iv, dict) and iv.get("paused_budget"):
+                payload = iv.get("circuit_breaker")
+                if isinstance(payload, dict):
+                    return payload
+                break
+        return fallback if isinstance(fallback, dict) else None
+
+    def _publish_cb_transition(self, cb_snapshot, task_id, thread_id, pipeline_run_id):
+        """Publica ``circuit_breaker_changed`` SÓ em TRANSIÇÃO de estado (M3).
+
+        Dedup por estado atual: o snapshot (dict de 10 campos, mesmo shape do
+        publish no finally da API) só é emitido quando ``state`` muda desde a
+        última publicação. Retorna a Task de _broadcast_ws (None se nada
+        mudou): em contexto async dá para ``await`` (ordenação); em contexto
+        sync é fire-and-forget (mesmo padrão do node_execution).
+        """
+        if not isinstance(cb_snapshot, dict) or not isinstance(cb_snapshot.get("state"), str):
+            return None
+        state = cb_snapshot["state"]
+        if state == self._published_cb_state:
+            return None
+        self._published_cb_state = state
+        return self._broadcast_ws(
+            "circuit_breaker_changed",
+            task_id,
+            cb_snapshot,
+            thread_id=thread_id,
+            run_id=pipeline_run_id,
+        )
 
     def _get_input_with_timeout(self, prompt_text: str, timeout: float = 300) -> str:
         """Lê input com suporte a timeout no Unix/Linux."""
@@ -1474,9 +1516,28 @@ class TaskDispatcher:
                             thread_id=thread_id,
                             run_id=pipeline_run_id,
                         )
+                        # M3: transição do CircuitBreaker observada no estado do
+                        # nó → publica circuit_breaker_changed em tempo real.
+                        _cb_task = self._publish_cb_transition(
+                            output.get("circuit_breaker"), task_id, thread_id, pipeline_run_id
+                        )
+                        if _cb_task is not None:
+                            await _cb_task
 
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
+
+            # M3: cobre o estado FINAL (dedup idempotente — se a última
+            # transição já emitiu o mesmo estado, nada é publicado de novo).
+            # Hard-stop M-10: prefere o snapshot do interrupt (o canal não
+            # carrega o CB novo) e reescreve o canal para o finally da API
+            # não publicar estado STALE (closed) por cima.
+            _cb_authoritative = self._cb_from_snapshot(state_snapshot, result.get("circuit_breaker"))
+            if _cb_authoritative is not None:
+                result["circuit_breaker"] = _cb_authoritative
+            _cb_task = self._publish_cb_transition(_cb_authoritative, task_id, thread_id, pipeline_run_id)
+            if _cb_task is not None:
+                await _cb_task
 
             # Item 4.1: aprovação vale para o merge da sandbox — review mode só
             # aprova se o usuário confirmar; caso contrário o merge é negado.
@@ -1631,6 +1692,9 @@ class TaskDispatcher:
                             thread_id=thread_id,
                             run_id=pipeline_run_id,
                         )
+                        # M3: transição do CircuitBreaker (sync: fire-and-forget,
+                        # mesmo padrão do node_execution acima).
+                        self._publish_cb_transition(output.get("circuit_breaker"), task_id, thread_id, pipeline_run_id)
 
             if self.interactive:
                 snapshot = graph.get_state(config)
@@ -1652,10 +1716,21 @@ class TaskDispatcher:
                                     thread_id=thread_id,
                                     run_id=pipeline_run_id,
                                 )
+                                self._publish_cb_transition(
+                                    output.get("circuit_breaker"), task_id, thread_id, pipeline_run_id
+                                )
                     snapshot = graph.get_state(config)
 
             state_snapshot = graph.get_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
+
+            # M3: estado final (dedup idempotente) — hard-stop M-10 prefere o
+            # snapshot do interrupt (canal não carrega o CB novo) e reescreve o
+            # canal para o finally da API não publicar estado STALE.
+            _cb_authoritative = self._cb_from_snapshot(state_snapshot, result.get("circuit_breaker"))
+            if _cb_authoritative is not None:
+                result["circuit_breaker"] = _cb_authoritative
+            self._publish_cb_transition(_cb_authoritative, task_id, thread_id, pipeline_run_id)
 
             # Item 4.1: aprovação vale para o merge da sandbox — review mode só
             # aprova se o usuário confirmar; caso contrário o merge é negado.
@@ -1993,9 +2068,24 @@ class TaskDispatcher:
                             thread_id=thread_id,
                             run_id=pipeline_run_id,
                         )
+                        # M3: transição do CircuitBreaker no resume (mesmo dedup).
+                        _cb_task = self._publish_cb_transition(
+                            output.get("circuit_breaker"), task_id, thread_id, pipeline_run_id
+                        )
+                        if _cb_task is not None:
+                            await _cb_task
 
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
+
+            # M3: estado final do resume (dedup idempotente) — hard-stop M-10
+            # prefere o snapshot do interrupt e reescreve o canal.
+            _cb_authoritative = self._cb_from_snapshot(state_snapshot, result.get("circuit_breaker"))
+            if _cb_authoritative is not None:
+                result["circuit_breaker"] = _cb_authoritative
+            _cb_task = self._publish_cb_transition(_cb_authoritative, task_id, thread_id, pipeline_run_id)
+            if _cb_task is not None:
+                await _cb_task
 
             # B7: preserva degraded/degraded_reason persistidos da run pausada —
             # o estado do checkpoint pode não carregar a flag (ela foi gravada

@@ -148,7 +148,13 @@ def _raise_if_llm_error_marker(raw_response_text: str, result=None) -> None:
                 )
     else:
         # Em saídas estruturadas, apenas marcadores inequívocos de modelo/provedor inexistente barram
-        for marker in ("Model not found", "model_not_found", "is not a valid model", "UnknownError", "Unexpected server error"):
+        for marker in (
+            "Model not found",
+            "model_not_found",
+            "is not a valid model",
+            "UnknownError",
+            "Unexpected server error",
+        ):
             if marker in haystack:
                 raise RuntimeError(
                     "LLM Engine falhou: resposta contém erro de modelo/servidor. "
@@ -264,12 +270,18 @@ def call_llm_via_opencode(
         # serializável (canal `circuit_breaker` do GraphState). Reconstrói a
         # instância para o can_proceed() funcionar — antes o dict chegava aqui
         # e o enforcement do CB ficava morto nos nós.
-        if isinstance(circuit_breaker, dict):
+        cb_dict = circuit_breaker if isinstance(circuit_breaker, dict) else None
+        if cb_dict is not None:
             from ...guardrails.circuit_breaker import CircuitBreaker
 
             circuit_breaker = CircuitBreaker.from_snapshot(circuit_breaker)
         if not circuit_breaker.can_proceed():
             raise RuntimeError("Circuit breaker is open - cannot proceed")
+        # M3: reflete a transição (ex.: open→half-open em can_proceed) no canal
+        # do estado — mesmo dict propagado; o dispatcher compara e publica
+        # circuit_breaker_changed em tempo real.
+        if cb_dict is not None:
+            cb_dict.update(circuit_breaker.snapshot())
 
     # Monta prompt final com instrução de formato
     if schema_model:

@@ -1452,9 +1452,12 @@ async def _run_pipeline(
         )
 
         # Evento do snapshot do CircuitBreaker (10 campos) — consumido pela UI
-        # para renderizar o estado do gate de custo/falhas da run.
+        # para renderizar o estado do gate de custo/falhas da run. M3: transições
+        # são publicadas EM TEMPO REAL pelo dispatcher (_publish_cb_transition);
+        # este finally fica como fallback idempotente — só publica se o estado
+        # final ainda não foi emitido durante a execução (sem duplicata).
         cb = final_state.get("circuit_breaker")
-        if isinstance(cb, dict):
+        if isinstance(cb, dict) and cb.get("state") != getattr(dispatcher, "_published_cb_state", None):
             await event_bus.publish(run_id, "circuit_breaker_changed", cb)
     except Exception as e:
         error = str(e)

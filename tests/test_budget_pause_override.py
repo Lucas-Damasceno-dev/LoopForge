@@ -147,6 +147,19 @@ async def test_budget_hard_stop_pause_override_resume_e2e():
         assert cost["budget"]["max_usd"] == 0.01
         assert cost["budget_warning"] is False
 
+        # M3: circuit_breaker_changed publicado na TRANSIÇÃO (closed→open)
+        # DURANTE a execução (quando o developer estoura o budget e pausa) —
+        # não só no finally. O journal da run guarda o snapshot (state).
+        events = (await client.get(f"/api/v1/runs/{run_id}/events")).json()["events"]
+        cb_states = [
+            e["payload"]["state"]
+            for e in events
+            if e["event"] == "circuit_breaker_changed" and isinstance(e.get("payload"), dict)
+        ]
+        assert "open" in cb_states, f"transição closed→open não publicada em tempo real: {cb_states}"
+        # Sem spam: uma publicação por estado (closed inicial + open da pausa).
+        assert len(cb_states) == len(set(cb_states)), f"dedup por estado falhou: {cb_states}"
+
         # Override com limite maior (aplica ao checkpoint)
         ov = await client.post(f"/api/v1/runs/{run_id}/cost/override", json={"max_usd": 50.0})
         assert ov.status_code == 200
