@@ -35,7 +35,7 @@ from lf.api.auth import Principal, get_current_principal, verify_authentication
 from lf.api.config import get_api_settings
 from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
-from lf.api.events import event_bus
+from lf.api.events import WORKER_ID, event_bus
 from lf.api.models import AgentTemplate, HumanDecisionModel, PipelineRun, PipelineTemplate
 from lf.api.pipeline_validator import SPECIAL_AGENT_IDS, validate_pipeline
 from lf.api.pipelines import PipelineBase
@@ -1268,6 +1268,10 @@ async def _events_forwarder(app: FastAPI) -> None:
             try:
                 data = json.loads(msg["data"])
             except Exception:
+                continue
+            if data.get("origin") == WORKER_ID:
+                # Mensagem do PRÓPRIO worker: o publish já broadcastou aos WS
+                # locais — pular evita o double-delivery local.
                 continue
             run_id = data.get("run_id")
             if run_id:

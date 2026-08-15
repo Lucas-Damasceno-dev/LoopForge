@@ -25,6 +25,11 @@ from lf.api.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
+# Identidade do worker (estável por processo): usada p/ dedup no canal
+# lf:events — o envelope do canal carrega ``origin``; cada worker pula a
+# própria mensagem (o broadcast local do publish já entregou aos seus WS).
+WORKER_ID = uuid.uuid4().hex
+
 
 def _generate_uuid() -> str:
     return str(uuid.uuid4())
@@ -211,7 +216,10 @@ class EventBus:
         self._broadcast(envelope)
         if self._redis is not None:
             try:
-                await self._redis.publish("lf:events", json.dumps(envelope))
+                # Envelope do CANAL ganha origin (worker-id) para dedup no
+                # forwarder; journal e broadcast local permanecem intactos.
+                channel_envelope = {**envelope, "origin": WORKER_ID}
+                await self._redis.publish("lf:events", json.dumps(channel_envelope))
             except Exception:
                 logger.warning("Falha ao publicar evento no redis", exc_info=True)
         return envelope
