@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 from pydantic_settings import BaseSettings
 
 from lf.config.loader import load_ade_config, save_ade_config
@@ -78,6 +78,12 @@ class APISettings(BaseSettings):
     # Rate limiting leve in-memory (sliding window por IP ou X-API-Key):
     # requests por minuto. 0 = desabilitado. Env: LF_API_RATE_LIMIT_PER_MIN.
     rate_limit_per_min: int = 300
+
+    # Fila multi-worker (E3): "memory" = fila in-process (BC, single worker);
+    # "redis" = fila global via Redis (pending/active/params + semáforo).
+    # Envs sem prefixo LF_API_ (aliases explícitos, integração externa/CLI).
+    queue_backend: str = Field(default="memory", validation_alias="LF_QUEUE_BACKEND")
+    redis_url: str = Field(default="redis://localhost:6379", validation_alias="LF_REDIS_URL")
 
     # Pool de conexões (usado quando PostgreSQL for fornecido)
     db_pool_size: int = 5
