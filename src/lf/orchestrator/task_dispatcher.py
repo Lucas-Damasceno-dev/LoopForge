@@ -476,8 +476,10 @@ class TaskDispatcher:
             try:
                 return input()
             except Exception:
-                # Fallback consistente com o timeout Unix (aborta em vez de aprovar)
-                return "x"
+                # Sem TTY/stdin fechado (ex: execução headless): NÃO há operador
+                # humano — retorna '' para o gate seguir no polling REMOTO em vez
+                # de abortar (o fallback antigo retornava 'x' e matava a run).
+                return ""
 
     def _get_single_key_with_timeout(self, prompt_text: str, timeout: float = 0.5) -> str:
         """Lê uma única tecla sem exigir Enter (modo cbreak), com timeout.
@@ -486,8 +488,9 @@ class TaskDispatcher:
         mantém ISIG ligado, então ^C continua levantando KeyboardInterrupt —
         comportamento de aborto preservado). Retorna a tecla pressionada
         (1 char) ou '' no timeout, sem imprimir mensagem de timeout (evita spam).
-        Em ambiente não-TTY (ex: pytest), faz fallback para
-        _get_input_with_timeout para preservar o comportamento dos testes.
+        Em ambiente não-TTY (ex: pytest, API headless), faz fallback para
+        _get_input_with_timeout — o '' resultante é ignorado pelo gate, que
+        segue no polling REMOTO (B3).
         """
         if prompt_text:
             print(prompt_text, end="", flush=True)
@@ -536,25 +539,32 @@ class TaskDispatcher:
                     feedback_message TEXT,
                     user TEXT DEFAULT 'human_operator',
                     timestamp TEXT NOT NULL,
-                    state_patch TEXT
+                    state_patch TEXT,
+                    consumed BOOLEAN DEFAULT 0
                 )
             """)
             # C3 (M-12): migração aditiva da coluna state_patch — tabelas criadas
-            # pelo ORM (models.HumanDecisionModel) não declaram a coluna.
+            # pelo ORM (models.HumanDecisionModel) não declaram a coluna. B2:
+            # consumed (filtro do polling por run_id+gate_node) na mesma guarda.
             cols = {row[1] for row in cursor.execute("PRAGMA table_info(human_decisions)")}
             if "state_patch" not in cols:
                 cursor.execute("ALTER TABLE human_decisions ADD COLUMN state_patch TEXT")
+            if "consumed" not in cols:
+                cursor.execute("ALTER TABLE human_decisions ADD COLUMN consumed BOOLEAN DEFAULT 0")
             conn.commit()
             conn.close()
         except Exception as e:
             print(f"--- AVISO: Falha ao garantir tabela human_decisions: {e} ---")
 
-    def _poll_remote_decision_once(self, run_id: str) -> dict | None:
+    def _poll_remote_decision_once(self, run_id: str, gate_node: str | None = None) -> dict | None:
         """Consulta única à tabela human_decisions por decisão remota.
 
-        Retorna {"action", "category", "message", "state_patch"} se houver
-        decisão pendente para o run_id, ou None caso contrário. Não bloqueia.
+        Retorna {"id", "action", "category", "message", "state_patch"} se
+        houver decisão PENDENTE (consumed=0) para o (run_id, gate_node), ou
+        None caso contrário. Não bloqueia.
         ``state_patch`` (C3/M-12) é decodificado de JSON quando presente.
+        B2: o filtro agora casa (run_id, gate_node) — antes era só run_id e uma
+        decisão aprovada num gate re-aplicava no próximo (append-only).
         """
         if not run_id or run_id in ("default-run", "test", "test-run", "test-thread"):
             return None
@@ -568,22 +578,71 @@ class TaskDispatcher:
         try:
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT action, feedback_category, feedback_message, state_patch "
-                "FROM human_decisions WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1",
-                (run_id,),
-            )
+            if gate_node:
+                cursor.execute(
+                    "SELECT id, action, feedback_category, feedback_message, state_patch "
+                    "FROM human_decisions WHERE run_id = ? AND gate_node = ? AND consumed = 0 "
+                    "ORDER BY timestamp DESC LIMIT 1",
+                    (run_id, gate_node),
+                )
+            else:
+                cursor.execute(
+                    "SELECT id, action, feedback_category, feedback_message, state_patch "
+                    "FROM human_decisions WHERE run_id = ? AND consumed = 0 "
+                    "ORDER BY timestamp DESC LIMIT 1",
+                    (run_id,),
+                )
             row = cursor.fetchone()
             conn.close()
             if row:
-                result: dict = {"action": row[0], "category": row[1], "message": row[2]}
-                if row[3]:
+                result: dict = {"id": row[0], "action": row[1], "category": row[2], "message": row[3]}
+                if row[4]:
                     with contextlib.suppress(json.JSONDecodeError):
-                        result["state_patch"] = json.loads(row[3])
+                        result["state_patch"] = json.loads(row[4])
                 return result
         except Exception as exc:
             logger.warning("Falha ao verificar decisão remota: %s", exc)
         return None
+
+    def _mark_decision_consumed(self, decision_id: str | None) -> None:
+        """Marca a decisão remota como CONSUMIDA (B2) — o polling é append-only
+        e, sem a flag, a MESMA decisão re-aplicava em gates subsequentes."""
+        if not decision_id:
+            return
+        try:
+            db_path = Path(".loopforge/telemetry.sqlite").resolve()
+            self._ensure_human_decisions_table(db_path)
+            conn = sqlite3.connect(str(db_path))
+            try:
+                conn.execute("UPDATE human_decisions SET consumed = 1 WHERE id = ?", (decision_id,))
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as exc:
+            logger.warning("Falha ao marcar decisão como consumida: %s", exc)
+
+    def _existing_pipeline_run_flags(self, run_id: str) -> tuple[bool, str | None]:
+        """Lê degraded/degraded_reason persistidos de pipeline_runs (B7).
+
+        O resume preserva as flags da run pausada no upsert final — o estado do
+        checkpoint pode não carregar degraded (a flag foi gravada só no DB).
+        """
+        try:
+            db_path = Path(".loopforge/telemetry.sqlite").resolve()
+            if not db_path.exists():
+                return False, None
+            conn = sqlite3.connect(str(db_path), timeout=10.0)
+            try:
+                row = conn.execute(
+                    "SELECT degraded, degraded_reason FROM pipeline_runs WHERE id = ?", (run_id,)
+                ).fetchone()
+            finally:
+                conn.close()
+            if row:
+                return bool(row[0]), (row[1] if isinstance(row[1], str) else None)
+        except Exception as exc:
+            logger.warning("Falha ao ler flags degradadas da run %s: %s", run_id, exc)
+        return False, None
 
     @staticmethod
     def _resolve_telemetry_run_id(thread_id: str) -> str:
@@ -626,8 +685,8 @@ class TaskDispatcher:
             patch_json = json.dumps(state_patch, ensure_ascii=False) if state_patch else None
             cursor.execute(
                 "INSERT INTO human_decisions "
-                "(id, run_id, gate_node, action, feedback_category, feedback_message, user, timestamp, state_patch) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(id, run_id, gate_node, action, feedback_category, feedback_message, user, timestamp, state_patch, consumed) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
                 (decision_id, run_id, gate_node, action, category, message, "human_operator", now_iso, patch_json),
             )
             conn.commit()
@@ -657,6 +716,7 @@ class TaskDispatcher:
         duration_seconds: float | None = None,
         thread_id: str | None = None,
         degraded: bool = False,
+        degraded_reason: str | None = None,
     ) -> None:
         """Upsert idempotente em pipeline_runs (M-07/A2) — writer canônico.
 
@@ -713,14 +773,17 @@ class TaskDispatcher:
                     """
                     INSERT INTO pipeline_runs
                         (id, idea, stack, status, current_node, duration_seconds,
-                         thread_id, degraded, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         thread_id, degraded, degraded_reason, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         status = excluded.status,
                         current_node = excluded.current_node,
                         duration_seconds = excluded.duration_seconds,
                         thread_id = excluded.thread_id,
                         degraded = excluded.degraded,
+                        degraded_reason = CASE WHEN excluded.degraded_reason IS NOT NULL
+                                               THEN excluded.degraded_reason
+                                               ELSE pipeline_runs.degraded_reason END,
                         updated_at = excluded.updated_at,
                         idea = CASE WHEN excluded.idea IS NOT NULL
                                     THEN excluded.idea ELSE pipeline_runs.idea END,
@@ -739,6 +802,7 @@ class TaskDispatcher:
                         0.0 if duration_seconds is None else duration_seconds,
                         thread_id,
                         degraded,
+                        degraded_reason,
                         now,
                         now,
                     ),
@@ -1017,7 +1081,7 @@ class TaskDispatcher:
             if raw_choice in ("c", "r", "a", "x"):
                 choice = raw_choice
                 break
-            remote_decision = self._poll_remote_decision_once(telemetry_run_id)
+            remote_decision = self._poll_remote_decision_once(telemetry_run_id, next_node)
             if remote_decision:
                 break
 
@@ -1034,6 +1098,9 @@ class TaskDispatcher:
                 console.print(
                     f"[bold green]➜ Decisão Remota via API Detectada: {remote_decision['action'].upper()}[/bold green]"
                 )
+                # B2: decisão aplicada → marcada como consumida (o polling é
+                # append-only; sem a flag ela re-aplicaria no próximo gate).
+                self._mark_decision_consumed(remote_decision.get("id"))
             elif timeout_elapsed and self.hitl_on_timeout == "abort":
                 # C4 (M-11) on_timeout=abort: run falha CONTROLADAMENTE sem
                 # consumir LLM (nenhum nó é re-agendado). O estado final é
@@ -1094,18 +1161,30 @@ class TaskDispatcher:
 
         elif choice == "a":
             action = "adjust_prompt"
-            console.print("\n[bold cyan]✏️  Feedback Estruturado (Request Changes):[/bold cyan]")
-            console.print("  Categoria: [1] Bug  [2] Style  [3] Missing Feature  [4] General")
-            cat_choice = self._get_input_with_timeout("➜ Categoria [1-4] (default: 4): ", timeout=60) or "4"
-            cat_map = {"1": "bug", "2": "style", "3": "missing_feature", "4": "general"}
-            cat = cat_map.get(cat_choice.strip(), "general")
+            # B3: decisão remota traz feedback_category/feedback_message — aplica
+            # direto SEM stdin e propaga category/message para o novo prompt.
+            remote_fb = remote_decision or {}
+            if remote_fb.get("category") or remote_fb.get("message"):
+                cat = remote_fb.get("category") or "general"
+                msg = remote_fb.get("message") or "Ajustar implementação."
+                console.print(f"[bold cyan]✏️  Feedback Remoto via API: [{cat}] {msg}[/bold cyan]")
+            elif not sys.stdin.isatty():
+                # Sem TTY e sem feedback remoto: default sem bloquear (B3) —
+                # antes o re-prompt por stdin travava 60s+ em execução headless.
+                cat, msg = "general", "Ajustar implementação."
+            else:
+                console.print("\n[bold cyan]✏️  Feedback Estruturado (Request Changes):[/bold cyan]")
+                console.print("  Categoria: [1] Bug  [2] Style  [3] Missing Feature  [4] General")
+                cat_choice = self._get_input_with_timeout("➜ Categoria [1-4] (default: 4): ", timeout=60) or "4"
+                cat_map = {"1": "bug", "2": "style", "3": "missing_feature", "4": "general"}
+                cat = cat_map.get(cat_choice.strip(), "general")
 
-            msg = (
-                self._get_input_with_timeout(
-                    "➜ Mensagem detalhada de feedback: ", timeout=self.subprocess_timeout_seconds
+                msg = (
+                    self._get_input_with_timeout(
+                        "➜ Mensagem detalhada de feedback: ", timeout=self.subprocess_timeout_seconds
+                    )
+                    or "Ajustar implementação."
                 )
-                or "Ajustar implementação."
-            )
 
             app.update_state(
                 config,
@@ -1667,6 +1746,102 @@ class TaskDispatcher:
                     approved=False,
                 )
 
+    async def _resume_gate_async(
+        self,
+        graph,
+        config: dict,
+        next_node: str,
+        task_id: str,
+        thread_id: str,
+        pipeline_run_id: str,
+    ) -> str:
+        """Re-entra no gate HITL durante o resume (B4), no MESMO mecanismo do
+        fluxo normal: anuncia ``hitl_gate_reached``, aguarda decisão remota via
+        poll (run_id+gate_node) e aplica a ação ao checkpoint via aupdate_state.
+
+        Retorna 'continue' (ou a ação aplicada) ou 'abort'. No timeout, segue
+        ``hitl_on_timeout`` (continue default; abort marca erro; pause aguarda
+        decisão tardia indefinidamente).
+        """
+        run_id = config.get("configurable", {}).get("thread_id", "default-run")
+        telemetry_run_id = self._resolve_telemetry_run_id(run_id)
+
+        # C4 (M-11): hitl_gate_reached na primeira entrada do gate (dedup por run+nó).
+        if (telemetry_run_id, next_node) not in self._announced_hitl_gates:
+            self._announced_hitl_gates.add((telemetry_run_id, next_node))
+            await self._publish_event_async(
+                "hitl_gate_reached",
+                task_id,
+                {
+                    "gate_node": next_node,
+                    "thread_id": run_id,
+                    "run_id": telemetry_run_id,
+                    "timeout_seconds": self.hitl_timeout_seconds,
+                    "on_timeout": self.hitl_on_timeout,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+                thread_id=thread_id,
+                run_id=pipeline_run_id,
+            )
+
+        # on_timeout=pause: gate permanece aberto aguardando decisão tardia.
+        deadline = float("inf") if self.hitl_on_timeout == "pause" else time.monotonic() + self.hitl_timeout_seconds
+        remote: dict | None = None
+        while time.monotonic() < deadline:
+            remote = self._poll_remote_decision_once(telemetry_run_id, next_node)
+            if remote:
+                break
+            await asyncio.sleep(0.5)
+
+        if not remote:
+            if self.hitl_on_timeout == "abort":
+                console = Console()
+                console.print(
+                    f"\n[red]⏰ Tempo limite esgotado no resume (on_timeout=abort): abortando pipeline.[/red]"
+                )
+                await graph.aupdate_state(
+                    config, {"error": "HITL timeout sem decisão no resume — abortado (on_timeout=abort)."}
+                )
+                return "abort"
+            # continue (default): segue sem registrar decisão humana (audit trail intacto).
+            return "continue"
+
+        self._mark_decision_consumed(remote.get("id"))
+        action = remote.get("action", "approve")
+
+        if action == "abort":
+            await graph.aupdate_state(config, {"error": "Pipeline abortada via decisão remota no resume."})
+            return "abort"
+
+        if action == "retry":
+            await graph.aupdate_state(config, {"error": None})
+            return "continue"
+
+        if action == "adjust_prompt":
+            cat = remote.get("category") or "general"
+            msg = remote.get("message") or "Ajustar implementação."
+            snap = await graph.aget_state(config)
+            history = list((snap.values or {}).get("feedback_history", []) or [])
+            await graph.aupdate_state(
+                config,
+                {
+                    "error": None,
+                    "feedback_history": history
+                    + [{"from": "human", "node": next_node, "category": cat, "message": msg}],
+                },
+            )
+            return "continue"
+
+        if action == "adjust_state":
+            patch = remote.get("state_patch") or {}
+            if patch:
+                await graph.aupdate_state(config, patch)
+            return "continue"
+
+        # approve/continue
+        await graph.aupdate_state(config, {"error": None})
+        return "continue"
+
     def resume(self, project_id: str = "project", task_id: str = "task-1", thread_id: str | None = None) -> dict:
         """Retoma a execução de uma pipeline a partir do último nó bem-sucedido via trajectories.db.
 
@@ -1736,6 +1911,47 @@ class TaskDispatcher:
                         )
             resuming_node = snapshot.next[0] if snapshot.next else last_values.get("next_agent", "cpo")
 
+            # B4: gate HITL pendente no resume — o checkpoint parado em
+            # interrupt (next != []) precisa re-entrar no loop de decisão ANTES
+            # de continuar o astream. Distingue de pausa por budget (M-10):
+            # o hard-stop usa interrupt() com payload `paused_budget`; o gate
+            # (interrupt_after) não carrega __interrupt__.
+            budget_paused = bool(
+                getattr(snapshot, "interrupts", None)
+                and any(
+                    isinstance(getattr(i, "value", None), dict) and i.value.get("paused_budget")
+                    for i in snapshot.interrupts
+                )
+            )
+            pending_gate: str | None = None
+            if snapshot.next and not budget_paused and bool(last_values.get("is_interactive")):
+                candidate = snapshot.next[0]
+                # Mesmo conjunto de gates do build_graph (human_gate_enabled).
+                if candidate in ("developer", "qa", "parallel_audit"):
+                    pending_gate = candidate
+
+            if pending_gate:
+                gate_action = await self._resume_gate_async(
+                    graph, config, pending_gate, task_id, thread_id, pipeline_run_id
+                )
+                if gate_action == "abort":
+                    self._upsert_pipeline_run(
+                        pipeline_run_id,
+                        "failed",
+                        idea=last_values.get("idea"),
+                        stack=last_values.get("stack"),
+                        current_node=pending_gate,
+                        thread_id=thread_id,
+                    )
+                    await self._publish_event_async(
+                        "pipeline_failed",
+                        task_id,
+                        {"status": "failed", "error": "Pipeline abortada no gate durante o resume."},
+                        thread_id=thread_id,
+                        run_id=pipeline_run_id,
+                    )
+                    return {**last_values, "error": "Pipeline abortada no gate durante o resume.", "status": "failed"}
+
             print(
                 f"--- CHECKPOINT RECOVERY: Retomando pipeline (thread: {thread_id}) a partir do nó '{resuming_node}' ---"
             )
@@ -1779,7 +1995,14 @@ class TaskDispatcher:
             state_snapshot = await graph.aget_state(config)
             result = dict(state_snapshot.values) if state_snapshot and state_snapshot.values else {}
 
-            degraded = bool(result.get("degraded"))
+            # B7: preserva degraded/degraded_reason persistidos da run pausada —
+            # o estado do checkpoint pode não carregar a flag (ela foi gravada
+            # só no DB) e o upsert final sobrescreveria com False.
+            persisted_degraded, persisted_reason = self._existing_pipeline_run_flags(pipeline_run_id)
+            degraded = bool(result.get("degraded")) or persisted_degraded
+            degraded_reason = result.get("degraded_reason")
+            if not isinstance(degraded_reason, str):
+                degraded_reason = persisted_reason
             final_status = "completed" if not result.get("error") else "failed"
             final_event = "pipeline_finished" if final_status == "completed" else "pipeline_failed"
             self._upsert_pipeline_run(
@@ -1791,6 +2014,7 @@ class TaskDispatcher:
                 duration_seconds=round(time.monotonic() - start_time, 2),
                 thread_id=thread_id,
                 degraded=degraded,
+                degraded_reason=degraded_reason,
             )
             await self._publish_event_async(
                 final_event,

@@ -33,6 +33,9 @@ class RunResponse(BaseModel):
     current_node: str | None = None
     logs: str | None = None
     duration_seconds: float = 0.0
+    # ADR-0003 (M-02): thread LangGraph da run — o frontend usa em
+    # HitlDrawer/TimelineBar/RunInspector (types.ts:66). Aditivo (D10).
+    thread_id: str | None = None
     # Degradação da run (mock fallback, provider degradado etc.) — ADITIVO.
     degraded: bool = False
     degraded_reason: str | None = None

@@ -47,11 +47,11 @@ class Principal:
 #   - .../cost e .../override (todos)     — custos + override de custo
 #   - /api/v1/prompts       (PATCH/DELETE) — override/remoção de prompt
 #   - /api/v1/memory        (DELETE)      — remoção de lesson
-#   - /api/runs/*           (DELETE)      — remoção de run
+#   - /api/runs/* e /api/v1/runs/* (DELETE) — remoção de run (D11: v1 coberto)
 # RUNNER
 #   - /api/v1/runs, /api/runs (POST)      — criação de run
-#   - .../resume, .../execute, .../decide (POST) — controle de run
-#   - /api/runs/*           (PATCH)       — atualização de run
+#   - .../resume, .../execute, .../decide, .../cancel (POST) — controle de run
+#   - /api/runs/* e /api/v1/runs/* (PATCH) — atualização de run
 #   - /api/v1/trajectories  (POST import/fork)
 #   - /api/v1/memory        (POST/PATCH)  — escrita de lessons
 #   - /api/v1/prompts       (POST)
@@ -69,7 +69,7 @@ def _required_role(method: str, path: str) -> str:
     p = _normalize_path(path)
 
     # ADMIN
-    if m == "DELETE" and (p.startswith("/api/runs") or p.startswith("/api/v1/memory")):
+    if m == "DELETE" and (p.startswith("/api/runs") or p.startswith("/api/v1/runs") or p.startswith("/api/v1/memory")):
         return "admin"
     if p.startswith("/api/v1/config"):
         return "admin"
@@ -87,9 +87,11 @@ def _required_role(method: str, path: str) -> str:
         return "runner"
     if m == "POST" and p in ("/api/v1/runs", "/api/runs"):
         return "runner"
-    if m == "POST" and (p.endswith("/resume") or p.endswith("/execute") or p.endswith("/decide")):
+    if m == "POST" and (
+        p.endswith("/resume") or p.endswith("/execute") or p.endswith("/decide") or p.endswith("/cancel")
+    ):
         return "runner"
-    if m == "PATCH" and p.startswith("/api/runs"):
+    if m == "PATCH" and (p.startswith("/api/runs") or p.startswith("/api/v1/runs")):
         return "runner"
     if m == "POST" and p.startswith("/api/v1/trajectories") and (p.endswith("/import") or p.endswith("/fork")):
         return "runner"

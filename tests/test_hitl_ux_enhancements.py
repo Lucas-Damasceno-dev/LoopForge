@@ -31,17 +31,24 @@ async def setup_test_env(tmp_path):
 
 @pytest.mark.asyncio
 async def test_api_human_decision_endpoints():
+    """Endpoints /decide e /decisions sob o contrato B1 (validação de decisão).
+
+    Run criada SEM interactive (mock) → conclui sozinha: o POST /decide agora
+    devolve 409 (run não aceita decisões fora do gate pendente) em vez de
+    aceitar qualquer coisa com 201 — era o bug A1 do audit.
+    """
     app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-        # 1. Cria run
+        # 1. Cria run (mock, não-interativa → termina sem gate)
         run_resp = await client.post("/api/runs", json={"idea": "Test HITL run"})
         assert run_resp.status_code == 201
         run_id = run_resp.json()["id"]
 
         import asyncio
+
         await asyncio.sleep(0.2)
 
-        # 2. Registra decisão humana
+        # 2. Decisão humana fora de gate pendente → 409 com mensagem clara
         dec_resp = await client.post(
             f"/api/runs/{run_id}/decide",
             json={
@@ -52,13 +59,21 @@ async def test_api_human_decision_endpoints():
                 "user": "tester",
             },
         )
-        assert dec_resp.status_code == 201
-        assert dec_resp.json()["feedback_category"] == "bug"
+        assert dec_resp.status_code == 409, dec_resp.text
+        detail = str(dec_resp.json()["detail"])
+        assert "não aceita decisões" in detail or "no pending decision" in detail
 
-        # 3. Lista decisões
+        # 3. Run inexistente → 404
+        nf = await client.post(
+            f"/api/runs/{'nao-existe'}/decide",
+            json={"gate_node": "qa", "action": "approve"},
+        )
+        assert nf.status_code == 404
+
+        # 4. Lista decisões continua funcional (nenhuma gravada — 409 rejeitou)
         list_resp = await client.get(f"/api/runs/{run_id}/decisions")
         assert list_resp.status_code == 200
-        assert len(list_resp.json()) == 1
+        assert len(list_resp.json()) == 0
 
 
 def test_task_dispatcher_hitl_visual_and_record_decision(tmp_path):
@@ -103,7 +118,6 @@ def test_cli_explore_command(tmp_path):
     res = runner.invoke(explore_cmd, ["--db-path", db_file])
     assert res.exit_code == 0
     assert "Explorer" in res.output
-
 
 
 def test_cli_run_flags(tmp_path):

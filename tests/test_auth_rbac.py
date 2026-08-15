@@ -158,13 +158,17 @@ def test_matriz_roles():
     assert _required_role("DELETE", "/api/v1/prompts/system") == "admin"
     assert _required_role("DELETE", "/api/v1/memory/lessons/l1") == "admin"
     assert _required_role("DELETE", "/api/runs/abc") == "admin"
+    # D11: matriz cobre o prefixo v1 (/api/v1/runs) na MESMA regra
+    assert _required_role("DELETE", "/api/v1/runs/abc") == "admin"
     # Runner
     assert _required_role("POST", "/api/v1/runs") == "runner"
     assert _required_role("POST", "/api/runs") == "runner"
     assert _required_role("POST", "/api/v1/runs/abc/resume") == "runner"
     assert _required_role("POST", "/api/runs/abc/execute") == "runner"
     assert _required_role("POST", "/api/v1/runs/abc/decide") == "runner"
+    assert _required_role("POST", "/api/v1/runs/abc/cancel") == "runner"  # C8
     assert _required_role("PATCH", "/api/runs/abc") == "runner"
+    assert _required_role("PATCH", "/api/v1/runs/abc") == "runner"  # D11
     assert _required_role("POST", "/api/v1/trajectories/import") == "runner"
     assert _required_role("POST", "/api/v1/trajectories/abc/fork") == "runner"
     assert _required_role("POST", "/api/v1/memory/lessons") == "runner"

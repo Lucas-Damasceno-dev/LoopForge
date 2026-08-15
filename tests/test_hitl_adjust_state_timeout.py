@@ -73,6 +73,43 @@ async def _final_state(thread_id: str) -> dict:
         await saver.conn.close()
 
 
+async def _open_gate(client: AsyncClient, run_id: str, skip: set[str], timeout: float = 30.0) -> str:
+    """Aguarda o evento hitl_gate_reached e devolve um gate_node AINDA NÃO
+    decidido (não está em ``skip``).
+
+    Cada gate anuncia UMA vez (dedup por run+nó no dispatcher); o helper
+    ignora gates já tratados para o fluxo multi-gate (qa → parallel_audit).
+    """
+    waited = 0.0
+    while waited < timeout:
+        resp = await client.get(f"/api/v1/runs/{run_id}/events")
+        assert resp.status_code == 200
+        for ev in resp.json()["events"]:
+            if ev.get("event") == "hitl_gate_reached":
+                node = (ev.get("payload") or {}).get("gate_node")
+                if node and node not in skip:
+                    return node
+        await asyncio.sleep(0.3)
+        waited += 0.3
+    raise AssertionError(f"gate não abriu em {timeout}s para a run {run_id}")
+
+
+async def _decide_at_gate(
+    client: AsyncClient, run_id: str, gate_node: str, payload: dict, timeout: float = 30.0
+) -> None:
+    """POST /decide para o gate; antes de ele abrir o contrato B1 devolve 409."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while True:
+        resp = await client.post(f"/api/runs/{run_id}/decide", json={"gate_node": gate_node, **payload})
+        if resp.status_code == 201:
+            return
+        assert resp.status_code == 409, resp.text
+        if loop.time() >= deadline:
+            raise AssertionError(f"decisão {gate_node} não aceita em {timeout}s: {resp.text}")
+        await asyncio.sleep(0.2)
+
+
 # ─── C3 (M-12): adjust_state ────────────────────────────────────────────────
 
 
@@ -80,54 +117,53 @@ async def _final_state(thread_id: str) -> dict:
 async def test_adjust_state_e2e_aplica_patch_e_run_prossegue():
     """(a) POST /decide com action=adjust_state + state_patch no gate.
 
-    O dispatcher em polling consome a decisão, aplica o patch ao checkpoint e a
-    run prossegue — o estado final reflete os canais reais patchados (idea e
-    routing_mode) e o campo arbitrário é descartado pelo LangGraph.
+    A run é criada VIA API com interactive=True (B1: o decide valida a run
+    existente e o gate pendente). O dispatcher em polling consome a decisão
+    adjust_state, aplica o patch ao checkpoint e a run prossegue — o estado
+    final reflete os canais reais patchados (idea e routing_mode) e o campo
+    arbitrário é descartado pelo LangGraph.
     """
     app = create_app()
-    run_id = str(uuid.uuid4())
-    task = TaskSchema(id=run_id, title="Ajustar estado via HITL", agent_id="cpo")
-    dispatcher = TaskDispatcher(mock_llm=True, interactive=True, hitl_timeout_seconds=60)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+        create_resp = await client.post(
+            "/api/runs",
+            json={"idea": "Ajustar estado via HITL", "stack": "python", "mock_llm": True, "interactive": True},
+        )
+        assert create_resp.status_code == 201, create_resp.text
+        run_id = create_resp.json()["id"]
+        thread_id = f"run-{run_id}"
 
-    results: dict = {}
+        patch_payload = {
+            "idea": "ideia ajustada via adjust_state",
+            "routing_mode": "patch",
+            "campo_arbitrario": {"nao": "é canal do GraphState"},
+        }
 
-    def _run_dispatch():
-        results["state"] = dispatcher.dispatch(task=task, project_id=f"run-{run_id}")
+        # Gate 1: adjust_state com patch; gate 2 (paralelo): approve.
+        decided: set[str] = set()
+        g1 = await _open_gate(client, run_id, decided)
+        decided.add(g1)
+        await _decide_at_gate(
+            client, run_id, g1, {"action": "adjust_state", "state_patch": patch_payload, "user": "e2e"}
+        )
+        g2 = await _open_gate(client, run_id, decided)
+        decided.add(g2)
+        await _decide_at_gate(client, run_id, g2, {"action": "approve", "user": "e2e"})
 
-    patch_payload = {
-        "idea": "ideia ajustada via adjust_state",
-        "routing_mode": "patch",
-        "campo_arbitrario": {"nao": "é canal do GraphState"},
-    }
-    with patch.object(dispatcher, "_get_single_key_with_timeout", return_value=""):
-        thread = threading.Thread(target=_run_dispatch, daemon=True)
-        start = time.monotonic()
-        thread.start()
-
-        # Aguarda a pipeline alcançar o primeiro gate (developer -> qa).
-        await asyncio.sleep(2.0)
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-            resp = await client.post(
-                f"/api/runs/{run_id}/decide",
-                json={
-                    "gate_node": "developer",
-                    "action": "adjust_state",
-                    "state_patch": patch_payload,
-                    "user": "e2e",
-                },
-            )
-            assert resp.status_code == 201
-
-        thread.join(timeout=120)
-        elapsed = time.monotonic() - start
-
-    assert not thread.is_alive(), "dispatcher travou no gate — decisão adjust_state não foi consumida"
-    assert not results["state"].get("error"), results["state"].get("error")
-    assert elapsed < 60, f"gate deveria avançar pela decisão remota, não por timeout: {elapsed:.1f}s"
+        # Run completa após o patch (mock, sem LLM).
+        waited = 0.0
+        data: dict = {}
+        while waited < 60.0:
+            await asyncio.sleep(0.2)
+            r = await client.get(f"/api/v1/runs/{run_id}")
+            data = r.json()
+            if data["status"] in ("completed", "failed"):
+                break
+            waited += 0.2
+        assert data.get("status") != "failed", f"run falhou: {data}"
 
     # Checkpoint final reflete o patch nos canais reais do GraphState
-    final = await _final_state(f"run-{run_id}")
+    final = await _final_state(thread_id)
     assert final.get("idea") == "ideia ajustada via adjust_state"
     assert final.get("routing_mode") == "patch"
     # Canal fora do TypedDict é descartado pelo LangGraph (documentado)
@@ -234,7 +270,10 @@ def test_hitl_on_timeout_pause_aguarda_decisao_tardia(tmp_path, monkeypatch):
         assert thread.is_alive(), "on_timeout=pause deveria manter o gate aberto após o timeout (sem decisão)"
 
         # Decisão TARDIA: chega depois do deadline — em pause ela é aceita.
-        dispatcher._record_decision(run_id, "developer", "approve")
+        # gate_node precisa casar com o gate pendente real ('qa' — B2). O 2º
+        # gate (parallel_audit) também fica em pause: decisão tardia para ambos.
+        dispatcher._record_decision(run_id, "qa", "approve")
+        dispatcher._record_decision(run_id, "parallel_audit", "approve")
 
         thread.join(timeout=120)
         elapsed = time.monotonic() - start

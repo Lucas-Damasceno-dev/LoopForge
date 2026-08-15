@@ -62,6 +62,11 @@ class HumanDecisionModel(Base):
     )  # bug, style, missing_feature, general
     feedback_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     user: Mapped[str] = mapped_column(String(50), default="human_operator")
+    # B2: decisão consumida pelo polling do gate (filtro por run_id+gate_node).
+    # Coluna aditiva — garantida via ALTER TABLE em app._ensure_human_decisions_state_patch_column.
+    # server_default: o dispatcher insere via SQL cru (sem a coluna) — sem
+    # DEFAULT no DB o INSERT quebraria (NOT NULL constraint).
+    consumed: Mapped[bool] = mapped_column(default=False, server_default="0")
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now_utc)
 
 

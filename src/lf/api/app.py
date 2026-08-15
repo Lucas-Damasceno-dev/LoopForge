@@ -4,6 +4,7 @@ Expõe endpoints REST, WebSockets autenticados para streaming e Web Dashboard UI
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -57,14 +58,43 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Gerencia ciclo de vida da aplicação: init e close do DB."""
+    """Gerencia ciclo de vida da aplicação: init do DB + crash recovery (C9)."""
     settings = get_api_settings()
     await init_db(settings)
     # Migração aditiva de pipeline_runs (degraded/degraded_reason): DBs legados
     # não têm as colunas — ALTER TABLE idempotente (padrão C3/M-12).
     _ensure_pipeline_runs_degraded_columns(_telemetry_db_path())
+    # C9: a fila E3 é in-memory — crash do processo derrubou execução e fila.
+    # Runs `running`/`queued` no DB não têm task ativa nem slot: viram `failed`
+    # com motivo claro (resume recupera do checkpoint). Runs `paused` são
+    # PRESERVADAS (checkpoint persiste — intenção M-10).
+    await _recover_interrupted_runs(app)
     yield
     await close_db()
+
+
+async def _recover_interrupted_runs(app: FastAPI) -> None:
+    """Marca como ``failed`` runs órfãs (running/queued) no startup (C9)."""
+    from lf.api.database import session_factory
+    from lf.api.models import PipelineRun
+
+    if not session_factory:
+        return
+    async with session_factory() as session:
+        result = await session.execute(select(PipelineRun).where(PipelineRun.status.in_(["running", "queued"])))
+        orphaned = list(result.scalars().all())
+        for run in orphaned:
+            run.status = "failed"
+            run.logs = "Servidor reiniciou; use resume para retomar a execução"
+        if orphaned:
+            await session.commit()
+    for run in orphaned:
+        with contextlib.suppress(Exception):
+            await event_bus.publish(
+                run.id,
+                "run_updated",
+                {"status": "failed", "reason": "servidor reiniciou; use resume"},
+            )
 
 
 class RunQueueState:
@@ -105,12 +135,14 @@ def _telemetry_db_path() -> Path:
 
 
 def _ensure_human_decisions_state_patch_column(db_path: Path) -> None:
-    """Garante a coluna aditiva ``state_patch`` em human_decisions (C3/M-12).
+    """Garante as colunas aditivas ``state_patch``/``consumed`` em human_decisions.
 
-    O modelo ORM ``HumanDecisionModel`` (models.py, fora do escopo da ADE) não
-    declara a coluna — ela é adicionada via SQL direto com o mesmo espírito da
-    migração aditiva de pipeline_runs em database.py. Telemetria: nunca derruba
-    o request (try/except + warning).
+    O modelo ORM ``HumanDecisionModel`` (models.py) pode não declarar as
+    colunas em DBs legados — elas são adicionadas via SQL direto com o mesmo
+    espírito da migração aditiva de pipeline_runs em database.py. ``consumed``
+    (B2): o polling do gate filtra decisões não consumidas por (run_id,
+    gate_node); sem a coluna o SELECT quebraria. Telemetria: nunca derruba o
+    request (try/except + warning).
     """
     try:
         conn = sqlite3.connect(str(db_path), timeout=10.0)
@@ -119,11 +151,13 @@ def _ensure_human_decisions_state_patch_column(db_path: Path) -> None:
             cols = {row[1] for row in conn.execute("PRAGMA table_info(human_decisions)")}
             if "state_patch" not in cols:
                 conn.execute("ALTER TABLE human_decisions ADD COLUMN state_patch TEXT")
-                conn.commit()
+            if "consumed" not in cols:
+                conn.execute("ALTER TABLE human_decisions ADD COLUMN consumed BOOLEAN DEFAULT 0")
+            conn.commit()
         finally:
             conn.close()
     except Exception as exc:
-        logger.warning("Falha ao garantir coluna state_patch em human_decisions: %s", exc)
+        logger.warning("Falha ao garantir colunas em human_decisions: %s", exc)
 
 
 def _ensure_pipeline_runs_degraded_columns(db_path: Path) -> None:
@@ -172,6 +206,9 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     from lf.config.loader import load_ade_config
 
     app.state.run_queue = RunQueueState(max_concurrent=load_ade_config().runner.max_concurrent_runs)
+    # C8: registry run_id → asyncio.Task em execução (para POST /cancel).
+    # A fila em memória morre no restart — o crash recovery (C9) cobre isso.
+    app.state.run_tasks = {}  # dict[str, asyncio.Task]
 
     # ─── Middleware: CORS (M-04) ───────────────────────────────────
     # Origens de LF_CORS_ORIGINS (vírgula) ou default ["*"]. Wildcard não
@@ -371,7 +408,14 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         return run
 
     async def _resume_run_impl(run_id: str, session: AsyncSession) -> PipelineRun:
-        """Retoma uma execução interrompida usando o thread_id persistido (M-01)."""
+        """Retoma uma execução interrompida usando o thread_id persistido (M-01).
+
+        B5/B6: o resume NÃO roda mais fora da fila — passa pelo MESMO mecanismo
+        E3 de run nova (_execute_pipeline_in_background, promovido até
+        max_concurrent). O mock_llm é lido do CHECKPOINT (a run mock persiste
+        `mock_llm=True` no estado; run real segue mock_llm=False) — antes o
+        dispatcher de resume caía no default mock e gerava output falso.
+        """
         run = await session.get(PipelineRun, run_id)
         if not run:
             raise HTTPException(status_code=404, detail="Run not found")
@@ -383,46 +427,28 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         # a coluna (mesmo valor gravado por _promote_next/_execute_pipeline_in_background).
         thread_id = run.thread_id or f"run-{target_id}"
 
+        # B5: mock_llm do checkpoint — runs reais (mock_llm=False persistido)
+        # retomam SEM mock; runs originalmente mock seguem mock.
+        checkpoint_state = await _checkpoint_state(thread_id)
+        mock_llm = bool(checkpoint_state.get("mock_llm", False))
+
         # S3 T5 (round 1): resume usa o SNAPSHOT persistido da run (imutável),
         # nunca o template atual — se a run era de pipeline custom, o grafo
         # retomado é o mesmo do start (build_pipeline_graph); sem snapshot,
         # comportamento legado (build_graph default).
-        pipeline, agent_templates = await _pipeline_context_from_snapshot(run.pipeline_snapshot)
-
-        def _sync_resume():
-            from lf.orchestrator.task_dispatcher import TaskDispatcher
-
-            dispatcher = TaskDispatcher(pipeline=pipeline, agent_templates=agent_templates)
-            return dispatcher.resume(thread_id=thread_id)
-
-        async def _resume_in_bg():
-            from lf.api.database import session_factory
-
-            if session_factory:
-                async with session_factory() as bg_session:
-                    r = await bg_session.get(PipelineRun, target_id)
-                    if r:
-                        r.status = "running"
-                        await bg_session.commit()
-            try:
-                final_state = await asyncio.to_thread(_sync_resume)
-                if session_factory:
-                    async with session_factory() as bg_session:
-                        r = await bg_session.get(PipelineRun, target_id)
-                        if r:
-                            r.status = "completed" if not final_state.get("error") else "failed"
-                            r.logs = final_state.get("error") or "Pipeline retomada com sucesso"
-                            await bg_session.commit()
-            except Exception as e:
-                if session_factory:
-                    async with session_factory() as bg_session:
-                        r = await bg_session.get(PipelineRun, target_id)
-                        if r:
-                            r.status = "failed"
-                            r.logs = str(e)
-                            await bg_session.commit()
-
-        asyncio.create_task(_resume_in_bg())
+        await _execute_pipeline_in_background(
+            app,
+            run_id=target_id,
+            idea=run.idea,
+            stack=run.stack,
+            mock_llm=mock_llm,
+            routing_mode="full",
+            interactive=False,
+            model=None,
+            pipeline_snapshot=run.pipeline_snapshot,
+            resume=True,
+        )
+        await session.refresh(run)
         return run
 
     @app.post(
@@ -710,7 +736,37 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     async def _record_decision_impl(
         run_id: str, payload: HumanDecisionCreate, session: AsyncSession
     ) -> HumanDecisionModel:
-        """Registra decisão humana (HITL) vinda da Web Dashboard UI ou CLI."""
+        """Registra decisão humana (HITL) vinda da Web Dashboard UI ou CLI.
+
+        A1 (B1): valida a decisão ANTES de gravar — run existe (404), run em
+        status que aceita decisão (running/paused com gate pendente) e
+        gate_node com gate REALMENTE pendente no checkpoint (409). Sem isso o
+        POST /decide aceitava qualquer coisa e poluía o audit trail.
+        """
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+
+        if run.status not in ("running", "paused"):
+            raise HTTPException(
+                status_code=409,
+                detail=f"run {run_id} não aceita decisões no status '{run.status}'",
+            )
+
+        # B1(c): gate_node precisa casar com um gate PENDENTE de verdade — o
+        # checkpoint da thread parado em interrupt com o nó no `next`.
+        thread_id = run.thread_id or f"run-{run.id}"
+        pending = await _checkpoint_next_nodes(thread_id)
+        if payload.gate_node not in pending:
+            raise HTTPException(
+                status_code=409,
+                detail=f"no pending decision for gate_node {payload.gate_node} on run {run_id}",
+            )
+
+        # B2: garante state_patch/consumed ANTES do INSERT (o ORM pode não
+        # declarar as colunas em DBs legados — o dispatcher filtra por consumed).
+        _ensure_human_decisions_state_patch_column(_telemetry_db_path())
+
         decision = HumanDecisionModel(
             run_id=run_id,
             gate_node=payload.gate_node,
@@ -727,7 +783,6 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             # roda a cada 0.5s e, se a linha fosse visível com state_patch NULL
             # antes do UPDATE, a decisão era consumida sem o patch (race real).
             db_path = _telemetry_db_path()
-            _ensure_human_decisions_state_patch_column(db_path)
             await session.flush()  # atribui decision.id (default _generate_uuid)
             await session.execute(
                 text("UPDATE human_decisions SET state_patch = :sp WHERE id = :id"),
@@ -782,6 +837,54 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         """Alias legado de POST /api/v1/runs/{id}/decide (M-18)."""
         _mark_legacy(response)
         return await _record_decision_impl(run_id, payload, session)
+
+    async def _cancel_run_impl(run_id: str, session: AsyncSession) -> PipelineRun:
+        """Cancela uma run (C8): queued → remove da fila; running → cancela a
+        task; paused → failed. completed/failed → 409 (não cancelável)."""
+        run = await session.get(PipelineRun, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+
+        if run.status in ("completed", "failed"):
+            raise HTTPException(status_code=409, detail="run not cancellable")
+
+        q = app.state.run_queue
+        async with q.lock:
+            if run_id in q.pending:
+                # Remove da fila FIFO preservando a ordem das demais.
+                q.pending = deque(rid for rid in q.pending if rid != run_id)
+                q.params.pop(run_id, None)
+            q.active.discard(run_id)
+
+        # C8: cancela a task asyncio correspondente (se em execução). O finally
+        # de _run_pipeline libera a vaga e promove a próxima da fila.
+        task = getattr(app.state, "run_tasks", {}).get(run_id)
+        if task is not None and not task.done():
+            task.cancel()
+
+        run.status = "failed"
+        run.logs = "Cancelado pelo usuário"
+        await session.commit()
+        await session.refresh(run)
+
+        # Emite run_updated com o status final para o frontend (WS) atualizar
+        # em tempo real — mesmo mecanismo do _set_run_status.
+        await event_bus.publish(
+            run_id,
+            "run_updated",
+            {"status": "failed", "reason": "cancelado pelo usuário"},
+        )
+        return run
+
+    @app.post(
+        "/api/v1/runs/{run_id}/cancel",
+        response_model=RunResponse,
+        tags=["Runs"],
+        dependencies=[Depends(verify_authentication)],
+    )
+    async def cancel_run_v1(run_id: str, session: AsyncSession = Depends(get_session)):
+        """Rota canônica (C8): cancela uma run (queued/running/paused)."""
+        return await _cancel_run_impl(run_id, session)
 
     @app.get(
         "/api/v1/runs/{run_id}/decisions",
@@ -963,7 +1066,14 @@ async def _set_run_status(run_id: str, status: str, **extra) -> None:
                 for key, value in extra.items():
                     setattr(run, key, value)
                 await session.commit()
-    await event_bus.publish(run_id, "run_updated", {"status": status})
+    # D12: degraded/degraded_reason chegam no payload do run_updated (aditivo)
+    # — o frontend (que escuta WS) atualiza o badge de degradação em tempo real.
+    payload: dict = {"status": status}
+    if "degraded" in extra:
+        payload["degraded"] = bool(extra["degraded"])
+    if extra.get("degraded_reason") is not None:
+        payload["degraded_reason"] = extra["degraded_reason"]
+    await event_bus.publish(run_id, "run_updated", payload)
 
 
 async def _promote_next(app: FastAPI) -> None:
@@ -990,11 +1100,14 @@ async def _promote_next(app: FastAPI) -> None:
         interactive = params.get("interactive", False)
         model = params.get("model")
         pipeline_snapshot = params.get("pipeline_snapshot")
+        # B6: resume entra na fila E3 como run nova (resume=True sinaliza ao
+        # executor para chamar dispatcher.resume em vez de dispatch).
+        resume = params.get("resume", False)
 
         # M-02/ADR-0003: thread canônica `run-{id}` persistida junto da promoção.
         await _set_run_status(run_id, "running", thread_id=f"run-{run_id}", parent_run_id=run_id)
 
-        asyncio.create_task(
+        task = asyncio.create_task(
             _run_pipeline(
                 app,
                 run_id=run_id,
@@ -1005,8 +1118,13 @@ async def _promote_next(app: FastAPI) -> None:
                 interactive=interactive,
                 model=model,
                 pipeline_snapshot=pipeline_snapshot,
+                resume=resume,
             )
         )
+        # C8: registry run_id → asyncio.Task para o POST /cancel cancelar a
+        # execução correspondente (a fila em memória morre no restart, ok).
+        app.state.run_tasks[run_id] = task
+        task.add_done_callback(lambda t, rid=run_id: app.state.run_tasks.pop(rid, None))
 
 
 async def _execute_pipeline_in_background(
@@ -1019,12 +1137,15 @@ async def _execute_pipeline_in_background(
     interactive: bool = False,
     model: str | None = None,
     pipeline_snapshot: dict | None = None,
+    resume: bool = False,
 ) -> None:
     """Enfileira a run na fila E3 (FIFO) e dispara a promoção se houver vaga.
 
     M-21 (E3): runs novas nascem `queued` e só executam quando houver slot
     livre (até ``max_concurrent`` simultâneas).
     Idempotente: uma run já ativa/enfileirada não é enfileirada de novo.
+    B6: resume usa o MESMO caminho (``resume=True`` → o executor chama
+    dispatcher.resume em vez de dispatch).
     """
     q = app.state.run_queue
     async with q.lock:
@@ -1038,6 +1159,7 @@ async def _execute_pipeline_in_background(
             "interactive": interactive,
             "model": model,
             "pipeline_snapshot": pipeline_snapshot,
+            "resume": resume,
         }
         q.pending.append(run_id)
     await _promote_next(app)
@@ -1068,6 +1190,32 @@ async def _checkpoint_next_nodes(thread_id: str) -> list[str]:
         return list(snap.next) if snap else []
     except Exception:
         return []
+    finally:
+        await saver.conn.close()
+
+
+async def _checkpoint_state(thread_id: str) -> dict:
+    """Valores do checkpoint da thread (dict vazio se inexistente/inacessível).
+
+    B5: o resume lê `mock_llm` (e demais canais) do estado persistido — a run
+    mock grava `mock_llm=True` no initial_state e o checkpoint preserva.
+    """
+    from pathlib import Path
+
+    from lf.pipeline.checkpointer import create_async_checkpointer
+    from lf.pipeline.graph import build_graph
+
+    db_path = Path(".loopforge/trajectories.db").resolve()
+    if not db_path.exists():
+        return {}
+    saver = create_async_checkpointer(db_path)
+    try:
+        await saver.setup()
+        graph = build_graph(checkpointer=saver)
+        snap = await graph.aget_state({"configurable": {"thread_id": thread_id}})
+        return dict(snap.values) if snap and snap.values else {}
+    except Exception:
+        return {}
     finally:
         await saver.conn.close()
 
@@ -1122,8 +1270,13 @@ async def _run_pipeline(
     interactive: bool = False,
     model: str | None = None,
     pipeline_snapshot: dict | None = None,
+    resume: bool = False,
 ) -> None:
-    """Executa a pipeline de uma run JÁ promovida; no fim, promove a próxima da fila."""
+    """Executa a pipeline de uma run JÁ promovida; no fim, promove a próxima da fila.
+
+    B6: resume=True chama ``dispatcher.resume`` (thread persistida) em vez de
+    ``dispatch`` — o gate HITL pendente é re-entrado dentro do resume.
+    """
     import os
     import time
 
@@ -1131,6 +1284,18 @@ async def _run_pipeline(
     from lf.orchestrator.task_dispatcher import TaskDispatcher
 
     start_time = time.time()
+
+    # B6: thread canônica para o resume — a persistida em pipeline_runs
+    # (fallback `run-{id}`, mesmo valor gravado na promoção).
+    resume_thread_id: str | None = None
+    if resume:
+        from lf.api.database import session_factory
+
+        if session_factory:
+            async with session_factory() as s:
+                run_row = await s.get(PipelineRun, run_id)
+                if run_row:
+                    resume_thread_id = run_row.thread_id or f"run-{run_id}"
 
     task = TaskSchema(
         id=f"task-{run_id[:8]}",
@@ -1166,6 +1331,8 @@ async def _run_pipeline(
     )
 
     def _sync_dispatch():
+        if resume:
+            return dispatcher.resume(thread_id=resume_thread_id or f"run-{run_id}")
         return dispatcher.dispatch(
             task,
             project_id=f"run-{run_id}",
@@ -1182,7 +1349,10 @@ async def _run_pipeline(
 
         final_status = "completed" if (not err and tests_failed == 0) else "failed"
         current_node = final_state.get("next_agent", "FINISH")
-        log_msg = err if err else f"Pipeline concluída em {duration}s. Testes com falha: {tests_failed}"
+        if resume:
+            log_msg = err if err else f"Pipeline retomada com sucesso em {duration}s. Testes com falha: {tests_failed}"
+        else:
+            log_msg = err if err else f"Pipeline concluída em {duration}s. Testes com falha: {tests_failed}"
 
         # M-10: hard-stop de budget = PAUSA (interrupt no grafo) — detecta pelo
         # checkpoint com next != [] (mecanismo documentado em
@@ -1203,6 +1373,18 @@ async def _run_pipeline(
         degraded_reason = final_state.get("degraded_reason")
         if not isinstance(degraded_reason, str):
             degraded_reason = None
+        # B7: no resume o checkpoint pode não carregar degraded (a run pausada
+        # persistiu a flag no DB) — preserva os valores persistidos quando o
+        # estado retornado não os declara.
+        if resume and not degraded:
+            from lf.api.database import session_factory as _sf
+
+            if _sf:
+                async with _sf() as _s:
+                    _r = await _s.get(PipelineRun, run_id)
+                    if _r and _r.degraded:
+                        degraded = True
+                        degraded_reason = degraded_reason or _r.degraded_reason
 
         await _set_run_status(
             run_id,
