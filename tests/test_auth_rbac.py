@@ -145,6 +145,47 @@ def test_get_principal_helper():
     assert "admin" in principal.roles
 
 
+@pytest.mark.asyncio
+async def test_auth_me_retorna_principal(tmp_path):
+    """/auth/me devolve name+roles do principal da key."""
+    _write_ade(tmp_path, _ade_keys())
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.get("/api/v1/auth/me", headers={"X-API-Key": RUNNER_KEY})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["name"] == "runner-svc"
+        assert body["roles"] == ["runner"]
+
+
+@pytest.mark.asyncio
+async def test_auth_me_env_key_admin(tmp_path):
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.get("/api/v1/auth/me", headers={"X-API-Key": ENV_KEY})
+        assert r.status_code == 200
+        assert r.json()["roles"] == ["admin"]
+
+
+@pytest.mark.asyncio
+async def test_auth_me_sem_key_401(tmp_path):
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        assert (await ac.get("/api/v1/auth/me")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_auth_me_auth_off_anonymous_admin(tmp_path, monkeypatch):
+    """Auth desativada → principal anônimo admin (BC: UI assume admin)."""
+    monkeypatch.delenv("LF_API_API_KEY", raising=False)
+    monkeypatch.delenv("LF_API_REQUIRE_AUTH", raising=False)
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.get("/api/v1/auth/me")
+        assert r.status_code == 200
+        assert r.json() == {"name": "anonymous", "roles": ["admin"]}
+
+
 def test_matriz_roles():
     """Matriz path→role: admin > runner > viewer, default viewer p/ leituras."""
     # Admin

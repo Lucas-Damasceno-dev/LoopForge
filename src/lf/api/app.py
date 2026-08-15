@@ -32,7 +32,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lf.api.auth import verify_authentication
+from lf.api.auth import Principal, get_current_principal, verify_authentication
 from lf.api.config import get_api_settings
 from lf.api.dashboard_html import get_dashboard_html
 from lf.api.database import close_db, get_session, init_db
@@ -42,6 +42,7 @@ from lf.api.pipeline_validator import SPECIAL_AGENT_IDS, validate_pipeline
 from lf.api.pipelines import PipelineBase
 from lf.api.rate_limit import RateLimitMiddleware
 from lf.api.schemas import (
+    AuthMeResponse,
     HealthResponse,
     HumanDecisionCreate,
     HumanDecisionResponse,
@@ -380,6 +381,15 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     async def create_run_v1(payload: RunCreate, session: AsyncSession = Depends(get_session)):
         """Rota canônica (M-18): cria e enfileira uma nova run."""
         return await _create_run_impl(payload, session)
+
+    @app.get(
+        "/api/v1/auth/me",
+        response_model=AuthMeResponse,
+        tags=["Auth"],
+    )
+    async def auth_me(principal: Principal = Depends(get_current_principal)) -> AuthMeResponse:
+        """Identidade do principal (name + roles) — base do login da SPA."""
+        return AuthMeResponse(name=principal.name, roles=list(principal.roles))
 
     @app.post(
         "/api/runs",

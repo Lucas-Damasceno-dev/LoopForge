@@ -138,6 +138,43 @@ def _resolve_principal(key: str | None, settings: APISettings) -> Principal | No
     return _key_store(settings).get(key)
 
 
+def _principal_from_request(
+    request: Request,
+    credentials: HTTPBasicCredentials | None,
+    api_key_header: str | None,
+    settings: APISettings,
+) -> Principal | None:
+    """Resolve o principal de headers (X-API-Key → Basic), ou None."""
+    principal = _resolve_principal(api_key_header, settings)
+    if principal is None and credentials is not None:
+        principal = _resolve_principal(credentials.username, settings)
+        if principal is None:
+            principal = _resolve_principal(credentials.password, settings)
+    return principal
+
+
+def get_current_principal(
+    request: Request,
+    credentials: HTTPBasicCredentials | None = Security(security_basic),
+    api_key_header: str | None = Security(security_api_key),
+) -> Principal:
+    """Dependency: principal autenticado (401 se auth ativa e inválido).
+
+    Auth desativada → principal anônimo admin (BC: a UI assume admin).
+    """
+    settings = APISettings()
+    if not _auth_enabled(settings):
+        return Principal(name="anonymous", roles=("admin",))
+    principal = _principal_from_request(request, credentials, api_key_header, settings)
+    if principal is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas ou ausentes.",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return principal
+
+
 def get_principal(api_key: str | None, settings: APISettings | None = None) -> Principal | None:
     """Helper público: resolve uma API key para o Principal (name + roles)."""
     return _resolve_principal(api_key, settings or APISettings())
@@ -150,25 +187,15 @@ def verify_authentication(
 ) -> bool:
     """Verifica autenticação (Basic ou X-API-Key) e aplica RBAC por método+path."""
     settings = APISettings()
-
     if not _auth_enabled(settings):
         return True
-
-    # Resolve o principal: header X-API-Key primeiro; Basic aceita key no
-    # username ou password (BC legado).
-    principal = _resolve_principal(api_key_header, settings)
-    if principal is None and credentials is not None:
-        principal = _resolve_principal(credentials.username, settings)
-        if principal is None:
-            principal = _resolve_principal(credentials.password, settings)
-
+    principal = _principal_from_request(request, credentials, api_key_header, settings)
     if principal is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais inválidas ou ausentes.",
             headers={"WWW-Authenticate": "Basic"},
         )
-
     required = _required_role(request.method, request.url.path)
     if not principal.has_role(required):
         raise HTTPException(
@@ -178,5 +205,4 @@ def verify_authentication(
                 f"{request.method} {request.url.path} (principal '{principal.name}')."
             ),
         )
-
     return True

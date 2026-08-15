@@ -307,3 +307,10 @@ class SaveDockerConfigResponse(BaseModel):
     success: bool
     saved_files: list[str] = Field(default_factory=list)
     message: str
+
+
+class AuthMeResponse(BaseModel):
+    """GET /api/v1/auth/me — identidade do principal autenticado."""
+
+    name: str
+    roles: list[str]
