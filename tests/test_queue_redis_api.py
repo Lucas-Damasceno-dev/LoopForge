@@ -12,7 +12,6 @@ from httpx import ASGITransport, AsyncClient
 
 import lf.api.queue as queue_mod
 from lf.api.app import create_app
-from lf.api.config import APISettings
 from lf.api.database import close_db, init_db
 
 

@@ -117,6 +117,22 @@ plan:
 | `LF_API_HOST` | `0.0.0.0` | Host do servidor FastAPI (`lf serve`) |
 | `LF_API_PORT` | `8000` | Porta do servidor FastAPI |
 | `LF_API_KEY` | — | API key exigida pela API (X-API-Key / HTTP Basic) |
+| `LF_QUEUE_BACKEND` | `memory` | Fila de execução: `memory` (single-process, BC) ou `redis` (multi-worker) |
+| `LF_REDIS_URL` | `redis://localhost:6379` | URL do Redis quando `LF_QUEUE_BACKEND=redis` |
+
+### Operação multi-worker
+
+Para escalar horizontalmente com `--workers > 1`, a fila, os eventos WebSocket e o rate limit precisam ser globais — isso exige Redis:
+
+```bash
+export LF_QUEUE_BACKEND=redis
+export LF_REDIS_URL=redis://localhost:6379
+lf serve --workers 2 --port 8000
+```
+
+- `lf serve --workers N` valida: `workers > 1` exige `LF_QUEUE_BACKEND=redis`; `--reload` é incompatível com `--workers > 1`.
+- Com `docker compose up -d`, o serviço `redis` (imagem `redis:7-alpine`, volume `redis_data`) sobe junto e o app aponta para `redis://redis:6379` por padrão.
+- Cada worker promove runs da fila global (máx. `runner.max_concurrent_runs` ativas no total), renova leases via heartbeat e entrega eventos WS apenas aos clientes conectados nele próprio (broadcast cross-worker via canal `lf:events`). Cancelamento de run é propagado entre workers via canal `lf:cancel`.
 
 ### OmniRoute (proxy local)
 
@@ -158,6 +174,10 @@ OPENCODE_MODEL=opencode/deepseek-v4-flash-free
 LF_API_HOST=0.0.0.0
 LF_API_PORT=8000
 LF_API_KEY=
+
+# Multi-worker (fila global)
+# LF_QUEUE_BACKEND=memory   # memory (single-process, BC) | redis (multi-worker)
+# LF_REDIS_URL=redis://localhost:6379
 ```
 
 ---

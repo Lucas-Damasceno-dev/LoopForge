@@ -1,6 +1,5 @@
 """Validação de --workers no lf serve (multi-processo exige fila redis)."""
 
-import pytest
 from click.testing import CliRunner
 
 from lf.cli.commands.serve import serve_cmd

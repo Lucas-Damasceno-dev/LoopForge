@@ -6,7 +6,6 @@ import contextlib
 import json
 
 import pytest
-import pytest_asyncio
 from fakeredis import FakeAsyncRedis
 
 from lf.api.app import _events_forwarder, create_app

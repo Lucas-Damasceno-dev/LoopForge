@@ -1,7 +1,5 @@
 """Rate limit global via Redis (ZSET) quando configurado; in-memory sem."""
 
-import asyncio
-
 import pytest
 from fakeredis import FakeAsyncRedis
 
