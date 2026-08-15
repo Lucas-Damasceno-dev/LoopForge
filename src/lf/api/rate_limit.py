@@ -86,7 +86,10 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        now = time.monotonic()
+        # Redis: score do ZSET precisa de wall-clock (time.time) — monotonic
+        # tem base por-processo e seria incomparável entre workers. In-memory
+        # (single-process) segue com monotonic (BC).
+        now = time.time() if self.redis is not None else time.monotonic()
         key = self._client_key(scope)
         allowed, retry_after = await self._check_window(key, now)
         if not allowed:
