@@ -102,6 +102,12 @@ async def test_execute_and_resume_existing_run(monkeypatch, client: AsyncClient)
 
 @pytest.mark.asyncio
 async def test_record_human_decision_dispara_broadcast(monkeypatch, client: AsyncClient):
+    """Contrato B1 (A1): decide fora de gate pendente é REJEITADO com 409.
+
+    Run criada mock SEM interactive → termina sem gate; o POST /decide não
+    registra decisão nem emite human_decision_submitted (antes aceitava
+    qualquer coisa com 201 — bug do audit).
+    """
     run_resp = await client.post("/api/runs", json={"idea": "decisao"})
     run_id = run_resp.json()["id"]
     broadcast = AsyncMock()
@@ -114,8 +120,19 @@ async def test_record_human_decision_dispara_broadcast(monkeypatch, client: Asyn
         "user": "tester",
     }
     resp = await client.post(f"/api/runs/{run_id}/decide", json=payload)
-    assert resp.status_code == 201
-    assert broadcast.await_count >= 1
+    # 409: run sem gate pendente (completed/inexistente) não aceita decisão.
+    assert resp.status_code == 409
+    detail = str(resp.json()["detail"])
+    assert "não aceita decisões" in detail or "no pending decision" in detail
+    assert broadcast.await_count == 0
+
+    # Run inexistente → 404 (e nada broadcastado).
+    nf = await client.post(
+        f"/api/runs/{'nao-existe'}/decide",
+        json={"gate_node": "qa", "action": "approve"},
+    )
+    assert nf.status_code == 404
+    assert broadcast.await_count == 0
 
 
 def test_websocket_auth_rejeita_token_invalido():
