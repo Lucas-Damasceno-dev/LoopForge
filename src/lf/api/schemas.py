@@ -16,6 +16,13 @@ class RunCreate(BaseModel):
     interactive: bool = Field(False, description="Pausar após nós para aprovação humana (HITL)")
     model: str | None = Field(None, description="Modelo LLM override para a run (vence env/config)")
     pipeline_id: str | None = Field(None, description="Pipeline a executar; ausente = montagem automática atual")
+    # S3: override do snapshot do pipeline (válido no create). Ausente =
+    # deriva do template (pipeline_id) ou montagem automática. Validação
+    # semântica via validate_pipeline — 422 se inválido.
+    snapshot: dict | None = Field(
+        None,
+        description="Snapshot do pipeline (name/description/nodes/edges) — override no create",
+    )
 
 
 class RunUpdate(BaseModel):
@@ -44,6 +51,12 @@ class RunResponse(BaseModel):
     # via join no read (None se o template foi deletado).
     pipeline_id: str | None = None
     pipeline_name: str | None = None
+    # S3: snapshot imutável da run (pipeline_snapshot do PipelineRun) — a UI
+    # mostra no detail o que foi executado de fato. Aditivo.
+    # validation_alias: o ORM grava em `pipeline_snapshot`; RunResponse é
+    # construído via model_validate(run) (from_attributes) — o alias garante
+    # o mapeamento, mantendo o nome público `snapshot`.
+    snapshot: dict | None = Field(default=None, validation_alias="pipeline_snapshot")
     created_at: datetime
     updated_at: datetime
 

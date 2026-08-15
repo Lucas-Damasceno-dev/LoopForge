@@ -322,7 +322,18 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         )
 
         pipeline_snapshot: dict | None = None
-        if payload.pipeline_id:
+        if payload.snapshot is not None:
+            # Override do usuário no create-run: valida como pipeline real.
+            pipeline = PipelineBase.model_validate(payload.snapshot)
+            agents_result = await session.execute(select(AgentTemplate.id))
+            known_agents = {row[0] for row in agents_result.all()} | SPECIAL_AGENT_IDS
+            errors = validate_pipeline(pipeline, known_agents)
+            if errors:
+                raise HTTPException(status_code=422, detail=f"snapshot invalid: {', '.join(errors)}")
+            pipeline_snapshot = pipeline.model_dump()
+            if payload.pipeline_id:
+                run.pipeline_id = payload.pipeline_id
+        elif payload.pipeline_id:
             template = await session.get(PipelineTemplate, payload.pipeline_id)
             if template is None:
                 raise HTTPException(status_code=404, detail="Pipeline not found")
