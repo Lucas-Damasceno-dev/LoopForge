@@ -684,9 +684,8 @@ class TaskDispatcher:
             now_iso = datetime.now(UTC).isoformat()
             patch_json = json.dumps(state_patch, ensure_ascii=False) if state_patch else None
             cursor.execute(
-                "INSERT INTO human_decisions "
-                "(id, run_id, gate_node, action, feedback_category, feedback_message, user, timestamp, state_patch, consumed) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+                "INSERT INTO human_decisions (id, run_id, gate_node, action, feedback_category, "
+                "feedback_message, user, timestamp, state_patch, consumed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
                 (decision_id, run_id, gate_node, action, category, message, "human_operator", now_iso, patch_json),
             )
             conn.commit()
@@ -1075,7 +1074,7 @@ class TaskDispatcher:
             raw_choice = self._get_single_key_with_timeout(prompt_text, poll_interval)
             prompt_text = ""
             if raw_choice == "d":
-                self._render_hitl_diff(state)
+                self._render_hitl_diff_preview(state)
                 prompt_text = "\n➜ Escolha [c/r/a/d/x] (default: c): "
                 continue
             if raw_choice in ("c", "r", "a", "x"):
@@ -1542,6 +1541,9 @@ class TaskDispatcher:
             return result
 
         except Exception as e:
+            # Item 1: traceback completo no log — a causa raiz da falha não
+            # deve depender só do evento pipeline_error (sem stack).
+            logger.exception("Falha na execução da pipeline (thread=%s, run=%s)", thread_id, pipeline_run_id)
             self._upsert_pipeline_run(
                 pipeline_run_id,
                 "failed",
@@ -1719,6 +1721,8 @@ class TaskDispatcher:
             return result
 
         except Exception as e:
+            # Item 1: gate/execução HITL — traceback no log (thread/run).
+            logger.exception("Falha na execução HITL (thread=%s, run=%s)", thread_id, pipeline_run_id)
             self._upsert_pipeline_run(
                 pipeline_run_id,
                 "failed",
@@ -1796,9 +1800,7 @@ class TaskDispatcher:
         if not remote:
             if self.hitl_on_timeout == "abort":
                 console = Console()
-                console.print(
-                    f"\n[red]⏰ Tempo limite esgotado no resume (on_timeout=abort): abortando pipeline.[/red]"
-                )
+                console.print("\n[red]⏰ Tempo limite esgotado no resume (on_timeout=abort): abortando pipeline.[/red]")
                 await graph.aupdate_state(
                     config, {"error": "HITL timeout sem decisão no resume — abortado (on_timeout=abort)."}
                 )
@@ -2037,6 +2039,8 @@ class TaskDispatcher:
             return result
 
         except Exception as e:
+            # Item 1: falha no resume — traceback no log (thread/run).
+            logger.exception("Falha no resume (thread=%s, run=%s)", thread_id, pipeline_run_id)
             self._upsert_pipeline_run(
                 pipeline_run_id,
                 "failed",

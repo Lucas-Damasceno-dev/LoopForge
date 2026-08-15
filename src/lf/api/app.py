@@ -55,6 +55,10 @@ from lf.api.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
+# Heartbeat app-level do WebSocket (item 2): sem mensagens por este intervalo,
+# o servidor envia {"type":"ping"} — o frontend responde {"type":"pong"}.
+WS_HEARTBEAT_INTERVAL = 30.0
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -283,9 +287,19 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
                 websocket,
             )
             while True:
-                data = await websocket.receive_json()
+                # Heartbeat app-level (item 2): sem mensagens por ~30s (socket
+                # meio-aberto/rede parcial), o servidor envia {"type":"ping"} —
+                # o frontend responde {"type":"pong"} (contrato combinado). A
+                # escrita é única: este loop é o único writer do socket no
+                # endpoint (pong de resposta + heartbeat).
+                try:
+                    data = await asyncio.wait_for(websocket.receive_json(), timeout=WS_HEARTBEAT_INTERVAL)
+                except TimeoutError:
+                    await ws_manager.send_personal_message({"type": "ping"}, websocket)
+                    continue
                 if data.get("type") == "ping":
                     await ws_manager.send_personal_message({"type": "pong"}, websocket)
+                # "pong" = ack do heartbeat do servidor — sem resposta (evita loop).
         except WebSocketDisconnect:
             ws_manager.disconnect(run_id, websocket)
         except Exception:
@@ -782,7 +796,6 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
             # na mesma transação. Atomicidade é obrigatória: o polling do gate
             # roda a cada 0.5s e, se a linha fosse visível com state_patch NULL
             # antes do UPDATE, a decisão era consumida sem o patch (race real).
-            db_path = _telemetry_db_path()
             await session.flush()  # atribui decision.id (default _generate_uuid)
             await session.execute(
                 text("UPDATE human_decisions SET state_patch = :sp WHERE id = :id"),
@@ -1413,6 +1426,9 @@ async def _run_pipeline(
     except Exception as e:
         error = str(e)
         duration = round(time.time() - start_time, 2)
+        # Traceback no log (item 1): a causa raiz da falha da run não pode
+        # depender do GET /runs/{id}/logs — o operador precisa do stack.
+        logger.exception("Erro na execução da pipeline (run_id=%s)", run_id)
         await _set_run_status(
             run_id,
             "failed",

@@ -1,10 +1,13 @@
 name: spa drift + smoke install
 
+# Drift-check + smoke install valem também na branch principal (o ci.yml
+# já roda em main/master; aqui garantimos que o dist da SPA nunca seja
+# versionado no git do engine também fora da branch da ADE).
 on:
   push:
-    branches: [feature/ade-fase-a]
+    branches: [main, master, feature/ade-fase-a]
   pull_request:
-    branches: [feature/ade-fase-a]
+    branches: [main, master, feature/ade-fase-a]
 
 jobs:
   spa-drift:

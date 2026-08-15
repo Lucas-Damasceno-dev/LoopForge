@@ -155,3 +155,25 @@ def test_websocket_ping_pong():
             ws.send_json({"type": "ping"})
             pong = ws.receive_json()
             assert pong["type"] == "pong"
+
+
+def test_websocket_heartbeat_ping(monkeypatch):
+    """Heartbeat app-level (item 2): socket ocioso recebe {'type':'ping'}.
+
+    O intervalo é reduzido via monkeypatch para o teste não esperar 30s; o
+    frontend responde {'type':'pong'} (ignorado pelo servidor — sem loop).
+    """
+    os.environ["LF_API_REQUIRE_AUTH"] = "false"
+    from lf.api.app import WS_HEARTBEAT_INTERVAL
+
+    monkeypatch.setattr("lf.api.app.WS_HEARTBEAT_INTERVAL", 0.2)
+    assert WS_HEARTBEAT_INTERVAL == 30.0  # default prod preservado
+    app = create_app()
+    with TestClient(app) as tc:
+        with tc.websocket_connect("/ws/runs/abc") as ws:
+            msg = ws.receive_json()
+            assert msg["event"] == "connected"
+            # Sem mensagens do cliente → servidor envia ping do heartbeat.
+            ping = ws.receive_json()
+            assert ping == {"type": "ping"}
+            ws.send_json({"type": "pong"})
