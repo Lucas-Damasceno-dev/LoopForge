@@ -1,4 +1,5 @@
 """Comando oficial CLI 'lf serve' para subir a API REST, WebSockets e Dashboard Web UI."""
+
 import os
 import secrets
 
@@ -14,8 +15,13 @@ console = Console()
 @click.option("--port", default=8000, type=int, help="Porta HTTP (padrão: 8000)")
 @click.option("--reload", is_flag=True, help="Ativa modo auto-reload para desenvolvimento")
 @click.option("--no-ui", is_flag=True, help="Não serve dashboard/SPA, apenas a API")
-def serve_cmd(host: str, port: int, reload: bool, no_ui: bool):
+@click.option("--workers", default=1, type=int, help="Número de workers (multi-processo exige LF_QUEUE_BACKEND=redis)")
+def serve_cmd(host: str, port: int, reload: bool, no_ui: bool, workers: int):
     """Inicia o servidor de API REST, WebSockets e Web Dashboard do LoopForge v6."""
+    if workers > 1 and os.environ.get("LF_QUEUE_BACKEND") != "redis":
+        raise click.ClickException("--workers > 1 exige LF_QUEUE_BACKEND=redis (fila/eventos/rate-limit globais).")
+    if reload and workers > 1:
+        raise click.ClickException("--reload é incompatível com --workers > 1.")
     api_key = os.getenv("LF_API_API_KEY") or os.getenv("LF_API_KEY")
     if not api_key:
         api_key = secrets.token_hex(16)
@@ -32,9 +38,10 @@ def serve_cmd(host: str, port: int, reload: bool, no_ui: bool):
         os.environ["LF_UI_ENABLED"] = "0"
 
     uvicorn.run(
-        "lf.api.app:create_app",
+        app="lf.api.app:create_app",
         factory=True,
         host=host,
         port=port,
         reload=reload,
+        workers=workers,
     )

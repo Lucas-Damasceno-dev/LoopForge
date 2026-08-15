@@ -1,9 +1,19 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: loopforge_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
   loopforge:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: loopforge_engine
+    depends_on:
+      - redis
     ports:
       - "8000:8000"
     environment:
@@ -11,6 +21,8 @@ services:
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-inclusionai/ling-3.0-flash:free}
       - LF_API_HOST=0.0.0.0
       - LF_API_PORT=8000
+      - LF_QUEUE_BACKEND=${LF_QUEUE_BACKEND:-memory}
+      - LF_REDIS_URL=${LF_REDIS_URL:-redis://redis:6379}
     volumes:
       - loopforge_data:/app/.loopforge
     restart: unless-stopped
@@ -22,4 +34,6 @@ services:
 
 volumes:
   loopforge_data:
+    driver: local
+  redis_data:
     driver: local

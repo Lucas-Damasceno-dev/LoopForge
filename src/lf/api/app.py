@@ -81,8 +81,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.queue_worker = asyncio.create_task(_queue_worker_loop(app))
         event_bus.configure_redis(app.state.run_queue.redis)
         app.state.events_worker = asyncio.create_task(_events_forwarder(app))
+        app.state.cancel_worker = asyncio.create_task(_cancel_listener(app))
     yield
-    for name in ("events_worker", "queue_worker"):
+    for name in ("events_worker", "queue_worker", "cancel_worker"):
         worker = getattr(app.state, name, None)
         if worker is not None:
             worker.cancel()
@@ -217,6 +218,7 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
     # Local do processo: cada worker promove e executa localmente (redis).
     app.state.run_tasks = {}  # dict[str, asyncio.Task]
     app.state.queue_worker = None  # task do worker loop (redis)
+    app.state.cancel_worker = None  # task do listener de lf:cancel (redis)
 
     # ─── Middleware: CORS (M-04) ───────────────────────────────────
     # Origens de LF_CORS_ORIGINS (vírgula) ou default ["*"]. Wildcard não
@@ -900,6 +902,13 @@ def create_app(ui_enabled: bool | None = None) -> FastAPI:
         await q.remove_pending(run_id)
         await q.release(run_id)
 
+        # C8 multi-worker: a task roda no worker que promoveu a run. Publica
+        # lf:cancel — cada worker cancela a task local se tiver no run_tasks.
+        from lf.api.queue import RedisQueue
+
+        if isinstance(q, RedisQueue):
+            await q.redis.publish("lf:cancel", run_id)
+
         # C8: cancela a task asyncio correspondente (se em execução). O finally
         # de _run_pipeline libera a vaga e promove a próxima da fila.
         task = getattr(app.state, "run_tasks", {}).get(run_id)
@@ -1279,6 +1288,31 @@ async def _events_forwarder(app: FastAPI) -> None:
             await ws_manager.broadcast(data)
     finally:
         await pubsub.unsubscribe("lf:events")
+
+
+async def _cancel_listener(app: FastAPI) -> None:
+    """Escuta lf:cancel e cancela a task local da run (C8 multi-worker).
+
+    O cancel foi disparado em outro worker (que removeu pending/active e
+    publicou o canal); aqui cada worker cancela a task LOCAL do run_tasks
+    se a run estiver executando neste processo.
+    """
+    q = app.state.run_queue
+    pubsub = q.redis.pubsub()
+    await pubsub.subscribe("lf:cancel")
+    try:
+        while True:
+            msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if msg is None:
+                continue
+            rid = msg["data"]
+            if isinstance(rid, bytes):
+                rid = rid.decode()
+            task = app.state.run_tasks.get(rid)
+            if task is not None and not task.done():
+                task.cancel()
+    finally:
+        await pubsub.unsubscribe("lf:cancel")
 
 
 async def _checkpoint_next_nodes(thread_id: str) -> list[str]:
