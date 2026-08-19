@@ -28,12 +28,21 @@ _FORBIDDEN_COMMANDS = {
 
 
 def _find_run_dir(run_id: str) -> Path | None:
-    d1 = Path(f"/tmp/loopforge/run_{run_id}")
-    if d1.exists() and d1.is_dir():
-        return d1
-    d2 = Path(f".loopforge/worktrees/run_{run_id}")
-    if d2.exists() and d2.is_dir():
-        return d2
+    candidates = [
+        Path(f".slim/worktrees/run_{run_id}"),
+        Path(f".slim/worktrees/{run_id}"),
+        Path(f"/tmp/loopforge/run_{run_id}"),
+        Path(f"/tmp/loopforge/{run_id}"),
+        Path(f".loopforge/worktrees/run_{run_id}"),
+    ]
+    for c in candidates:
+        if c.exists() and c.is_dir():
+            return c
+    wt_base = Path(".slim/worktrees")
+    if wt_base.exists() and wt_base.is_dir():
+        for item in wt_base.iterdir():
+            if item.is_dir() and (item.name.startswith(f"task-{run_id[:8]}") or item.name.startswith(run_id[:8])):
+                return item
     return None
 
 

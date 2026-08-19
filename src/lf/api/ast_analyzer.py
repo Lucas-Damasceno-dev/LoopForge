@@ -22,22 +22,67 @@ logger = logging.getLogger(__name__)
 
 ast_router = APIRouter(prefix="/api/v1/ast", tags=["AST & Dependencies"])
 
-_SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", ".ruff_cache", ".genome", ".registry", "node_modules", "dist", "build", ".venv"}
+_SKIP_DIRS = {
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".genome",
+    ".registry",
+    "node_modules",
+    "dist",
+    "build",
+    ".venv",
+}
 
 _PY_STD_LIBS = {
-    "sys", "os", "io", "re", "json", "math", "random", "time", "datetime", "typing", "collections",
-    "functools", "itertools", "pathlib", "sqlite3", "asyncio", "logging", "unittest", "shutil",
-    "dataclasses", "enum", "uuid", "copy", "socket", "http", "urllib", "threading", "subprocess",
+    "sys",
+    "os",
+    "io",
+    "re",
+    "json",
+    "math",
+    "random",
+    "time",
+    "datetime",
+    "typing",
+    "collections",
+    "functools",
+    "itertools",
+    "pathlib",
+    "sqlite3",
+    "asyncio",
+    "logging",
+    "unittest",
+    "shutil",
+    "dataclasses",
+    "enum",
+    "uuid",
+    "copy",
+    "socket",
+    "http",
+    "urllib",
+    "threading",
+    "subprocess",
 }
 
 
 def _find_run_dir(run_id: str) -> Path | None:
-    d1 = Path(f"/tmp/loopforge/run_{run_id}")
-    if d1.exists() and d1.is_dir():
-        return d1
-    d2 = Path(f".loopforge/worktrees/run_{run_id}")
-    if d2.exists() and d2.is_dir():
-        return d2
+    candidates = [
+        Path(f".slim/worktrees/run_{run_id}"),
+        Path(f".slim/worktrees/{run_id}"),
+        Path(f"/tmp/loopforge/run_{run_id}"),
+        Path(f"/tmp/loopforge/{run_id}"),
+        Path(f".loopforge/worktrees/run_{run_id}"),
+    ]
+    for c in candidates:
+        if c.exists() and c.is_dir():
+            return c
+    wt_base = Path(".slim/worktrees")
+    if wt_base.exists() and wt_base.is_dir():
+        for item in wt_base.iterdir():
+            if item.is_dir() and (item.name.startswith(f"task-{run_id[:8]}") or item.name.startswith(run_id[:8])):
+                return item
     return None
 
 
@@ -51,21 +96,25 @@ def _analyze_python_file(rel_path: str, content: str) -> AstModuleInfo:
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 doc = ast.get_docstring(node)
-                symbols.append(AstSymbolInfo(
-                    name=node.name,
-                    kind="class",
-                    line_number=node.lineno,
-                    docstring=doc[:120] if doc else None,
-                ))
+                symbols.append(
+                    AstSymbolInfo(
+                        name=node.name,
+                        kind="class",
+                        line_number=node.lineno,
+                        docstring=doc[:120] if doc else None,
+                    )
+                )
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 doc = ast.get_docstring(node)
                 kind = "async_function" if isinstance(node, ast.AsyncFunctionDef) else "function"
-                symbols.append(AstSymbolInfo(
-                    name=node.name,
-                    kind=kind,
-                    line_number=node.lineno,
-                    docstring=doc[:120] if doc else None,
-                ))
+                symbols.append(
+                    AstSymbolInfo(
+                        name=node.name,
+                        kind=kind,
+                        line_number=node.lineno,
+                        docstring=doc[:120] if doc else None,
+                    )
+                )
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.append(alias.name)
@@ -104,7 +153,12 @@ def _analyze_generic_file(rel_path: str, content: str, lang: str) -> AstModuleIn
     for idx, line in enumerate(lines, start=1):
         sline = line.strip()
         # Imports
-        if sline.startswith("import ") or sline.startswith("from ") or sline.startswith("use ") or sline.startswith("require("):
+        if (
+            sline.startswith("import ")
+            or sline.startswith("from ")
+            or sline.startswith("use ")
+            or sline.startswith("require(")
+        ):
             match = re.search(r"['\"]([^'\"]+)['\"]", sline)
             if match:
                 imports.append(match.group(1))

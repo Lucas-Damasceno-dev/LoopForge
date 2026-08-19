@@ -18,16 +18,36 @@ logger = logging.getLogger(__name__)
 
 coverage_router = APIRouter(prefix="/api/v1/coverage", tags=["Coverage"])
 
-_SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", ".ruff_cache", ".genome", ".registry", "node_modules", "dist", "build", ".venv"}
+_SKIP_DIRS = {
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".genome",
+    ".registry",
+    "node_modules",
+    "dist",
+    "build",
+    ".venv",
+}
 
 
 def _find_run_dir(run_id: str) -> Path | None:
-    d1 = Path(f"/tmp/loopforge/run_{run_id}")
-    if d1.exists() and d1.is_dir():
-        return d1
-    d2 = Path(f".loopforge/worktrees/run_{run_id}")
-    if d2.exists() and d2.is_dir():
-        return d2
+    candidates = [
+        Path(f".slim/worktrees/run_{run_id}"),
+        Path(f".slim/worktrees/{run_id}"),
+        Path(f"/tmp/loopforge/run_{run_id}"),
+        Path(f"/tmp/loopforge/{run_id}"),
+        Path(f".loopforge/worktrees/run_{run_id}"),
+    ]
+    for c in candidates:
+        if c.exists() and c.is_dir():
+            return c
+    wt_base = Path(".slim/worktrees")
+    if wt_base.exists() and wt_base.is_dir():
+        for item in wt_base.iterdir():
+            if item.is_dir() and (item.name.startswith(f"task-{run_id[:8]}") or item.name.startswith(run_id[:8])):
+                return item
     return None
 
 
@@ -45,13 +65,15 @@ def _parse_cobertura_xml(xml_path: Path, run_dir: Path) -> list[FileCoverageItem
             covered = sum(1 for line in lines if int(line.attrib.get("hits", 0)) > 0)
             missed = total - covered
             pct = round((covered / total * 100), 1) if total > 0 else 100.0
-            items.append(FileCoverageItem(
-                file_path=filename,
-                total_lines=total,
-                covered_lines=covered,
-                missed_lines=missed,
-                percentage=pct,
-            ))
+            items.append(
+                FileCoverageItem(
+                    file_path=filename,
+                    total_lines=total,
+                    covered_lines=covered,
+                    missed_lines=missed,
+                    percentage=pct,
+                )
+            )
     except Exception as exc:
         logger.warning("Erro ao processar cobertura XML %s: %s", xml_path, exc)
     return items
@@ -68,13 +90,15 @@ def _parse_coverage_json(json_path: Path) -> list[FileCoverageItem]:
             covered_statements = summary.get("covered_statements", 0)
             missing = summary.get("missing_lines", 0)
             pct = summary.get("percent_covered", 0.0)
-            items.append(FileCoverageItem(
-                file_path=filepath,
-                total_lines=num_statements,
-                covered_lines=covered_statements,
-                missed_lines=missing,
-                percentage=round(float(pct), 1),
-            ))
+            items.append(
+                FileCoverageItem(
+                    file_path=filepath,
+                    total_lines=num_statements,
+                    covered_lines=covered_statements,
+                    missed_lines=missing,
+                    percentage=round(float(pct), 1),
+                )
+            )
     except Exception as exc:
         logger.warning("Erro ao processar cobertura JSON %s: %s", json_path, exc)
     return items
@@ -109,13 +133,15 @@ def _compute_heuristic_coverage(run_dir: Path) -> list[FileCoverageItem]:
             covered = int(total * 0.85) if has_test_files else int(total * 0.4)
             missed = total - covered
             pct = round((covered / total * 100), 1)
-            items.append(FileCoverageItem(
-                file_path=rel,
-                total_lines=total,
-                covered_lines=covered,
-                missed_lines=missed,
-                percentage=pct,
-            ))
+            items.append(
+                FileCoverageItem(
+                    file_path=rel,
+                    total_lines=total,
+                    covered_lines=covered,
+                    missed_lines=missed,
+                    percentage=pct,
+                )
+            )
         except Exception:
             pass
 
