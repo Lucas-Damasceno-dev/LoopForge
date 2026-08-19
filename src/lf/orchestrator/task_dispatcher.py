@@ -313,15 +313,16 @@ class TaskDispatcher:
             return None
         from lf.runner.git.sandbox import GitSandbox
 
-        # Repo candidato: project_dir se for caminho real != "."; senão cwd.
+        # Repo candidato: project_dir se for caminho real != "." e for repo git; senão cwd se for git repo.
         project_dir = str(initial_state.get("project_dir") or ".")
-        if project_dir != "." and Path(project_dir).is_dir():
+        repo = None
+        if project_dir != "." and Path(project_dir).is_dir() and GitSandbox.is_git_repo(Path(project_dir)):
             repo = Path(project_dir).resolve()
-        else:
+        elif GitSandbox.is_git_repo(Path(os.getcwd())):
             repo = Path(os.getcwd()).resolve()
 
-        if not GitSandbox.is_git_repo(repo):
-            logger.debug("Sandbox: '%s' não é repo git válido — execução sem isolamento.", repo)
+        if repo is None:
+            logger.debug("Sandbox: nenhum repo git válido encontrado — execução sem isolamento.")
             return None
 
         # Dogfooding: nunca isolar o próprio repo LoopForge.
