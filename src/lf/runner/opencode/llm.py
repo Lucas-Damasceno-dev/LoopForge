@@ -244,6 +244,12 @@ def call_llm_via_opencode(
     """
     model_to_use = model or os.environ.get("OPENCODE_MODEL", DEFAULT_OPENCODE_MODEL)
 
+    if on_token_delta is None and run_id and node:
+        from ...pipeline.llm_factory import TokenDeltaPublisher
+
+        clean_run_id = str(run_id)[len("run-") :] if str(run_id).startswith("run-") else str(run_id)
+        on_token_delta = TokenDeltaPublisher(clean_run_id, str(node))
+
     full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
     # Cache check
