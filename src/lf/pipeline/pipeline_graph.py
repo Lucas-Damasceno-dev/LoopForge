@@ -64,9 +64,11 @@ def _attempt_counter(node: Callable) -> Callable:
 
 
 def _retry_router(max_retries: int, retry_target: str, next_target: str) -> Callable:
-    """Router de retry: enquanto ``attempt_count < max_retries`` volta ao fonte."""
+    """Router de retry: enquanto ``attempt_count < max_retries`` e sem doom-loop volta ao fonte."""
 
     def router(state: GraphState) -> str:
+        if state.get("doom_loop_detected"):
+            return next_target
         attempts = int(state.get("attempt_count", 0))
         return retry_target if attempts < max_retries else next_target
 

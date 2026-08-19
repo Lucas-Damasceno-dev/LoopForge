@@ -17,6 +17,17 @@ from typing import Any, cast
 from ...pipeline.state import GraphState
 
 
+def compute_qa_fingerprint(code: str, test_report: dict) -> str:
+    """Calcula hash SHA256 da iteração (código + falhas de teste) para detecção de estagnação."""
+    import hashlib
+
+    summary = test_report.get("summary", {}) if isinstance(test_report, dict) else {}
+    failed_tests = summary.get("tests_failed", 0)
+    errors = summary.get("errors", [])
+    raw = f"code_len:{len(code)}|code_hash:{hashlib.sha256(code.encode()).hexdigest()[:16]}|failed:{failed_tests}|errors:{errors}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 def qa(state: GraphState) -> dict:
     """Analisa código gerado, executa testes e gera relatório."""
     print("---EXECUTANDO NÓ: QA---")
@@ -283,12 +294,28 @@ def qa(state: GraphState) -> dict:
             "test_scope": "slice",
         }
 
+    fingerprints = list(state.get("retry_fingerprints", []) or [])
+    doom_detected = False
+    doom_reason = None
+    if not is_pass:
+        fp = compute_qa_fingerprint(code, report)
+        fingerprints.append(fp)
+        if len(fingerprints) >= 2 and fingerprints[-1] == fingerprints[-2]:
+            doom_detected = True
+            doom_reason = (
+                "Doom-Loop detectado: 2 tentativas consecutivas produziram o mesmo erro sem alteração no código."
+            )
+            print(f"--- AVISO: {doom_reason} ---")
+
     return {
         **state,
         "test_report": report,
         "qa_attempt_count": qa_attempt,
         "feedback_history": new_feedback,
         "next_agent": next_agent,
+        "retry_fingerprints": fingerprints,
+        "doom_loop_detected": doom_detected or bool(state.get("doom_loop_detected")),
+        "doom_loop_reason": doom_reason or state.get("doom_loop_reason"),
         **slice_payload_out,
     }
 

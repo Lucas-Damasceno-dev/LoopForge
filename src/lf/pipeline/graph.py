@@ -104,6 +104,12 @@ def should_retry(state: GraphState) -> Literal["parallel_audit", "developer", "t
     if tests_failed == 0:
         return "parallel_audit"
 
+    if state.get("doom_loop_detected"):
+        print(
+            f"--- AVISO: {state.get('doom_loop_reason', 'Doom-loop detectado')}. Interrompendo retries automáticos. ---"
+        )
+        return "parallel_audit"
+
     if qa_attempt < max_retries:
         return "developer"
 

@@ -55,6 +55,9 @@ class GraphState(TypedDict):
     max_retries: int
     error: str | None
     feedback_history: list[dict]
+    retry_fingerprints: NotRequired[list[str]]
+    doom_loop_detected: NotRequired[bool]
+    doom_loop_reason: NotRequired[str]
 
     # Fallback degradado — canal honesto de "mock por falha de LLM": os nós
     # setam degraded=True quando caem em resposta mock/heurística por ERRO de
