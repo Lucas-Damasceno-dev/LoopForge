@@ -18,9 +18,12 @@ services:
       - "8000:8000"
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-inclusionai/ling-3.0-flash:free}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-nemotron-3.5-lightning-free}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://opencode.ai/zen/v1}
       - LF_API_HOST=0.0.0.0
       - LF_API_PORT=8000
+      - LF_API_API_KEY=${LF_API_API_KEY:-dev-local-key}
+      - LF_API_RATE_LIMIT_PER_MIN=0
       - LF_QUEUE_BACKEND=${LF_QUEUE_BACKEND:-memory}
       - LF_REDIS_URL=${LF_REDIS_URL:-redis://redis:6379}
     volumes:

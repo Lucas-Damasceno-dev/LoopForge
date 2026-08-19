@@ -30,6 +30,10 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin/lf /usr/local/bin/lf
 COPY . .
 
+# QA harness (TestHarnessRunner) executa pytest no projeto gerado — sem ele,
+# toda run real falha com "comando de teste não encontrado no PATH".
+RUN pip install --no-cache-dir pytest pytest-asyncio
+
 EXPOSE 8000
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
