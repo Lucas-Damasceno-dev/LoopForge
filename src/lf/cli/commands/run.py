@@ -218,6 +218,17 @@ def run_cmd(
         ]
 
     console.print(f"[bold green]⚡ Iniciando LoopForge Run (Sessão ID: {session_id})...[/bold green]")
+    ade_url = f"http://127.0.0.1:8787/app?run={session_id}"
+    from rich.panel import Panel
+
+    console.print(
+        Panel(
+            f"[bold cyan]Acompanhamento em tempo real (ADE):[/bold cyan] [link={ade_url}]{ade_url}[/link]\n"
+            f"[dim]Visualize DAG interativo, streaming de nós, HITL e telemetria na interface web.[/dim]",
+            title="🌐 LoopForge ADE",
+            border_style="cyan",
+        )
+    )
     if complexity_level != "standard":
         console.print(f"[bold magenta]🎯 Nível de Complexidade: {complexity_level.upper()}[/bold magenta]")
     if stack:

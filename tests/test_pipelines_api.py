@@ -193,3 +193,39 @@ async def test_pipelines_requer_auth(tmp_path, monkeypatch):
 
         r = await ac.get("/api/v1/pipelines", headers={"X-API-Key": "env-admin-key-123"})
         assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_pipelines_export_import_sync(client: AsyncClient, tmp_path):
+    """Testa exportação para YAML, importação e sincronização de arquivos em disco."""
+    # 1. Cria pipeline
+    r = await client.post("/api/v1/pipelines", json=_pipeline(name="export_test"))
+    assert r.status_code == 201
+    pipeline_id = r.json()["id"]
+
+    # 2. Exporta em YAML
+    r = await client.get(f"/api/v1/pipelines/{pipeline_id}/export?format=yaml")
+    assert r.status_code == 200
+    assert "name: export_test" in r.text
+
+    # 3. Exporta em JSON
+    r = await client.get(f"/api/v1/pipelines/{pipeline_id}/export?format=json")
+    assert r.status_code == 200
+    assert r.json()["name"] == "export_test"
+
+    # 4. Importa novo pipeline via JSON
+    imported_payload = {
+        "name": "imported_pipeline",
+        "description": "via api",
+        "nodes": [{"id": "n1", "type": "input"}],
+        "edges": [],
+    }
+    r = await client.post("/api/v1/pipelines/import", json=imported_payload)
+    assert r.status_code == 200
+    assert r.json()["name"] == "imported_pipeline"
+
+    # 5. Testa sync do diretório .loopforge/pipelines
+    r = await client.post("/api/v1/pipelines/sync")
+    assert r.status_code == 200
+    assert "synced" in r.json()
+

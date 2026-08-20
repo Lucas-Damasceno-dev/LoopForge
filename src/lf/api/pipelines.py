@@ -189,3 +189,119 @@ async def validate_pipeline_endpoint(
     pipeline = PipelineBase(name=row.name, description=row.description, nodes=row.nodes, edges=row.edges)
     errors = validate_pipeline(pipeline, known_agents)
     return {"valid": not errors, "errors": errors}
+
+
+@pipelines_router.get("/{pipeline_id}/export")
+async def export_pipeline_endpoint(
+    pipeline_id: str,
+    format: Literal["yaml", "json"] = "yaml",
+    save_to_disk: bool = True,
+    session: AsyncSession = Depends(get_session),
+) -> Any:
+    """Exporta o pipeline em formato YAML (padrão) ou JSON, e salva em .loopforge/pipelines/."""
+    from pathlib import Path
+    import json
+    import yaml
+    from fastapi.responses import Response
+
+    row = await session.get(PipelineTemplate, pipeline_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    data = {
+        "name": row.name,
+        "description": row.description,
+        "nodes": row.nodes,
+        "edges": row.edges,
+    }
+
+    if save_to_disk:
+        pipelines_dir = Path(".loopforge/pipelines")
+        pipelines_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{row.name.lower().replace(' ', '_')}.yaml"
+        with open(pipelines_dir / filename, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, sort_keys=False, allow_unicode=True)
+
+    if format == "yaml":
+        yaml_content = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+        return Response(content=yaml_content, media_type="application/x-yaml")
+    return data
+
+
+@pipelines_router.post("/import", response_model=PipelineResponse)
+async def import_pipeline_endpoint(
+    payload: dict[str, Any],
+    session: AsyncSession = Depends(get_session),
+) -> PipelineTemplate:
+    """Importa definição de pipeline (YAML deserializado ou JSON) e persiste no banco."""
+    name = payload.get("name")
+    if not name:
+        raise HTTPException(status_code=422, detail="Pipeline name is required")
+
+    pipeline_create = PipelineCreate(
+        name=name,
+        description=payload.get("description", ""),
+        nodes=payload.get("nodes", []),
+        edges=payload.get("edges", []),
+    )
+
+    existing = await session.execute(select(PipelineTemplate).where(PipelineTemplate.name == name))
+    pipeline = existing.scalar_one_or_none()
+
+    if pipeline is not None:
+        pipeline.description = pipeline_create.description
+        pipeline.nodes = [n.model_dump() for n in pipeline_create.nodes]
+        pipeline.edges = [e.model_dump() for e in pipeline_create.edges]
+    else:
+        pipeline = PipelineTemplate(**pipeline_create.model_dump())
+        session.add(pipeline)
+
+    await session.commit()
+    await session.refresh(pipeline)
+    return pipeline
+
+
+@pipelines_router.post("/sync")
+async def sync_pipelines_from_disk(
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Sincroniza todos os arquivos YAML em .loopforge/pipelines/ com o banco de dados."""
+    from pathlib import Path
+    import yaml
+
+    pipelines_dir = Path(".loopforge/pipelines")
+    if not pipelines_dir.exists():
+        return {"synced": 0, "pipelines": []}
+
+    synced_names: list[str] = []
+    for file_path in pipelines_dir.glob("*.yaml"):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if not isinstance(data, dict) or "name" not in data:
+                continue
+
+            pipeline_create = PipelineCreate(
+                name=data["name"],
+                description=data.get("description", ""),
+                nodes=data.get("nodes", []),
+                edges=data.get("edges", []),
+            )
+
+            existing = await session.execute(select(PipelineTemplate).where(PipelineTemplate.name == data["name"]))
+            pipeline = existing.scalar_one_or_none()
+
+            if pipeline is not None:
+                pipeline.description = pipeline_create.description
+                pipeline.nodes = [n.model_dump() for n in pipeline_create.nodes]
+                pipeline.edges = [e.model_dump() for e in pipeline_create.edges]
+            else:
+                pipeline = PipelineTemplate(**pipeline_create.model_dump())
+                session.add(pipeline)
+
+            synced_names.append(data["name"])
+        except Exception:
+            continue
+
+    await session.commit()
+    return {"synced": len(synced_names), "pipelines": synced_names}
