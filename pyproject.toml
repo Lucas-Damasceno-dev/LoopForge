@@ -54,6 +54,7 @@ lf = "lf.cli.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".", "src", "packages/genome", "packages/registry", "packages/retro"]
 
 [tool.ruff]
 line-length = 120

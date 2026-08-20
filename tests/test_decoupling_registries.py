@@ -2,7 +2,9 @@
 
 import os
 
-from genome import BaseLanguageScanner, GenomeScanner, ModuleInfo
+from genome.core.scanner import GenomeScanner
+from genome.languages.base import BaseLanguageScanner
+from genome.store.models import ModuleInfo
 
 from lf.config.registry import BaseStackHandler, TechStackRegistry
 from lf.config.schema import resolve_tech_stack
