@@ -1,0 +1,1308 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Autonomous Agent Governance and Pipeline Orchestrator">
+      
+      
+        <meta name="author" content="LoopForge Team">
+      
+      
+      
+        <link rel="prev" href="../cli-reference/">
+      
+      
+        <link rel="next" href="../OPENCODE_CONTRACT/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>REST & WebSockets API - LoopForge v6 Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rest-websockets-api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="LoopForge v6 Documentation" class="md-header__button md-logo" aria-label="LoopForge v6 Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LoopForge v6 Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              REST & WebSockets API
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Lucas-Damasceno-dev/LoopForge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../ARCHITECTURE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture & 9-Agent Pipeline
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  REST & WebSockets API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPENCODE_CONTRACT/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  OpenCode Contract
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="LoopForge v6 Documentation" class="md-nav__button md-logo" aria-label="LoopForge v6 Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LoopForge v6 Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Lucas-Damasceno-dev/LoopForge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & 9-Agent Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST & WebSockets API
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST & WebSockets API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#autenticacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autenticação
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints-rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints REST API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Endpoints REST API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sistema-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sistema &amp; Interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execucoes-apiv1runs-canonico-apiruns-alias-legado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execuções (/api/v1/runs — canônico; /api/runs — alias legado)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#human-in-the-loop-apirunsiddecide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human-in-the-Loop (/api/runs/{id}/decide)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trilogia-agentic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trilogia Agentic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#routers-adicionais-apiv1-autenticados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Routers adicionais (/api/v1/..., autenticados)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websockets-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSockets Streaming
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WebSockets Streaming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conexoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conexões
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventos-emitidos-broadcast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Eventos emitidos (broadcast)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#heartbeat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heartbeat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPENCODE_CONTRACT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenCode Contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#autenticacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autenticação
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#endpoints-rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints REST API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Endpoints REST API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sistema-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sistema &amp; Interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execucoes-apiv1runs-canonico-apiruns-alias-legado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execuções (/api/v1/runs — canônico; /api/runs — alias legado)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#human-in-the-loop-apirunsiddecide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human-in-the-Loop (/api/runs/{id}/decide)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trilogia-agentic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trilogia Agentic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#routers-adicionais-apiv1-autenticados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Routers adicionais (/api/v1/..., autenticados)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websockets-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSockets Streaming
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WebSockets Streaming">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conexoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conexões
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eventos-emitidos-broadcast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Eventos emitidos (broadcast)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#heartbeat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heartbeat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="rest-websockets-api-reference">REST &amp; WebSockets API Reference<a class="headerlink" href="#rest-websockets-api-reference" title="Permanent link">&para;</a></h1>
+<p>O servidor REST API e os WebSockets do LoopForge fornecem endpoints para gerenciamento de execuções de pipeline e transmissão de eventos ao vivo em tempo real.</p>
+<hr />
+<h2 id="autenticacao">Autenticação<a class="headerlink" href="#autenticacao" title="Permanent link">&para;</a></h2>
+<p>A autenticação é opcional e configurada via <code>APISettings</code>. Dois métodos suportados:</p>
+<ul>
+<li><strong>X-API-Key</strong>: Header <code>X-API-Key</code> no request</li>
+<li><strong>HTTP Basic</strong>: Username ou password contendo a chave</li>
+</ul>
+<p>WebSockets validam via query parameter: <code>ws://host/ws/streaming?token=&lt;api_key&gt;</code></p>
+<hr />
+<h2 id="endpoints-rest-api">Endpoints REST API<a class="headerlink" href="#endpoints-rest-api" title="Permanent link">&para;</a></h2>
+<h3 id="sistema-interface">Sistema &amp; Interface<a class="headerlink" href="#sistema-interface" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>GET /</code> — Serve a Dashboard Web UI (Glassmorphic)</li>
+<li><code>GET /dashboard</code> — Serve a Dashboard Web UI</li>
+<li><code>GET /health</code> — Verifica status da API</li>
+</ul>
+<h3 id="execucoes-apiv1runs-canonico-apiruns-alias-legado">Execuções (<code>/api/v1/runs</code> — canônico; <code>/api/runs</code> — alias legado)<a class="headerlink" href="#execucoes-apiv1runs-canonico-apiruns-alias-legado" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><strong>Padrão M-18</strong>: cada rota canônica <code>/api/v1/runs/...</code> tem um alias legado <code>/api/runs/...</code> (mesma implementação, header <code>X-Legacy</code>). Os exemplos abaixo usam o prefixo legado por compatibilidade.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Método</th>
+<th>Endpoint</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/runs</code></td>
+<td>Cria nova execução (<code>queued</code>) e dispara pipeline em background</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/runs</code></td>
+<td>Lista execuções com paginação (<code>?skip=0&amp;limit=20</code>, máx. 100)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/runs/queue</code></td>
+<td>Estado da fila E3 (runs ativas + FIFO de <code>queued</code>)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/runs/{id}</code></td>
+<td>Retorna detalhes de uma execução (inclui <code>degraded</code>)</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>/api/v1/runs/{id}</code></td>
+<td>Atualiza status/campos da execução</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/v1/runs/{id}</code></td>
+<td>Remove registro da execução</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/runs/{id}/execute</code></td>
+<td>Dispara execução assíncrona em background</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/runs/{id}/resume</code></td>
+<td>Retoma execução de checkpoint</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/runs/{id}/cost</code></td>
+<td>Custo estimado por nó da run (tabela <code>llm_costs</code>)</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/runs/{id}/cost/override</code></td>
+<td>Override de budget para a run</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Exemplo de criação de run:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/runs<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"X-API-Key: my-key"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"idea": "API REST em Java", "stack": "java", "routing_mode": "full"}'</span>
+</code></pre></div></p>
+<p><strong>Resposta:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"uuid"</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"idea"</span><span class="p">:</span><span class="w"> </span><span class="s2">"API REST em Java"</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"stack"</span><span class="p">:</span><span class="w"> </span><span class="s2">"java"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"queued"</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">"current_node"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">"logs"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">"duration_seconds"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">"created_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2025-01-01T00:00:00"</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">"updated_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2025-01-01T00:00:00"</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">}</span>
+</code></pre></div></p>
+<h3 id="human-in-the-loop-apirunsiddecide">Human-in-the-Loop (<code>/api/runs/{id}/decide</code>)<a class="headerlink" href="#human-in-the-loop-apirunsiddecide" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Método</th>
+<th>Endpoint</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/v1/runs/{id}/decide</code></td>
+<td>Registra decisão humana (approve/retry/adjust_prompt/adjust_state/abort)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/v1/runs/{id}/decisions</code></td>
+<td>Lista histórico de decisões HITL</td>
+</tr>
+</tbody>
+</table>
+<p>O payload aceita <code>gate_node</code>, <code>action</code>, <code>feedback_category</code> (bug/style/missing_feature/general), <code>feedback_message</code> e <code>state_patch</code> (dict aplicado ao checkpoint quando <code>action=adjust_state</code>).</p>
+<p><strong>Exemplo de decisão HITL:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/runs/<span class="o">{</span>id<span class="o">}</span>/decide<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"gate_node": "developer", "action": "approve", "feedback_message": "LGTM"}'</span>
+</code></pre></div></p>
+<h3 id="trilogia-agentic">Trilogia Agentic<a class="headerlink" href="#trilogia-agentic" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Método</th>
+<th>Endpoint</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/genome</code></td>
+<td>Metadados do Codebase Genome (AST, bus factor)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/registry</code></td>
+<td>Contratos de interface e breaking changes</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/retro</code></td>
+<td>Histórico de sessões e recomendações</td>
+</tr>
+</tbody>
+</table>
+<h3 id="routers-adicionais-apiv1-autenticados">Routers adicionais (<code>/api/v1/...</code>, autenticados)<a class="headerlink" href="#routers-adicionais-apiv1-autenticados" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Prefixo</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/v1/trajectories</code></td>
+<td>Checkpoints LangGraph: listar, diff, export, import, fork</td>
+</tr>
+<tr>
+<td><code>/api/v1/mcp</code></td>
+<td>Servidores MCP e execução de tools (<code>/servers</code>, <code>/servers/{name}/tools</code>)</td>
+</tr>
+<tr>
+<td><code>/api/v1/providers</code></td>
+<td>Provedores LLM configurados</td>
+</tr>
+<tr>
+<td><code>/api/v1/config</code></td>
+<td>Configuração de runtime</td>
+</tr>
+<tr>
+<td><code>/api/v1/memory</code></td>
+<td>CRUD de lessons (memória persistente)</td>
+</tr>
+<tr>
+<td><code>/api/v1/evals</code></td>
+<td>Avaliações/benchmarks</td>
+</tr>
+<tr>
+<td><code>/api/v1/git</code></td>
+<td>Operações git (checkpoint, PR, sandbox)</td>
+</tr>
+<tr>
+<td><code>/api/v1/prompts</code></td>
+<td>Prompts registrados</td>
+</tr>
+<tr>
+<td><code>/api/v1/artifacts</code></td>
+<td>Artefatos gerados</td>
+</tr>
+<tr>
+<td><code>/api/v1/terminal</code></td>
+<td>Terminal remoto</td>
+</tr>
+<tr>
+<td><code>/api/v1/ast</code></td>
+<td>Análise AST de codebases</td>
+</tr>
+<tr>
+<td><code>/api/v1/coverage</code></td>
+<td>Relatórios de cobertura</td>
+</tr>
+<tr>
+<td><code>/api/v1/docker</code></td>
+<td>Geração de Dockerfile/CI</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="cors">CORS<a class="headerlink" href="#cors" title="Permanent link">&para;</a></h2>
+<p>Configurado via <code>CORSMiddleware</code> com permissão total:
+- <code>allow_origins=["*"]</code>, <code>allow_methods=["*"]</code>, <code>allow_headers=["*"]</code>
+- Custom header: <code>X-Process-Time</code> com duração do request</p>
+<hr />
+<h2 id="websockets-streaming">WebSockets Streaming<a class="headerlink" href="#websockets-streaming" title="Permanent link">&para;</a></h2>
+<h3 id="conexoes">Conexões<a class="headerlink" href="#conexoes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>WS /ws/streaming</code> — Stream global de eventos de pipeline</li>
+<li><code>WS /ws/runs/{run_id}</code> — Canal dedicado por run</li>
+</ul>
+<h3 id="eventos-emitidos-broadcast">Eventos emitidos (broadcast)<a class="headerlink" href="#eventos-emitidos-broadcast" title="Permanent link">&para;</a></h3>
+<p>Envelope: <code>{seq, event, run_id, timestamp, payload}</code> (journal persistido na tabela <code>events</code> de <code>telemetry.sqlite</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Evento</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>connected</code></td>
+<td>Confirmação de conexão</td>
+</tr>
+<tr>
+<td><code>run_created</code></td>
+<td>Nova run criada</td>
+</tr>
+<tr>
+<td><code>run_updated</code></td>
+<td>Atualização de run</td>
+</tr>
+<tr>
+<td><code>pipeline_started</code></td>
+<td>Pipeline iniciou execução</td>
+</tr>
+<tr>
+<td><code>node_execution</code></td>
+<td>Nó iniciou/finalizou execução</td>
+</tr>
+<tr>
+<td><code>pipeline_finished</code></td>
+<td>Pipeline concluída (com status e duração)</td>
+</tr>
+<tr>
+<td><code>pipeline_failed</code></td>
+<td>Pipeline falhou</td>
+</tr>
+<tr>
+<td><code>pipeline_error</code></td>
+<td>Erro na execução</td>
+</tr>
+<tr>
+<td><code>pipeline_resumed</code></td>
+<td>Pipeline retomada de checkpoint</td>
+</tr>
+<tr>
+<td><code>hitl_gate_reached</code></td>
+<td>Gate HITL aguardando decisão</td>
+</tr>
+<tr>
+<td><code>human_decision_submitted</code></td>
+<td>Decisão HITL registrada</td>
+</tr>
+<tr>
+<td><code>human_decision_expired</code></td>
+<td>Decisão HITL expirou (timeout)</td>
+</tr>
+<tr>
+<td><code>token_delta</code></td>
+<td>Stream de tokens do LLM</td>
+</tr>
+<tr>
+<td><code>circuit_breaker_changed</code></td>
+<td>Estado do CircuitBreaker mudou</td>
+</tr>
+</tbody>
+</table>
+<h3 id="heartbeat">Heartbeat<a class="headerlink" href="#heartbeat" title="Permanent link">&para;</a></h3>
+<p>O cliente pode enviar <code>{"type": "ping"}</code> para receber <code>{"type": "pong"}</code> como keep-alive.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

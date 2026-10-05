@@ -1,0 +1,1199 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Autonomous Agent Governance and Pipeline Orchestrator">
+      
+      
+        <meta name="author" content="LoopForge Team">
+      
+      
+      
+        <link rel="prev" href="../getting-started/">
+      
+      
+        <link rel="next" href="../configuration/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Architecture & 9-Agent Pipeline - LoopForge v6 Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#loopforge-v6-architecture-technical-specifications" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="LoopForge v6 Documentation" class="md-header__button md-logo" aria-label="LoopForge v6 Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LoopForge v6 Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture & 9-Agent Pipeline
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Lucas-Damasceno-dev/LoopForge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture & 9-Agent Pipeline
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  REST & WebSockets API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPENCODE_CONTRACT/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  OpenCode Contract
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="LoopForge v6 Documentation" class="md-nav__button md-logo" aria-label="LoopForge v6 Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LoopForge v6 Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Lucas-Damasceno-dev/LoopForge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & 9-Agent Pipeline
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & 9-Agent Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fluxo-de-dados-e-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fluxo de Dados e Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fluxo de Dados e Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagrama-mermaid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrama Mermaid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-logic-should_retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry Logic (should_retry)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sub-pacotes-do-ecossistema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sub-pacotes do Ecossistema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisoes-de-design-principais" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisões de Design Principais
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#routing-modes-adaptativos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Routing Modes Adaptativos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#human-in-the-loop-hitl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human-in-the-Loop (HITL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guardrails-circuit-breaker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guardrails &amp; Circuit Breaker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memoria-persistente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memória Persistente
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#autenticacao-da-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autenticação da API
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST & WebSockets API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPENCODE_CONTRACT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenCode Contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fluxo-de-dados-e-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fluxo de Dados e Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fluxo de Dados e Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagrama-mermaid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrama Mermaid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-logic-should_retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retry Logic (should_retry)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sub-pacotes-do-ecossistema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sub-pacotes do Ecossistema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisoes-de-design-principais" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisões de Design Principais
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#routing-modes-adaptativos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Routing Modes Adaptativos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#human-in-the-loop-hitl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Human-in-the-Loop (HITL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guardrails-circuit-breaker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guardrails &amp; Circuit Breaker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memoria-persistente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memória Persistente
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#autenticacao-da-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autenticação da API
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="loopforge-v6-architecture-technical-specifications">LoopForge v6 — Architecture &amp; Technical Specifications<a class="headerlink" href="#loopforge-v6-architecture-technical-specifications" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>LoopForge é um orquestrador autônomo de governança de agentes de IA construído em Python 3.11+ utilizando <strong>LangGraph</strong> para orquestração de workflow com estado (<code>GraphState</code>), <strong>Pydantic v2</strong> para validação estrita de dados, <strong>FastAPI</strong> para API REST e WebSockets, e o harness <strong>OpenCode</strong> para execução e LLM routing.</p>
+<hr />
+<h2 id="module-map">Module Map<a class="headerlink" href="#module-map" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>src/lf/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── api/              # Servidor FastAPI REST, WebSockets e templates HTML
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   ├── app.py        # Endpoints /api/v1/runs, /ws/streaming, background workers
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── auth.py       # Autenticação via HTTP Basic e X-API-Key
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── websocket_manager.py # Gerenciador de conexões WebSocket (broadcast)
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   └── schemas.py    # Schemas Pydantic de request/response
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── cli/              # Interface CLI Click (17 commandos)
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│   ├── commands/     # run, serve, benchmark, resume, diff, explore, pr,
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│   │                 # init, plan, status, release, completion, generate-tests,
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   │                 # audit, export, studio, clean
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│   └── main.py       # Registro centralizado de comandos core
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>├── config/           # Pydantic v2 schemas (LoopForgeConfig, TaskSchema, TechStack)
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   ├── schema.py     # Modelos Pydantic v2 com validação
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   ├── registry.py   # TechStackRegistry com 5 handlers (Python, Java, Rust, Go, JS/TS)
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   └── loader.py     # load_config() JSON/YAML
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>├── pipeline/         # LangGraph StateGraph, nodes, state
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   ├── graph.py      # build_graph(), entry_router(), should_retry(), NodeRegistry
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│   ├── state.py      # GraphState TypedDict (48 campos: 32 obrigatórios + 16 NotRequired)
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│   ├── llm_factory.py# SQLiteLLMCache, compressão de prompt, call_openrouter_api
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│   └── nodes/        # 9 nós dos agentes
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│       ├── cpo.py            # → PM
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│       ├── pm.py             # → Tech Lead
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│       ├── tech_lead.py      # → Test Writer (decisão dinâmica de stack)
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│       ├── test_writer.py    # → Developer (gera testes-contrato + inventário MODULES)
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│       ├── developer.py      # → QA (geração multi-arquivo)
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│       ├── qa.py             # → Parallel Audit (detecção automática de manifestos)
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│       ├── parallel_audit.py # → AppSec + DevOps em paralelo via ThreadPoolExecutor
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│       ├── appsec.py         # Scanner de segurança estático e auditoria LLM
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│       ├── devops.py         # Análise de deployabilidade e CI/CD
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│       └── lessons.py        # Função generate_lessons_md (NÃO é nó) — executada dentro do parallel_audit
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>├── orchestrator/     # Despacho de tarefas e criação de planos
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│   ├── task_dispatcher.py # dispatch(), resume(), HITL handler, checkpoints SQLite
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│   └── plan_creator.py    # Converte visão em TaskSchema[]
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>├── guardrails/       # Proteções de pipeline
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│   ├── circuit_breaker.py # 3 guardas: falhas, iterações, custo máximo USD
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>│   └── security_scanner.py# Varredura estática de segurança
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>├── memory/           # Memória persistente
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>│   └── manager.py    # MemoryManager (lições aprendidas, handoff context)
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>├── telemetry/        # Telemetria SQLite e benchmark ELO rating system
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>│   ├── store.py            # Armazenamento de telemetria
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>│   ├── analytics.py        # Análise de métricas
+<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>│   ├── benchmark.py        # BenchmarkSuite com cálculo ELO
+<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>│   └── benchmark_dataset.py# 10 problemas curados multi-stack
+<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>└── runner/           # Subprocesso OpenCode, git runner e test harness
+<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>    ├── opencode/     # OpenCodeRunner (script -q -c, timeout default 300s configurável)
+<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    ├── harness/      # TestHarnessRunner (auto-detecção de manifestos)
+<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    └── git/          # checkpoint.py, pr.py, sandbox.py (worktrees)
+</code></pre></div>
+<hr />
+<h2 id="fluxo-de-dados-e-pipeline">Fluxo de Dados e Pipeline<a class="headerlink" href="#fluxo-de-dados-e-pipeline" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>lf run --idea "..."
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>       ↓
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>TaskDispatcher → initial_state (stack=None)
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>       ↓
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>build_graph() → StateGraph.invoke()
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>       ↓
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>CPO → PM → Tech Lead (decide stack) → Test Writer (gera testes-contrato) → Developer (gera multi-arquivos)
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>       ↓
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>QA (detecta &amp; testa) → Parallel Audit (AppSec + DevOps; gera lessons.md + PROJECT_SUMMARY.md)
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>       ↓
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>FINISH / PR (gh pr create)
+</code></pre></div>
+<h3 id="diagrama-mermaid">Diagrama Mermaid<a class="headerlink" href="#diagrama-mermaid" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>graph TD
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    CPO[1. CPO Node] --&gt; PM[2. Product Manager Node]
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    PM --&gt; TL[3. Tech Lead Node]
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    TL --&gt; TW[4. Test Writer Node]
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    TW --&gt; DEV[5. Developer Node]
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    DEV --&gt; QA[6. QA Node]
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    QA --&gt;|PASS| PARALLEL[7. Parallel Audit Node]
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    QA --&gt;|FAIL &amp; Retries Left| DEV
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    QA --&gt;|FAIL &amp; Exhausted| END((FINISH))
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    PARALLEL --&gt; AppSec[AppSec Review]
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    PARALLEL --&gt; DevOps[DevOps Analysis]
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    AppSec --&gt;|CRÍTICA/ALTA| DEV
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    PARALLEL --&gt; END
+</code></pre></div>
+<p>Nota: o gerador de lições (<code>generate_lessons_md</code>) <strong>não é um nó</strong> — é uma função executada dentro do nó <code>parallel_audit</code>, produzindo <code>lessons.md</code> e <code>PROJECT_SUMMARY.md</code>.</p>
+<h3 id="retry-logic-should_retry">Retry Logic (<code>should_retry</code>)<a class="headerlink" href="#retry-logic-should_retry" title="Permanent link">&para;</a></h3>
+<p>Após o nó QA (<code>should_retry</code>, <code>graph.py:64</code>):</p>
+<ul>
+<li><strong>PASS</strong> (0 testes falhos) → prossegue para <code>parallel_audit</code></li>
+<li><strong>FAIL</strong> com retries restantes (<code>qa_attempt_count &lt; max_retries</code>) → retorna ao <code>developer</code></li>
+<li><strong>FAIL</strong> esgotado → <code>parallel_audit</code> mesmo assim, com o erro registrado <strong>dentro do nó</strong> (arestas condicionais não propagam mutação de estado)</li>
+<li><strong>AppSec com severidade CRÍTICA/ALTA</strong> → <code>developer</code> novamente via aresta <code>parallel_audit: {developer, __end__}</code> (<code>graph.py:152</code>)</li>
+</ul>
+<p>Modo <strong>incremental</strong> (<code>incremental_slices=true</code>, v7 5.1): slice <code>passed</code> → <code>test_writer</code> (contrato do próximo slice; <code>parallel_audit</code> se for o último); slice <code>failed</code> com tentativas &lt; <code>slice_max_retries</code> → <code>developer</code> (retry do mesmo slice); esgotado → <code>parallel_audit</code> (auditoria final + lições).</p>
+<hr />
+<h2 id="sub-pacotes-do-ecossistema">Sub-pacotes do Ecossistema<a class="headerlink" href="#sub-pacotes-do-ecossistema" title="Permanent link">&para;</a></h2>
+<p>Além do core <code>src/lf/</code>, o LoopForge inclui três pacotes independentes em <code>packages/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Pacote</th>
+<th>CLI</th>
+<th>Função</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Genome</strong></td>
+<td><code>genome</code></td>
+<td>Codebase Genome — escaneia estrutura de diretórios, AST, métricas de dependência e calcula bus factor. Endpoint: <code>GET /api/genome</code></td>
+</tr>
+<tr>
+<td><strong>Registry</strong></td>
+<td><code>registry</code></td>
+<td>Agentic Interface Registry — rastreia contratos de interface entre agentes e detecta breaking changes. Endpoint: <code>GET /api/registry</code></td>
+</tr>
+<tr>
+<td><strong>Retro</strong></td>
+<td><code>retro</code></td>
+<td>Agentic Retro — síntese pós-sessão, extração de causas-raiz e recomendações de melhoria. Endpoint: <code>GET /api/retro</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="decisoes-de-design-principais">Decisões de Design Principais<a class="headerlink" href="#decisoes-de-design-principais" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Decisão Dinâmica de Stack</strong>: O Tech Lead analisa os requisitos e grava a melhor stack em <code>state["stack"]</code>. Se o usuário fornecer <code>--stack</code>, esta é usada como override.</li>
+<li><strong>Roteamento Centralizado no Grafo</strong>: Arcos e transições definidos estritamente em <code>graph.py</code>.</li>
+<li><strong>Detecção Automática do QA</strong>: Reconhecimento agnóstico de manifestos e executores (<code>pom.xml</code>/<code>mvnw</code>, <code>Cargo.toml</code>, <code>go.mod</code>, <code>package.json</code>/<code>vitest.config</code>, <code>build.gradle</code>/<code>gradlew</code>, <code>pyproject.toml</code> com <code>[tool.pytest.ini_options]</code>/<code>pytest.ini</code>).</li>
+<li><strong>Auditoria Simultânea Paralela</strong>: Nó <code>parallel_audit</code> executa <code>AppSec</code> e <code>DevOps</code> simultaneamente via <code>ThreadPoolExecutor</code> para otimização de tempo.</li>
+<li><strong>Isolamento de Sessão de Banco de Dados</strong>: Trabalhadores assíncronos no FastAPI utilizam <code>session_factory()</code> próprio em corrotina background para evitar conflitos de concorrencia.</li>
+<li><strong>Cache Semântico e Compressão LLM</strong>: Redução de custo via deduplicação de prompts e armazenamento local SQLite.</li>
+</ul>
+<hr />
+<h2 id="routing-modes-adaptativos">Routing Modes Adaptativos<a class="headerlink" href="#routing-modes-adaptativos" title="Permanent link">&para;</a></h2>
+<p>O <code>entry_router</code> em <code>graph.py:25</code> avalia <code>routing_mode</code> e <code>task_type</code> para decidir o ponto de entrada:</p>
+<table>
+<thead>
+<tr>
+<th>Modo</th>
+<th>Entrada</th>
+<th>Gatilho</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>full</code></td>
+<td>CPO → PM → Tech Lead → Dev → QA → Audit</td>
+<td><code>routing_mode="full"</code> (default)</td>
+</tr>
+<tr>
+<td><code>fast</code> / <code>patch</code></td>
+<td>Developer → QA → Audit</td>
+<td><code>task_type="bugfix"/"refactor"/"simple"</code></td>
+</tr>
+<tr>
+<td><code>review-only</code></td>
+<td>QA → Parallel Audit</td>
+<td><code>task_type="review"</code></td>
+</tr>
+<tr>
+<td><code>explore</code></td>
+<td>Tech Lead (spike)</td>
+<td><code>routing_mode="explore"</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="human-in-the-loop-hitl">Human-in-the-Loop (HITL)<a class="headerlink" href="#human-in-the-loop-hitl" title="Permanent link">&para;</a></h2>
+<p>Ativado via <code>--interactive</code>/<code>-i</code>. O <code>TaskDispatcher</code> habilita <code>human_gate_enabled=True</code> no <code>build_graph()</code>, que insere <code>NodeInterrupt</code> nos nós <code>developer</code>, <code>qa</code> e <code>parallel_audit</code>.</p>
+<p>Ações disponíveis via <code>POST /api/runs/{id}/decide</code>:
+- <code>approve</code> — prossegue com o resultado atual
+- <code>retry</code> — reexecuta o nó
+- <code>adjust_prompt</code> — ajusta o prompt e reexecuta (com <code>feedback_category</code> e <code>feedback_message</code>)
+- <code>adjust_state</code> — aplica <code>state_patch</code> (dict) ao checkpoint da run
+- <code>continue</code> / <code>pause</code> — segue / suspende a execução
+- <code>abort</code> — encerra a pipeline</p>
+<p>Timeout padrão: <strong>300s</strong>, configurável via <code>ade.yaml</code> (<code>hitl.timeout_seconds</code>). Comportamento em timeout configurável via <code>ade.yaml</code> (<code>hitl.on_timeout</code>: <code>continue</code> (default) | <code>abort</code> | <code>pause</code>) — <code>task_dispatcher.py:109-120</code>.</p>
+<p>Decisões registradas em <code>.loopforge/telemetry.sqlite</code> (tabela <code>human_decisions</code>).</p>
+<hr />
+<h2 id="guardrails-circuit-breaker">Guardrails &amp; Circuit Breaker<a class="headerlink" href="#guardrails-circuit-breaker" title="Permanent link">&para;</a></h2>
+<p>Três guardas no <code>CircuitBreaker</code> (<code>guardrails/circuit_breaker.py</code>):</p>
+<ol>
+<li><strong>Falhas Consecutivas</strong>: Máximo de 5 falhas seguidas antes de abrir o circuito</li>
+<li><strong>Iterações Máximas</strong>: Limite de 20 chamadas totais</li>
+<li><strong>Custo Máximo USD</strong>: Gate por <code>max_total_cost</code> (default efetivo: $10.00, fonte única <code>budget.max_usd</code> em <code>.loopforge/ade.yaml</code> via <code>load_budget_usd</code> — o <code>budget_limit_usd</code> do <code>.loopforge.json</code> é legado)</li>
+</ol>
+<p>Estados: <code>closed</code> (ok) → <code>open</code> (bloqueado) → <code>half-open</code> (tentativa de recuperação após 300s).</p>
+<p>Integrado ao <code>OpenCodeRunner.run()</code> e ao <code>TaskDispatcher.dispatch()</code> — verifica <code>can_proceed()</code> antes de cada execução.</p>
+<hr />
+<h2 id="memoria-persistente">Memória Persistente<a class="headerlink" href="#memoria-persistente" title="Permanent link">&para;</a></h2>
+<p><code>MemoryManager</code> (<code>memory/manager.py</code>) armazena lições aprendidas (lessons) em <code>.loopforge/telemetry.sqlite</code> (default <code>TELEMETRY_DB_PATH</code>):</p>
+<ul>
+<li>Tabela: <code>lessons(id, run_id, stack, idea, lesson_text, created_at)</code></li>
+<li>Indexado por <code>stack</code> para busca eficiente</li>
+<li><code>search_relevant_lessons(query, stack, cross_project=...)</code> retorna top 3 por relevância (keyword scoring)</li>
+<li><code>cross_project_enabled()</code> (<code>manager.py:17</code>) controla busca global entre projetos; quando ativo, <code>cross_project=True</code> ignora o filtro de stack</li>
+<li>Conteúdo injetado em prompts de novos runs via <code>format_lessons_for_prompt()</code></li>
+</ul>
+<hr />
+<h2 id="autenticacao-da-api">Autenticação da API<a class="headerlink" href="#autenticacao-da-api" title="Permanent link">&para;</a></h2>
+<p>A API REST suporta dois métodos de autenticação via <code>auth.py</code>:</p>
+<ul>
+<li><strong>X-API-Key</strong>: Header <code>X-API-Key</code> (configurado em <code>APISettings.api_key</code>)</li>
+<li><strong>HTTP Basic</strong>: Username ou password como chave de API</li>
+</ul>
+<p>Ativada apenas quando <code>require_auth=True</code> ou <code>api_key</code> está definida nas settings. WebSockets validam token via query parameter <code>?token=</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

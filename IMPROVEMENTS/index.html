@@ -1,0 +1,861 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Autonomous Agent Governance and Pipeline Orchestrator">
+      
+      
+        <meta name="author" content="LoopForge Team">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Sugestões de Melhorias (após 2 runs reais) - LoopForge v6 Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="cyan" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sugestoes-de-melhorias-apos-2-runs-reais" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="LoopForge v6 Documentation" class="md-header__button md-logo" aria-label="LoopForge v6 Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LoopForge v6 Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Sugestões de Melhorias (após 2 runs reais)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Lucas-Damasceno-dev/LoopForge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../ARCHITECTURE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture & 9-Agent Pipeline
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../cli-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  REST & WebSockets API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPENCODE_CONTRACT/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  OpenCode Contract
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="LoopForge v6 Documentation" class="md-nav__button md-logo" aria-label="LoopForge v6 Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LoopForge v6 Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Lucas-Damasceno-dev/LoopForge" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & 9-Agent Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST & WebSockets API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPENCODE_CONTRACT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenCode Contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#bugs-observados-criticos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bugs observados (críticos)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bugs observados (críticos)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#p0-1-parser-do-harness-nao-detecta-erros-de-coleta-do-pytest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P0-1 — Parser do harness não detecta erros de coleta do pytest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p0-2-naming-contract-testwriterdeveloper-quebrado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P0-2 — Naming contract TestWriter↔Developer quebrado
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-3-feedback-de-falha-do-harness-nao-carrega-o-erro-real-pro-developer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P1-3 — Feedback de falha do harness não carrega o erro real pro Developer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p1-4-contaminacao-cross-run-no-workdir-compartilhado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P1-4 — Contaminação cross-run no workdir compartilhado
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#p2-5-timeout-default-insuficiente-para-modelos-de-reasoning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        P2-5 — Timeout default insuficiente para modelos de reasoning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oportunidades-validadas-nos-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oportunidades (validadas nos runs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experiencia-de-uso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiência de uso
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pendencias-reais-verificadas-em-2026-08-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pendências reais (verificadas em 2026-08-12)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priorizacao-sugerida" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priorização sugerida
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="sugestoes-de-melhorias-apos-2-runs-reais">Sugestões de Melhorias (após 2 runs reais)<a class="headerlink" href="#sugestoes-de-melhorias-apos-2-runs-reais" title="Permanent link">&para;</a></h1>
+<p><strong>Data</strong>: 2026-08-01
+<strong>Última auditoria</strong>: 2026-08-12 (todos os itens verificados no código real)
+<strong>Base</strong>: runs reais <code>examples/imp-valid</code> (Java/Spring, <code>--advanced</code>) e <code>examples/expense-split</code> (Python/FastAPI, <code>--advanced</code>) executados via OmniRoute local com modelo <code>oc/deepseek-v4-flash-free</code>.</p>
+<hr />
+<h2 id="bugs-observados-criticos">Bugs observados (críticos)<a class="headerlink" href="#bugs-observados-criticos" title="Permanent link">&para;</a></h2>
+<h3 id="p0-1-parser-do-harness-nao-detecta-erros-de-coleta-do-pytest">P0-1 — Parser do harness não detecta erros de coleta do pytest<a class="headerlink" href="#p0-1-parser-do-harness-nao-detecta-erros-de-coleta-do-pytest" title="Permanent link">&para;</a></h3>
+<p><strong>✅ FIXADO (auditoria 2026-08-12)</strong> — <code>src/lf/runner/harness/parser.py</code> agora:</p>
+<ul>
+<li><code>_find_exception_line</code> (parser.py:19-34) captura a 1ª linha de exceção (ex.: <code>ModuleNotFoundError</code>) logo abaixo do bloco <code>ERROR</code>.</li>
+<li><code>_extract_collection_errors</code> (parser.py:37-61) aplica regex nas linhas <code>ERROR ... .py</code> com mensagem inline opcional, deduplica por módulo (1ª mensagem vence) e trunca em 200 chars.</li>
+<li>Bloco 6 (parser.py:122-131): cada erro de coleta conta como falha (<code>failed += summary_errors</code>; <code>failed = max(failed, len(errors))</code>). Nunca retorna <code>passed=0, failed=0</code> quando existem erros. Erros Maven são descontados para evitar dupla contagem com o bloco 4 (parser.py:127).</li>
+</ul>
+<p>Sintoma original: <code>src/lf/runner/harness/parser.py</code> (54 linhas) só aplicava regex de <code>(\d+) passed</code> (linha 10) e <code>(\d+) failed</code> (linha 14), além dos formatos go/cargo/maven. Não lia <code>N errors during collection</code> nem as linhas <code>ERROR tests/...</code> do pytest. Quando a coleta falhava, o parse retornava <code>passed=0, failed=0</code> e <code>success=False</code>, escondendo a falha real por trás de um ImportError de coleta.</p>
+<hr />
+<h3 id="p0-2-naming-contract-testwriterdeveloper-quebrado">P0-2 — Naming contract TestWriter↔Developer quebrado<a class="headerlink" href="#p0-2-naming-contract-testwriterdeveloper-quebrado" title="Permanent link">&para;</a></h3>
+<p><strong>✅ FIXADO (auditoria 2026-08-12)</strong> — <code>src/lf/pipeline/nodes/test_writer.py:195</code> agora declara no <code>contract_tests</code> o inventário de módulos esperados via <code>### MODULES:</code> + <code>,</code>.join(modules)<code>. O QA valida o contrato no gate</code>qa.py:132-142<code>(procura</code>test_<em>.py<code>/</code></em>_test.py<code>em</code>tests/`), evitando ImportError por plural/singular.</p>
+<p>Sintoma original: no run <code>expense-split</code>, o TestWriter gerou testes-contrato importando <code>app.services.payment</code>, <code>notification</code> e <code>balance</code> (singular); o Developer gerou <code>payments.py</code>, <code>notifications.py</code> e <code>balances.py</code> (plural). Resultado: 3 ImportError na coleta do pytest. O run terminou com "QA retries exhausted" após 3 tentativas.</p>
+<hr />
+<h3 id="p1-3-feedback-de-falha-do-harness-nao-carrega-o-erro-real-pro-developer">P1-3 — Feedback de falha do harness não carrega o erro real pro Developer<a class="headerlink" href="#p1-3-feedback-de-falha-do-harness-nao-carrega-o-erro-real-pro-developer" title="Permanent link">&para;</a></h3>
+<p><strong>✅ FIXADO (auditoria 2026-08-12)</strong> — <code>src/lf/pipeline/nodes/qa.py</code> agora:</p>
+<ul>
+<li>Caso <code>no_tests_found</code> (qa.py:164-180): feedback inclui mensagem + <code>raw_output[-500:]</code> anexado.</li>
+<li>Caso erros reais (qa.py:183-213): feedback estruturado com <code>err_list[:3]</code>, <code>failed_tests_details</code> e <code>raw_output[-800:]</code>.</li>
+</ul>
+<p>Sintoma original: <code>qa.py:83-86</code> marcava <code>FAIL</code> quando <code>passed == 0</code>, mas o feedback que chegava ao Developer era a mensagem genérica de <code>qa.py:237</code>. O Developer recebia "Nenhum teste foi executado" em vez dos ImportError reais e <strong>regenerava a arquitetura do zero a cada retry</strong> (3 arquiteturas diferentes nas 3 tentativas do <code>expense-split</code>), nunca convergindo.</p>
+<hr />
+<h3 id="p1-4-contaminacao-cross-run-no-workdir-compartilhado">P1-4 — Contaminação cross-run no workdir compartilhado<a class="headerlink" href="#p1-4-contaminacao-cross-run-no-workdir-compartilhado" title="Permanent link">&para;</a></h3>
+<p><strong>✅ FIXADO (auditoria 2026-08-12)</strong> — <code>src/lf/orchestrator/task_dispatcher.py</code>:</p>
+<ul>
+<li><code>_task_dir_suffix</code> (task_dispatcher.py:50-55): id único por task (sufixo sanitizado com prefixo do projeto removido).</li>
+<li><code>output_dir</code> (task_dispatcher.py:169-175): <code>/tmp/loopforge/{project_id}/{suffix}</code> — workdir único por task, eliminando contaminação cross-run.</li>
+<li><code>_cleanup_stale_project_dirs</code> (developer.py:777) ampliado: remove <code>target/</code>, <code>build/</code>, <code>dist/</code>, <code>test_reports/</code>, <code>.pytest_cache/</code>, <code>htmlcov/</code> além de <code>cmd/internal/src/pkg/migrations</code>. <code>.venv/</code> e <code>node_modules/</code> são preservados. Proteção dogfooding (developer.py:802, 835): nunca limpa o repo LoopForge ou diretórios dentro dele.</li>
+</ul>
+<p>Sintoma original: <code>/tmp/loopforge/loopforge_project</code> acumulava <code>pom.xml</code>, <code>target/</code> e <code>test_reports/</code> do run Java dentro do projeto Python novo. <code>_cleanup_stale_project_dirs</code> (developer.py:461, definida em <code>developer.py:550</code>) só removia <code>{"cmd", "internal", "src", "pkg", "migrations"}</code> (linha 556).</p>
+<hr />
+<h3 id="p2-5-timeout-default-insuficiente-para-modelos-de-reasoning">P2-5 — Timeout default insuficiente para modelos de reasoning<a class="headerlink" href="#p2-5-timeout-default-insuficiente-para-modelos-de-reasoning" title="Permanent link">&para;</a></h3>
+<p><strong>✅ FIXADO (auditoria 2026-08-12)</strong> — <code>src/lf/pipeline/llm_factory.py</code>:</p>
+<ul>
+<li><code>DEFAULT_LLM_TIMEOUT = 300.0</code> (llm_factory.py:31), <code>REASONING_TIMEOUT = 600.0</code> (:33).</li>
+<li><code>_is_reasoning_model</code> (:41-44) detecta modelos reasoning via <code>_REASONING_MODEL_MARKERS</code> (:36-38: reasoner, reasoning, thinking, r1, o1, o3, deepseek-r, kimi, glm-4.5).</li>
+<li><code>_resolve_timeout</code> (:47-58): <strong>ENV &gt; reasoning &gt; default</strong>, nunca retorna <code>None</code>.</li>
+<li>Backoff preservado: <code>timeout_val = base_timeout * (1.0 + attempt * 0.5)</code> (:116).</li>
+<li>Complementar: <code>subprocess_timeout_seconds</code> configurável via <code>ade.yaml runner.subprocess_timeout_seconds</code> (task_dispatcher.py:119-127), antes hardcoded em 120s.</li>
+</ul>
+<p>Sintoma original: <code>OPENROUTER_TIMEOUT</code> default era <code>120s</code> (<code>src/lf/pipeline/llm_factory.py:59</code>). Prompts grandes do pipeline full + modelo de reasoning estouravam os 120s.</p>
+<hr />
+<h2 id="oportunidades-validadas-nos-runs">Oportunidades (validadas nos runs)<a class="headerlink" href="#oportunidades-validadas-nos-runs" title="Permanent link">&para;</a></h2>
+<p>Melhorias que <strong>funcionaram</strong> e merecem destaque:</p>
+<ul>
+<li><strong>TestWriter gerando contrato real</strong>: 8 arquivos de testes-contrato no <code>expense-split</code>.</li>
+<li><strong>Gates Q9 (cobertura de critérios) e R2 (contrato de testes)</strong> presentes em <code>qa.py</code> (101-107 e 132-142).</li>
+<li><strong>Retry QA→Developer</strong> com <code>attempt_count</code> e <code>feedback_history</code> acumulando entre tentativas.</li>
+<li><strong>Arquitetura gerada pelo Developer surpreendentemente boa</strong>: hexagonal no <code>imp-valid</code> (Java), em camadas no <code>expense-split</code> (models/repositories/services/schemas/api/migrations).</li>
+<li><strong><code>_extract_failing_snippets</code> (Q10)</strong> para enriquecer retries com trechos reais de erro.</li>
+</ul>
+<hr />
+<h2 id="experiencia-de-uso">Experiência de uso<a class="headerlink" href="#experiencia-de-uso" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Runs full <code>--advanced</code> com modelo de reasoning: <strong>minutos por nó</strong> — não matar o processo; ajustar <code>OPENROUTER_TIMEOUT</code> ou <code>ade.yaml runner.subprocess_timeout_seconds</code> se houver timeout.</li>
+<li><strong>Fast mode</strong> recomendado para bugfix/refactor (<code>--stack &lt;lang&gt;</code> com routing fast).</li>
+<li><strong>Mock mode</strong> para testar o fluxo do pipeline sem custo/latência.</li>
+<li>Documentar a expectativa de latência no guia de execução real.</li>
+</ul>
+<hr />
+<h2 id="pendencias-reais-verificadas-em-2026-08-12">Pendências reais (verificadas em 2026-08-12)<a class="headerlink" href="#pendencias-reais-verificadas-em-2026-08-12" title="Permanent link">&para;</a></h2>
+<p>Itens que ainda NÃO estão implementados (detalhes no <code>ROADMAP_CHECKLIST.md</code>):</p>
+<ol>
+<li><strong>Worktree Sandbox isolado (4.1, parcial)</strong>: <code>WorktreeSandbox</code> existe em <code>src/lf/runner/git/sandbox.py</code>, mas não é referenciado pelo <code>TaskDispatcher</code> nem pela CLI — falta wiring no <code>dispatch()</code>.</li>
+<li><strong>Diff side-by-side no HITL (4.4, parcial)</strong>: <code>lf diff</code> standalone existe (<code>src/lf/cli/commands/diff.py:21,33,58</code>), mas não integrado ao <code>lf run -i</code>.</li>
+<li><strong>Entrega incremental por User Story (5.1)</strong>: nenhum trecho de slice incremental encontrado no código; topologia atual é whole-feature.</li>
+</ol>
+<hr />
+<h2 id="priorizacao-sugerida">Priorização sugerida<a class="headerlink" href="#priorizacao-sugerida" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>P0-1 e P0-2</strong> → <strong>Resolvidos.</strong></li>
+<li><strong>P1-3 e P1-4</strong> → <strong>Resolvidos.</strong></li>
+<li><strong>P2-5</strong> → <strong>Resolvido.</strong></li>
+<li><strong>Próximo ciclo</strong>: 4.1 (wire do worktree sandbox), 4.4 (diff no HITL), 5.1 (incremental slices).</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
